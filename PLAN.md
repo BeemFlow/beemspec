@@ -278,11 +278,44 @@ BeemSpec/
 
 Every MCP tool response includes behavioral prompts that guide the coding agent. This is the key value proposition.
 
+### Grid Layout Semantics
+
+The story map grid has semantic meaning that agents should understand:
+
+```
+                    ← HORIZONTAL = Journey Progression (dependencies) →
+
+    Task A         Task B         Task C         Task D
+    ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐
+    │ Login   │    │ Add     │    │ Upload  │    │ Share   │
+ ↑  │ Google  │    │ profile │    │ avatar  │    │ profile │
+ │  └─────────┘    │ details │    └─────────┘    └─────────┘
+ │  ┌─────────┐    └─────────┘
+ │  │ Login   │
+VERT│ Email   │    Stories to the RIGHT depend on stories to the LEFT
+ │  └─────────┘    (user must log in before adding profile details)
+ │  ┌─────────┐
+ │  │ Login   │    Stories STACKED VERTICALLY are alternatives/variations
+ ↓  │ SSO     │    (different ways to accomplish the same user action)
+    └─────────┘
+```
+
+**Agent behavior based on grid position:**
+- **Horizontal neighbors**: Earlier tasks (left) are prerequisites for later tasks (right)
+- **Vertical stacking**: Alternative implementations of the same user action
+- **Foundations**: If multiple stories imply a shared system (e.g., 3 login methods → auth system), agent should identify and build the foundation first
+
 ### Tools
 
 #### 1. `get_story_context`
 **Input**: `{ story_id: string }`
-**Returns**: Full story context + agent instructions
+**Returns**: Full story context **+ sibling stories in same release** + agent instructions
+
+Even when working on a single story, the agent receives:
+- The specific story details
+- All other stories in the same release (for context)
+- Grid position information (which task column, what's to the left/right)
+- Agent instructions that guide foundation-aware implementation
 
 ```typescript
 {
@@ -297,58 +330,81 @@ Every MCP tool response includes behavioral prompts that guide the coding agent.
     personas: [...],
     task: {
       name: "...",
-      activity: { name: "..." }  // Full hierarchy context
+      activity: { name: "..." }
     },
-    release: { name: "..." }
+    release: { name: "..." },
+    // Grid context
+    position: {
+      taskIndex: 2,           // 0-indexed position in journey
+      siblingStories: [...],  // Other stories in same task column (alternatives)
+      prerequisiteTasks: [...] // Tasks to the left that may need to be done first
+    }
+  },
+  releaseContext: {
+    // All stories in this release for big-picture understanding
+    stories: [...],
+    // Suggested implementation order based on dependencies
+    suggestedOrder: [...]
   },
   agent_instructions: `
 ## Before You Begin
 
-1. **Sweep the Codebase**: Before making any changes, thoroughly analyze the existing codebase structure, patterns, and conventions. Understand:
-   - Directory organization
-   - Naming conventions
-   - Code patterns and architectural decisions
-   - Existing utilities and helpers you should reuse
-   - Testing patterns
+1. **Analyze the Codebase**
+   Before making any changes, thoroughly analyze the existing codebase:
+   - Directory structure and organization patterns
+   - Naming conventions (files, functions, variables)
+   - Architectural patterns (how data flows, state management)
+   - Existing utilities and helpers to reuse
+   - Testing patterns and coverage expectations
 
-2. **Create PLAN.md**: Write a comprehensive implementation plan in PLAN.md at the repo root. Include:
-   - Overview of changes
-   - Files to be created/modified
+2. **Understand the Release Context**
+   Review the full release to understand:
+   - What foundational systems are implied (e.g., multiple login stories → auth system)
+   - Which stories to the LEFT in the journey must be completed first
+   - Which stories are ALTERNATIVES (stacked vertically) vs SEQUENTIAL (horizontal)
+   - Build foundations that support future stories, not just the current one
+
+3. **Create PLAN.md**
+   Write a comprehensive implementation plan in PLAN.md at the repo root:
+   - Summary of the feature/change
+   - **Prerequisites**: What foundations or prior work this depends on
+   - **Shared systems**: Infrastructure that benefits multiple stories
+   - Files to be created or modify
    - Step-by-step implementation approach
    - Potential risks or concerns
    - Testing strategy
 
    **STOP and wait for user approval before executing the plan.**
 
-3. **Maintain Consistency**: Your implementation must:
-   - Follow existing code organization patterns
-   - Use established naming conventions
-   - Reuse existing utilities rather than creating duplicates
-   - Match the code style of surrounding files
-
-4. **Implementation Standards**:
-   - Address all acceptance criteria
-   - Handle edge cases listed in the story
+4. **Implementation Standards**
+   - Follow existing code organization exactly
+   - Match surrounding code style
+   - Reuse existing utilities (don't reinvent)
+   - Handle all edge cases from the story
    - Follow technical guidelines if provided
-   - Write tests following existing test patterns
-
-## Story Context
-[Story details injected here]
+   - Write tests matching existing patterns
+   - **Build incrementally**: Ensure what you build supports future stories in the release
   `
 }
 ```
 
 #### 2. `get_release_context`
 **Input**: `{ release_id: string }`
-**Returns**: All stories in a release for broader context
+**Returns**: Complete release with all stories, grid layout, and suggested implementation order
+
+This is the primary tool for planning a full release. Returns:
+- All stories organized by task columns
+- Activity groupings
+- Suggested implementation order based on horizontal dependencies
+- Identified shared foundations (systems multiple stories need)
 
 #### 3. `update_story_status`
 **Input**: `{ story_id: string, status: 'backlog' | 'ready' | 'in_progress' | 'review' | 'done' }`
-**Returns**: Confirmation + next suggested actions
+**Returns**: Confirmation + next suggested story based on grid position
 
 #### 4. `list_ready_stories`
 **Input**: `{ story_map_id?: string, release_id?: string }`
-**Returns**: Stories with status 'ready' for implementation
+**Returns**: Stories with status 'ready', ordered by suggested implementation sequence
 
 ### MCP Configuration (for Claude Code)
 
@@ -536,6 +592,21 @@ The following prompts are embedded in MCP tool responses:
 
 ```typescript
 export const AGENT_INSTRUCTIONS = {
+  gridSemantics: `
+## Understanding the Story Map Grid
+
+The story map uses a grid layout with semantic meaning:
+
+- **HORIZONTAL (left → right)**: Journey progression. Stories to the LEFT are prerequisites
+  for stories to the RIGHT. A user must complete earlier steps before later ones.
+
+- **VERTICAL (stacked in same column)**: Alternative implementations of the same user action.
+  Multiple login methods (Google, Email, SSO) stacked vertically are ALTERNATIVES, not sequential.
+
+- **FOUNDATIONS**: When you see multiple stories that imply a shared system (e.g., 3 different
+  login methods), identify the foundational infrastructure needed (auth system) and build that first.
+`,
+
   beforeImplementation: `
 ## Before You Begin
 
@@ -547,18 +618,27 @@ export const AGENT_INSTRUCTIONS = {
    - Existing utilities and helpers to reuse
    - Testing patterns and coverage expectations
 
-2. **Create Implementation Plan**
+2. **Understand Release Context**
+   Even when implementing a single story:
+   - Review sibling stories in the same release
+   - Identify what foundational systems are implied by multiple stories
+   - Understand which tasks to the LEFT must be completed first
+   - Recognize vertically stacked stories as alternatives, not dependencies
+   - Build with future stories in mind—don't paint yourself into a corner
+
+3. **Create Implementation Plan**
    Create a PLAN.md file at the repository root with:
    - Summary of the feature/change
+   - **Prerequisites**: Foundational work this story depends on
+   - **Shared Infrastructure**: Systems that benefit multiple stories in the release
    - List of files to create or modify
    - Step-by-step implementation approach
-   - Dependencies or prerequisites
    - Potential risks or areas needing clarification
    - Testing strategy
 
    **IMPORTANT: Stop and wait for user approval before proceeding.**
 
-3. **Implementation Standards**
+4. **Implementation Standards**
    When implementing:
    - Follow existing code organization exactly
    - Match surrounding code style
@@ -566,6 +646,7 @@ export const AGENT_INSTRUCTIONS = {
    - Handle all edge cases from the story
    - Follow technical guidelines if provided
    - Write tests matching existing patterns
+   - **Build incrementally**: What you build should support future stories
 `,
 
   afterCompletion: `
@@ -574,12 +655,13 @@ export const AGENT_INSTRUCTIONS = {
 1. Verify all acceptance criteria are met
 2. Run existing tests to ensure no regressions
 3. Update story status via BeemSpec MCP
+4. Consider: Does this unblock any stories to the RIGHT in the journey?
 `,
 
   statusUpdatePrompt: (newStatus: string) => `
 Story status updated to "${newStatus}".
-${newStatus === 'in_progress' ? 'Remember to create PLAN.md before implementing.' : ''}
-${newStatus === 'done' ? 'Great work! Consider running tests to verify.' : ''}
+${newStatus === 'in_progress' ? 'Remember to review the release context and create PLAN.md before implementing.' : ''}
+${newStatus === 'done' ? 'Great work! Check if this unblocks stories to the right in the user journey.' : ''}
 `
 };
 ```
