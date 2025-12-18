@@ -13,7 +13,8 @@ BeemSpec is a context and prompt engine for coding agents, with a product manage
 | Component | Technology | Rationale |
 |-----------|------------|-----------|
 | Framework | Next.js 14+ (App Router) | Modern React, API routes, TypeScript |
-| Database | SQLite + better-sqlite3 | Simple, file-based, no server needed |
+| Database | PostgreSQL via Supabase | Hosted, scalable, real-time capable, multi-user ready |
+| ORM | Drizzle ORM | Type-safe, lightweight, great DX |
 | MCP Server | @modelcontextprotocol/sdk | Official SDK, runs as separate process |
 | Styling | Tailwind CSS + shadcn/ui | Rapid development, good defaults |
 | State | React hooks + fetch | Simple for MVP, no need for Redux/Zustand |
@@ -22,64 +23,111 @@ BeemSpec is a context and prompt engine for coding agents, with a product manage
 
 ## Data Model
 
+### Story Map Hierarchy
+
+Based on standard user story mapping structure:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PERSONAS        👤 👤 👤                    👤 👤 👤                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ ACTIVITIES      ┌─────────────────┐         ┌─────────────────┐             │
+│ (Journey        │ Onboarding      │         │ Account Setup   │   BACKBONE  │
+│  Phases)        │ Process         │         │                 │             │
+│                 └─────────────────┘         └─────────────────┘             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ TASKS           ┌───────┐┌───────┐┌───────┐ ┌───────┐┌───────┐              │
+│ (User           │Welcome││Profile││App    │ │Security│Payment│              │
+│  Actions)       │Message││Create ││Tour   │ │Settings│Setup  │              │
+│                 └───────┘└───────┘└───────┘ └───────┘└───────┘              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ STORIES         ┌───────┐┌───────┐┌───────┐ ┌───────┐┌───────┐              │
+│ (Implement-     │Display││Enter  ││Guide  │ │Set up ││Add    │   MVP        │
+│  ations)        │welcome││basic  ││through│ │password││payment│   ────────  │
+│                 │message││info   ││key    │ │       ││method │   RELEASE    │
+│                 └───────┘└───────┘└───────┘ └───────┘└───────┘   SLICES     │
+│                 ┌───────┐┌───────┐          ┌───────┐┌───────┐              │
+│                 │High-  ││Upload │          │Enable ││Review │   Release 2  │
+│                 │light  ││profile│          │2FA    ││billing│   ────────   │
+│                 │feature││pic    │          │       ││       │              │
+│                 └───────┘└───────┘          └───────┘└───────┘              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
 ### Entity Relationship
 
 ```
-StoryMap (1) ──┬── (N) BackboneItem (1) ── (N) Story
+StoryMap (1) ──┬── (N) Activity (1) ── (N) Task (1) ── (N) Story
                │
-               └── (N) Release (1) ── (N) Story
+               ├── (N) Release ──────────────────────── (N) Story
                │
-               └── (N) Persona (N) ── (N) Story
+               └── (N) Persona ──────────────────────── (N) Story (or Activity)
 ```
 
-### Schema
+**Hierarchy:**
+- **Activities**: High-level journey phases (e.g., "Onboarding Process", "Account Setup")
+- **Tasks**: User actions within activities (e.g., "Welcome Message", "Profile Creation")
+- **Stories**: Specific implementations under tasks (the actual work items)
+- **Releases**: Horizontal slices that group stories across the map
+
+### Schema (PostgreSQL)
 
 ```sql
 -- Story Maps (containers for the entire map)
 CREATE TABLE story_maps (
-  id TEXT PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   description TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Personas (user types)
 CREATE TABLE personas (
-  id TEXT PRIMARY KEY,
-  story_map_id TEXT NOT NULL,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  story_map_id UUID NOT NULL REFERENCES story_maps(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
   goals TEXT,
   sort_order INTEGER DEFAULT 0,
-  FOREIGN KEY (story_map_id) REFERENCES story_maps(id) ON DELETE CASCADE
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Backbone Items (horizontal journey steps)
-CREATE TABLE backbone_items (
-  id TEXT PRIMARY KEY,
-  story_map_id TEXT NOT NULL,
+-- Activities (high-level journey phases - top of backbone)
+CREATE TABLE activities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  story_map_id UUID NOT NULL REFERENCES story_maps(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
   sort_order INTEGER DEFAULT 0,
-  FOREIGN KEY (story_map_id) REFERENCES story_maps(id) ON DELETE CASCADE
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Tasks (user actions under activities - second level of backbone)
+CREATE TABLE tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  activity_id UUID NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Releases (horizontal slices for grouping stories)
 CREATE TABLE releases (
-  id TEXT PRIMARY KEY,
-  story_map_id TEXT NOT NULL,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  story_map_id UUID NOT NULL REFERENCES story_maps(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
-  sort_order INTEGER DEFAULT 0,
-  FOREIGN KEY (story_map_id) REFERENCES story_maps(id) ON DELETE CASCADE
+  sort_order INTEGER DEFAULT 0,  -- Lower = higher priority (MVP = 0)
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Stories (the actual tasks/features)
+-- Stories (the actual implementation items)
 CREATE TABLE stories (
-  id TEXT PRIMARY KEY,
-  backbone_item_id TEXT NOT NULL,
-  release_id TEXT,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  release_id UUID REFERENCES releases(id) ON DELETE SET NULL,
   title TEXT NOT NULL,
 
   -- PM Quality Fields (enforced)
@@ -94,25 +142,34 @@ CREATE TABLE stories (
   -- Status tracking
   status TEXT DEFAULT 'backlog' CHECK(status IN ('backlog', 'ready', 'in_progress', 'review', 'done')),
 
-  -- Positioning
+  -- Positioning within task column
   sort_order INTEGER DEFAULT 0,
 
   -- Timestamps
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-  FOREIGN KEY (backbone_item_id) REFERENCES backbone_items(id) ON DELETE CASCADE,
-  FOREIGN KEY (release_id) REFERENCES releases(id) ON DELETE SET NULL
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Story-Persona junction (many-to-many)
 CREATE TABLE story_personas (
-  story_id TEXT NOT NULL,
-  persona_id TEXT NOT NULL,
-  PRIMARY KEY (story_id, persona_id),
-  FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE,
-  FOREIGN KEY (persona_id) REFERENCES personas(id) ON DELETE CASCADE
+  story_id UUID NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+  persona_id UUID NOT NULL REFERENCES personas(id) ON DELETE CASCADE,
+  PRIMARY KEY (story_id, persona_id)
 );
+
+-- Activity-Persona junction (optional: personas can be linked at activity level)
+CREATE TABLE activity_personas (
+  activity_id UUID NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+  persona_id UUID NOT NULL REFERENCES personas(id) ON DELETE CASCADE,
+  PRIMARY KEY (activity_id, persona_id)
+);
+
+-- Indexes for common queries
+CREATE INDEX idx_activities_story_map ON activities(story_map_id);
+CREATE INDEX idx_tasks_activity ON tasks(activity_id);
+CREATE INDEX idx_stories_task ON stories(task_id);
+CREATE INDEX idx_stories_release ON stories(release_id);
+CREATE INDEX idx_stories_status ON stories(status);
 ```
 
 ---
@@ -125,6 +182,8 @@ BeemSpec/
 ├── next.config.js
 ├── tailwind.config.js
 ├── tsconfig.json
+├── drizzle.config.ts                 # Drizzle ORM config
+├── .env.local                        # Supabase credentials (gitignored)
 │
 ├── src/
 │   ├── app/                          # Next.js App Router
@@ -142,7 +201,9 @@ BeemSpec/
 │   │       │   ├── route.ts          # GET all, POST create
 │   │       │   └── [id]/
 │   │       │       └── route.ts      # GET, PUT, DELETE single
-│   │       ├── backbone-items/
+│   │       ├── activities/
+│   │       │   └── route.ts
+│   │       ├── tasks/
 │   │       │   └── route.ts
 │   │       ├── stories/
 │   │       │   ├── route.ts
@@ -157,9 +218,10 @@ BeemSpec/
 │   │   ├── ui/                       # shadcn/ui components
 │   │   ├── story-map/
 │   │   │   ├── StoryMapCanvas.tsx    # Main story map view
-│   │   │   ├── BackboneItem.tsx      # Backbone column header
+│   │   │   ├── ActivityColumn.tsx    # Activity (top backbone) header
+│   │   │   ├── TaskColumn.tsx        # Task (sub-backbone) column
 │   │   │   ├── StoryCard.tsx         # Individual story card
-│   │   │   ├── ReleaseRow.tsx        # Release slice indicator
+│   │   │   ├── ReleaseSlice.tsx      # Release divider row
 │   │   │   └── PersonaBadge.tsx      # Persona indicator
 │   │   └── stories/
 │   │       ├── StoryDialog.tsx       # Create/edit story modal
@@ -167,12 +229,13 @@ BeemSpec/
 │   │
 │   ├── lib/
 │   │   ├── db/
-│   │   │   ├── index.ts              # Database connection
-│   │   │   ├── schema.ts             # Schema initialization
+│   │   │   ├── index.ts              # Drizzle client + Supabase connection
+│   │   │   ├── schema.ts             # Drizzle schema definitions
 │   │   │   └── queries/              # Query functions by entity
 │   │   │       ├── story-maps.ts
+│   │   │       ├── activities.ts
+│   │   │       ├── tasks.ts
 │   │   │       ├── stories.ts
-│   │   │       ├── backbone-items.ts
 │   │   │       ├── personas.ts
 │   │   │       └── releases.ts
 │   │   └── utils.ts                  # Utility functions
@@ -193,11 +256,11 @@ BeemSpec/
 │   │   ├── prompts/
 │   │   │   └── agent-instructions.ts # Built-in behavioral prompts
 │   │   └── db/
-│   │       └── index.ts              # Shared DB access
+│   │       └── index.ts              # Supabase/Drizzle connection
 │   └── README.md                     # MCP setup instructions
 │
-└── data/
-    └── beemspec.db                   # SQLite database file
+└── drizzle/
+    └── migrations/                   # Database migrations
 ```
 
 ---
@@ -225,7 +288,10 @@ Every MCP tool response includes behavioral prompts that guide the coding agent.
     edge_cases: "...",
     technical_guidelines: "...",
     personas: [...],
-    backbone_item: { name: "..." },
+    task: {
+      name: "...",
+      activity: { name: "..." }  // Full hierarchy context
+    },
     release: { name: "..." }
   },
   agent_instructions: `
@@ -286,55 +352,77 @@ Every MCP tool response includes behavioral prompts that guide the coding agent.
       "command": "node",
       "args": ["/path/to/BeemSpec/mcp-server/dist/index.js"],
       "env": {
-        "BEEMSPEC_DB_PATH": "/path/to/BeemSpec/data/beemspec.db"
+        "DATABASE_URL": "postgresql://user:pass@host:5432/db"
       }
     }
   }
 }
 ```
 
+The MCP server uses the same Supabase connection string as the web app, allowing both to access the same data.
+
 ---
 
 ## UI Design
 
 ### Dashboard (Home Page)
-- List of story maps
+- List of story maps (cards with name, description, stats)
 - Create new story map button
-- Quick stats (total stories, in progress, etc.)
+- Quick stats (total stories, in progress, done)
 
 ### Story Map Canvas
-A visual board layout:
+
+The canvas reflects the 3-level backbone hierarchy from the reference images:
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│  Story Map: [Name]                              [Settings] [Export] │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  [+ Add]   │
-│  │  Sign Up │  │  Setup   │  │   Use    │  │  Share   │  Backbone  │
-│  │          │  │ Profile  │  │ Feature  │  │ Results  │            │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
-│  ─────────────────────────────────────────────────────── Release 1 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐                          │
-│  │ Email    │  │ Basic    │  │ Core     │                          │
-│  │ signup   │  │ profile  │  │ workflow │                          │
-│  │ ●●○○○    │  │ ●●●○○    │  │ ●●●●○    │                          │
-│  └──────────┘  └──────────┘  └──────────┘                          │
-│  ─────────────────────────────────────────────────────── Release 2 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
-│  │ OAuth    │  │ Avatar   │  │ Advanced │  │ PDF      │            │
-│  │ login    │  │ upload   │  │ filters  │  │ export   │            │
-│  │ ○○○○○    │  │ ○○○○○    │  │ ○○○○○    │  │ ○○○○○    │            │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│  Story Map: [Name]                                       [Personas] [Settings]     │
+├────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                    │
+│  PERSONAS     👤 👤                              👤 👤 👤                          │
+│               ─────                              ─────────                          │
+│                                                                                    │
+│  ┌─────────────────────────────────┐    ┌─────────────────────────────────┐       │
+│  │        ONBOARDING PROCESS       │    │         ACCOUNT SETUP           │  [+]  │
+│  │          (Activity)             │    │          (Activity)             │       │
+│  └─────────────────────────────────┘    └─────────────────────────────────┘       │
+│                                                                                    │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐    ┌─────────┐ ┌─────────┐ ┌─────────┐       │
+│  │ Welcome │ │ Profile │ │  App    │    │Security │ │ Payment │ │ Notif.  │  [+]  │
+│  │ Message │ │ Creation│ │  Tour   │    │ Settings│ │  Setup  │ │ Prefs   │       │
+│  │ (Task)  │ │ (Task)  │ │ (Task)  │    │ (Task)  │ │ (Task)  │ │ (Task)  │       │
+│  └─────────┘ └─────────┘ └─────────┘    └─────────┘ └─────────┘ └─────────┘       │
+│  ═══════════════════════════════════════════════════════════════════════ MVP ════ │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐    ┌─────────┐ ┌─────────┐                   │
+│  │ Display │ │ Enter   │ │ Guide   │    │ Set up  │ │  Add    │                   │
+│  │ welcome │ │ basic   │ │ through │    │ password│ │ payment │     Stories       │
+│  │ message │ │ info    │ │ key     │    │         │ │ method  │                   │
+│  │  ●●●○○  │ │  ●●○○○  │ │ ●●●●○   │    │  ●○○○○  │ │  ○○○○○  │                   │
+│  └─────────┘ └─────────┘ └─────────┘    └─────────┘ └─────────┘                   │
+│  ══════════════════════════════════════════════════════════════ Release 2 ═══════ │
+│  ┌─────────┐ ┌─────────┐                ┌─────────┐ ┌─────────┐ ┌─────────┐       │
+│  │Highlight│ │ Upload  │                │ Enable  │ │ Review  │ │ Choose  │       │
+│  │ key     │ │ profile │                │  2FA    │ │ billing │ │ notif.  │       │
+│  │ features│ │ picture │                │         │ │ details │ │ types   │       │
+│  │  ○○○○○  │ │  ○○○○○  │                │  ○○○○○  │ │  ○○○○○  │ │  ○○○○○  │       │
+│  └─────────┘ └─────────┘                └─────────┘ └─────────┘ └─────────┘       │
+│                                                                                    │
+└────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Backbone items as columns
-- Release slices as horizontal dividers
-- Story cards positioned under their backbone, within their release
-- Drag-and-drop for reordering
-- Click card to open story detail dialog
+**Layout Structure:**
+- **Personas Row**: User type icons at top, linked to activities
+- **Activities Row**: High-level journey phases (top backbone)
+- **Tasks Row**: User actions grouped under activities (second backbone level)
+- **Release Slices**: Horizontal dividers (MVP, Release 2, etc.)
+- **Story Cards**: Grid below tasks, positioned by task column and release row
+
+**Interactions:**
+- Click activity/task to edit inline
+- Click story card to open detail dialog
+- Drag-and-drop stories between tasks and releases
+- [+] buttons to add activities, tasks, or stories
+- Status indicators (●○) show progress at a glance
 
 ### Story Dialog/Form
 Modal with enforced PM quality fields:
@@ -393,39 +481,44 @@ Modal with enforced PM quality fields:
 ## Implementation Phases
 
 ### Phase 1: Project Setup
-- [ ] Initialize Next.js project with TypeScript
-- [ ] Install dependencies (better-sqlite3, tailwindcss, etc.)
-- [ ] Set up shadcn/ui
-- [ ] Create database schema and initialization
-- [ ] Set up basic project structure
+- [ ] Initialize Next.js project with TypeScript (`create-next-app`)
+- [ ] Install dependencies (drizzle-orm, @neondatabase/serverless or postgres, tailwindcss)
+- [ ] Set up Supabase project and get connection string
+- [ ] Configure Drizzle ORM with schema
+- [ ] Set up shadcn/ui components
+- [ ] Run initial database migration
 
 ### Phase 2: Core Data Layer
-- [ ] Implement database queries for all entities
+- [ ] Define Drizzle schema for all entities (story_maps, activities, tasks, stories, personas, releases)
+- [ ] Implement query functions for each entity
 - [ ] Create API routes for CRUD operations
 - [ ] Add TypeScript types for all entities
 
 ### Phase 3: Story Map UI
-- [ ] Dashboard page (list story maps)
-- [ ] Story map canvas component
-- [ ] Backbone item management
-- [ ] Story card component
-- [ ] Release slice visualization
-- [ ] Story dialog with form validation
+- [ ] Dashboard page (list story maps, create new)
+- [ ] Story map canvas component with 3-level backbone
+- [ ] Activity column component
+- [ ] Task column component
+- [ ] Story card component with status indicator
+- [ ] Release slice dividers
+- [ ] Story dialog with PM quality form fields
+- [ ] Persona badges
 
 ### Phase 4: MCP Server
-- [ ] Set up MCP server project structure
+- [ ] Set up MCP server as separate package
+- [ ] Configure Drizzle connection to same Supabase DB
 - [ ] Implement `get_story_context` tool with agent instructions
 - [ ] Implement `get_release_context` tool
 - [ ] Implement `update_story_status` tool
 - [ ] Implement `list_ready_stories` tool
-- [ ] Write setup documentation
+- [ ] Write setup/configuration documentation
 
 ### Phase 5: Polish & Integration
-- [ ] Drag-and-drop reordering
-- [ ] Persona management UI
-- [ ] Release management UI
-- [ ] Requirements quality indicators
-- [ ] Export functionality (optional)
+- [ ] Drag-and-drop reordering (activities, tasks, stories)
+- [ ] Persona management panel
+- [ ] Release management panel
+- [ ] Inline editing for activities/tasks
+- [ ] Requirements quality indicators (completeness scoring)
 
 ---
 
@@ -503,12 +596,13 @@ ${newStatus === 'done' ? 'Great work! Consider running tests to verify.' : ''}
 
 The MVP is successful when:
 
-1. A PM can create a story map with backbone, releases, and stories
+1. A PM can create a story map with activities, tasks, releases, and stories
 2. Stories enforce quality fields (requirements, acceptance criteria)
-3. An engineer can configure Claude Code to use the MCP server
-4. Calling `get_story_context` returns the story + behavioral prompts
-5. The agent creates a PLAN.md before implementing (guided by prompts)
-6. Story status can be updated via MCP from within the coding agent
+3. The 3-level backbone (activities → tasks → stories) renders correctly
+4. An engineer can configure Claude Code to use the MCP server
+5. Calling `get_story_context` returns the story + behavioral prompts
+6. The agent creates a PLAN.md before implementing (guided by prompts)
+7. Story status can be updated via MCP from within the coding agent
 
 ---
 
