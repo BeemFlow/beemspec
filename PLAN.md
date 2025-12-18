@@ -13,11 +13,10 @@ BeemSpec is a context and prompt engine for coding agents, with a product manage
 | Component | Technology | Rationale |
 |-----------|------------|-----------|
 | Framework | Next.js 14+ (App Router) | Modern React, API routes, TypeScript |
-| Database | PostgreSQL via Supabase | Hosted, scalable, real-time capable, multi-user ready |
-| ORM | Drizzle ORM | Type-safe, lightweight, great DX |
+| Database | Supabase (PostgreSQL + JS SDK) | Hosted DB, official SDK, minimal deps |
 | MCP Server | @modelcontextprotocol/sdk | Official SDK, runs as separate process |
-| Styling | Tailwind CSS + shadcn/ui | Rapid development, good defaults |
-| State | React hooks + fetch | Simple for MVP, no need for Redux/Zustand |
+| Styling | shadcn/ui | Pre-built components with Tailwind (comes bundled) |
+| State | React hooks + fetch | Simple for MVP |
 
 ---
 
@@ -61,14 +60,17 @@ StoryMap (1) ──┬── (N) Activity (1) ── (N) Task (1) ── (N) Sto
                │
                ├── (N) Release ──────────────────────── (N) Story
                │
-               └── (N) Persona ──────────────────────── (N) Story (or Activity)
+               └── (N) Persona ─────┬── (N) Activity
+                                    ├── (N) Task
+                                    └── (N) Story
 ```
 
 **Hierarchy:**
 - **Activities**: High-level journey phases (e.g., "Onboarding Process", "Account Setup")
 - **Tasks**: User actions within activities (e.g., "Welcome Message", "Profile Creation")
-- **Stories**: Specific implementations under tasks (the actual work items)
-- **Releases**: Horizontal slices that group stories across the map
+- **Stories**: Specific implementations positioned in a **grid** (task column × release row)
+- **Releases**: Horizontal slices that group stories - **the unit for agent planning/implementation**
+- **Personas**: Can be attached at any level (activity, task, or story) like StoriesOnBoard
 
 ### Schema (PostgreSQL)
 
@@ -157,11 +159,18 @@ CREATE TABLE story_personas (
   PRIMARY KEY (story_id, persona_id)
 );
 
--- Activity-Persona junction (optional: personas can be linked at activity level)
+-- Activity-Persona junction
 CREATE TABLE activity_personas (
   activity_id UUID NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
   persona_id UUID NOT NULL REFERENCES personas(id) ON DELETE CASCADE,
   PRIMARY KEY (activity_id, persona_id)
+);
+
+-- Task-Persona junction
+CREATE TABLE task_personas (
+  task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  persona_id UUID NOT NULL REFERENCES personas(id) ON DELETE CASCADE,
+  PRIMARY KEY (task_id, persona_id)
 );
 
 -- Indexes for common queries
@@ -180,9 +189,8 @@ CREATE INDEX idx_stories_status ON stories(status);
 BeemSpec/
 ├── package.json
 ├── next.config.js
-├── tailwind.config.js
 ├── tsconfig.json
-├── drizzle.config.ts                 # Drizzle ORM config
+├── components.json                   # shadcn/ui config
 ├── .env.local                        # Supabase credentials (gitignored)
 │
 ├── src/
@@ -228,9 +236,9 @@ BeemSpec/
 │   │       └── StoryForm.tsx         # Story form with PM fields
 │   │
 │   ├── lib/
-│   │   ├── db/
-│   │   │   ├── index.ts              # Drizzle client + Supabase connection
-│   │   │   ├── schema.ts             # Drizzle schema definitions
+│   │   ├── supabase/
+│   │   │   ├── client.ts             # Browser Supabase client
+│   │   │   ├── server.ts             # Server Supabase client
 │   │   │   └── queries/              # Query functions by entity
 │   │   │       ├── story-maps.ts
 │   │   │       ├── activities.ts
@@ -255,12 +263,11 @@ BeemSpec/
 │   │   │   └── list-stories.ts
 │   │   ├── prompts/
 │   │   │   └── agent-instructions.ts # Built-in behavioral prompts
-│   │   └── db/
-│   │       └── index.ts              # Supabase/Drizzle connection
+│   │   └── supabase.ts               # Supabase client for MCP server
 │   └── README.md                     # MCP setup instructions
 │
-└── drizzle/
-    └── migrations/                   # Database migrations
+└── supabase/
+    └── migrations/                   # SQL migrations (optional, can use Supabase dashboard)
 ```
 
 ---
@@ -352,14 +359,15 @@ Every MCP tool response includes behavioral prompts that guide the coding agent.
       "command": "node",
       "args": ["/path/to/BeemSpec/mcp-server/dist/index.js"],
       "env": {
-        "DATABASE_URL": "postgresql://user:pass@host:5432/db"
+        "SUPABASE_URL": "https://xxx.supabase.co",
+        "SUPABASE_SERVICE_KEY": "eyJ..."
       }
     }
   }
 }
 ```
 
-The MCP server uses the same Supabase connection string as the web app, allowing both to access the same data.
+The MCP server uses the same Supabase credentials as the web app. Use the **service role key** (not anon key) for the MCP server since it runs locally and needs full access.
 
 ---
 
@@ -482,33 +490,33 @@ Modal with enforced PM quality fields:
 
 ### Phase 1: Project Setup
 - [ ] Initialize Next.js project with TypeScript (`create-next-app`)
-- [ ] Install dependencies (drizzle-orm, @neondatabase/serverless or postgres, tailwindcss)
-- [ ] Set up Supabase project and get connection string
-- [ ] Configure Drizzle ORM with schema
-- [ ] Set up shadcn/ui components
-- [ ] Run initial database migration
+- [ ] Set up Supabase project and get credentials
+- [ ] Install @supabase/supabase-js
+- [ ] Set up shadcn/ui (includes Tailwind)
+- [ ] Create database tables via Supabase SQL editor
+- [ ] Configure Supabase client (browser + server)
 
 ### Phase 2: Core Data Layer
-- [ ] Define Drizzle schema for all entities (story_maps, activities, tasks, stories, personas, releases)
-- [ ] Implement query functions for each entity
+- [ ] Define TypeScript types for all entities
+- [ ] Implement Supabase query functions for each entity
 - [ ] Create API routes for CRUD operations
-- [ ] Add TypeScript types for all entities
+- [ ] Test queries with sample data
 
 ### Phase 3: Story Map UI
 - [ ] Dashboard page (list story maps, create new)
-- [ ] Story map canvas component with 3-level backbone
-- [ ] Activity column component
+- [ ] Story map canvas with grid layout (tasks × releases)
+- [ ] Activity row component (spans multiple tasks)
 - [ ] Task column component
 - [ ] Story card component with status indicator
-- [ ] Release slice dividers
+- [ ] Release slice rows
 - [ ] Story dialog with PM quality form fields
-- [ ] Persona badges
+- [ ] Persona badges (attachable at any level)
 
 ### Phase 4: MCP Server
 - [ ] Set up MCP server as separate package
-- [ ] Configure Drizzle connection to same Supabase DB
+- [ ] Configure Supabase client with service key
 - [ ] Implement `get_story_context` tool with agent instructions
-- [ ] Implement `get_release_context` tool
+- [ ] Implement `get_release_context` tool (the main planning unit)
 - [ ] Implement `update_story_status` tool
 - [ ] Implement `list_ready_stories` tool
 - [ ] Write setup/configuration documentation
