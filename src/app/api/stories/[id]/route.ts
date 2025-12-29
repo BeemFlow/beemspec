@@ -19,21 +19,22 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const supabase = await createClient()
   const body = await request.json()
 
+  // Only include fields that were actually provided
+  const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (body.task_id !== undefined) updateData.task_id = body.task_id
+  if (body.release_id !== undefined) updateData.release_id = body.release_id
+  if (body.title !== undefined) updateData.title = body.title
+  if (body.requirements !== undefined) updateData.requirements = body.requirements
+  if (body.acceptance_criteria !== undefined) updateData.acceptance_criteria = body.acceptance_criteria
+  if (body.figma_link !== undefined) updateData.figma_link = body.figma_link
+  if (body.edge_cases !== undefined) updateData.edge_cases = body.edge_cases
+  if (body.technical_guidelines !== undefined) updateData.technical_guidelines = body.technical_guidelines
+  if (body.status !== undefined) updateData.status = body.status
+  if (body.sort_order !== undefined) updateData.sort_order = body.sort_order
+
   const { data, error } = await supabase
     .from('stories')
-    .update({
-      task_id: body.task_id,
-      release_id: body.release_id,
-      title: body.title,
-      requirements: body.requirements,
-      acceptance_criteria: body.acceptance_criteria,
-      figma_link: body.figma_link,
-      edge_cases: body.edge_cases,
-      technical_guidelines: body.technical_guidelines,
-      status: body.status,
-      sort_order: body.sort_order,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', id)
     .select()
     .single()

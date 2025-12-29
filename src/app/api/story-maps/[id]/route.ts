@@ -11,7 +11,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       .from('activities')
       .select(`*, tasks(*, stories(*))`)
       .eq('story_map_id', id)
-      .order('sort_order'),
+      .order('sort_order')
+      .order('sort_order', { referencedTable: 'tasks' })
+      .order('sort_order', { referencedTable: 'tasks.stories' }),
     supabase.from('releases').select('*').eq('story_map_id', id).order('sort_order'),
     supabase.from('personas').select('*').eq('story_map_id', id).order('sort_order'),
   ])
