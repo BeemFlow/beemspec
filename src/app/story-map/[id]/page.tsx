@@ -9,11 +9,11 @@ import { PromptDialog } from '@/components/ui/prompt-dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas'
 import { StoryDialog } from '@/components/story-map/StoryDialog'
-import type { StoryMapFull, Story } from '@/types'
+import { ActivityDialog } from '@/components/story-map/ActivityDialog'
+import { TaskDialog } from '@/components/story-map/TaskDialog'
+import type { StoryMapFull, Story, Activity, Task } from '@/types'
 
 type PromptType =
-  | { type: 'activity' }
-  | { type: 'task'; activityId: string }
   | { type: 'release' }
   | { type: 'renameRelease'; releaseId: string; currentName: string }
 
@@ -32,6 +32,15 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   // Confirm dialog state
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleteReleaseId, setDeleteReleaseId] = useState<string | null>(null)
+
+  // Activity dialog state
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false)
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
+
+  // Task dialog state
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [newTaskActivityId, setNewTaskActivityId] = useState<string | null>(null)
 
   const loadStoryMap = useCallback(async () => {
     try {
@@ -113,17 +122,110 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     }
   }
 
-  // Open prompt dialogs
+  // Activity handlers
   function handleAddActivity() {
-    setPromptContext({ type: 'activity' })
-    setPromptOpen(true)
+    setSelectedActivity(null)
+    setActivityDialogOpen(true)
   }
 
+  function handleEditActivity(activity: Activity) {
+    setSelectedActivity(activity)
+    setActivityDialogOpen(true)
+  }
+
+  async function handleSaveActivity(data: { name: string }) {
+    try {
+      if (selectedActivity) {
+        const res = await fetch(`/api/activities/${selectedActivity.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        })
+        if (!res.ok) throw new Error('Failed to update activity')
+      } else {
+        const maxSort = storyMap?.activities.length
+          ? Math.max(...storyMap.activities.map((a) => a.sort_order))
+          : -1
+        const res = await fetch('/api/activities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ story_map_id: id, name: data.name, sort_order: maxSort + 1 }),
+        })
+        if (!res.ok) throw new Error('Failed to create activity')
+      }
+      setActivityDialogOpen(false)
+      loadStoryMap()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    }
+  }
+
+  async function handleDeleteActivity() {
+    if (!selectedActivity) return
+    try {
+      const res = await fetch(`/api/activities/${selectedActivity.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete activity')
+      setActivityDialogOpen(false)
+      loadStoryMap()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    }
+  }
+
+  // Task handlers
   function handleAddTask(activityId: string) {
-    setPromptContext({ type: 'task', activityId })
-    setPromptOpen(true)
+    setSelectedTask(null)
+    setNewTaskActivityId(activityId)
+    setTaskDialogOpen(true)
   }
 
+  function handleEditTask(task: Task) {
+    setSelectedTask(task)
+    setNewTaskActivityId(null)
+    setTaskDialogOpen(true)
+  }
+
+  async function handleSaveTask(data: { name: string }) {
+    try {
+      if (selectedTask) {
+        const res = await fetch(`/api/tasks/${selectedTask.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        })
+        if (!res.ok) throw new Error('Failed to update task')
+      } else if (newTaskActivityId) {
+        const activity = storyMap?.activities.find((a) => a.id === newTaskActivityId)
+        const maxSort = activity?.tasks?.length
+          ? Math.max(...activity.tasks.map((t) => t.sort_order))
+          : -1
+        const res = await fetch('/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activity_id: newTaskActivityId, name: data.name, sort_order: maxSort + 1 }),
+        })
+        if (!res.ok) throw new Error('Failed to create task')
+      }
+      setTaskDialogOpen(false)
+      loadStoryMap()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    }
+  }
+
+  async function handleDeleteTask() {
+    if (!selectedTask) return
+    try {
+      const res = await fetch(`/api/tasks/${selectedTask.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete task')
+      setTaskDialogOpen(false)
+      loadStoryMap()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    }
+  }
+
+  // Release handlers
   function handleAddRelease() {
     setPromptContext({ type: 'release' })
     setPromptOpen(true)
@@ -134,37 +236,12 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     setPromptOpen(true)
   }
 
-  // Handle prompt submissions
+  // Handle prompt submissions (releases only)
   async function handlePromptSubmit(value: string) {
     if (!promptContext) return
 
     try {
       switch (promptContext.type) {
-        case 'activity': {
-          const maxSort = storyMap?.activities.length
-            ? Math.max(...storyMap.activities.map((a) => a.sort_order))
-            : -1
-          const res = await fetch('/api/activities', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ story_map_id: id, name: value, sort_order: maxSort + 1 }),
-          })
-          if (!res.ok) throw new Error('Failed to create activity')
-          break
-        }
-        case 'task': {
-          const activity = storyMap?.activities.find((a) => a.id === promptContext.activityId)
-          const maxSort = activity?.tasks?.length
-            ? Math.max(...activity.tasks.map((t) => t.sort_order))
-            : -1
-          const res = await fetch('/api/tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ activity_id: promptContext.activityId, name: value, sort_order: maxSort + 1 }),
-          })
-          if (!res.ok) throw new Error('Failed to create task')
-          break
-        }
         case 'release': {
           const maxSort = storyMap?.releases.length
             ? Math.max(...storyMap.releases.map((r) => r.sort_order))
@@ -235,14 +312,10 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     }
   }
 
-  // Get prompt dialog props based on context
+  // Get prompt dialog props based on context (releases only)
   function getPromptProps() {
     if (!promptContext) return { title: '', placeholder: '', defaultValue: '' }
     switch (promptContext.type) {
-      case 'activity':
-        return { title: 'New Activity', placeholder: 'Activity name', defaultValue: '' }
-      case 'task':
-        return { title: 'New Task', placeholder: 'Task name', defaultValue: '' }
       case 'release':
         return { title: 'New Release', placeholder: 'Release name', defaultValue: '' }
       case 'renameRelease':
@@ -283,7 +356,9 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
             onAddStory={handleAddStory}
             onEditStory={handleEditStory}
             onAddActivity={handleAddActivity}
+            onEditActivity={handleEditActivity}
             onAddTask={handleAddTask}
+            onEditTask={handleEditTask}
             onAddRelease={handleAddRelease}
             onRenameRelease={handleRenameRelease}
             onMoveRelease={handleMoveRelease}
@@ -321,6 +396,22 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         confirmLabel="Delete"
         variant="destructive"
         onConfirm={handleConfirmDelete}
+      />
+
+      <ActivityDialog
+        open={activityDialogOpen}
+        onOpenChange={setActivityDialogOpen}
+        activity={selectedActivity}
+        onSave={handleSaveActivity}
+        onDelete={selectedActivity ? handleDeleteActivity : undefined}
+      />
+
+      <TaskDialog
+        open={taskDialogOpen}
+        onOpenChange={setTaskDialogOpen}
+        task={selectedTask}
+        onSave={handleSaveTask}
+        onDelete={selectedTask ? handleDeleteTask : undefined}
       />
     </div>
   )

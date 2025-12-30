@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
+import { MapCard, CARD_WIDTH, CARD_HEIGHT } from '@/components/story-map/MapCard'
 import {
   DndContext,
   DragEndEvent,
@@ -31,7 +32,9 @@ interface Props {
   onAddStory: (taskId: string, releaseId: string | null) => void
   onEditStory: (story: Story) => void
   onAddActivity: () => void
+  onEditActivity: (activity: Activity) => void
   onAddTask: (activityId: string) => void
+  onEditTask: (task: Task) => void
   onAddRelease: () => void
   onRenameRelease: (releaseId: string, currentName: string) => void
   onMoveRelease: (releaseId: string, direction: 'up' | 'down') => void
@@ -39,8 +42,6 @@ interface Props {
   onRefresh: () => void
 }
 
-const CARD_WIDTH = 140
-const CARD_HEIGHT = 96
 const CARD_GAP = 8
 const GROUP_GAP = 24
 const ADD_BUTTON_WIDTH = 28
@@ -87,7 +88,9 @@ export function StoryMapCanvas({
   onAddStory,
   onEditStory,
   onAddActivity,
+  onEditActivity,
   onAddTask,
+  onEditTask,
   onAddRelease,
   onRenameRelease,
   onMoveRelease,
@@ -327,6 +330,7 @@ export function StoryMapCanvas({
                 <div key={activity.id} className="flex justify-between" style={{ width: getGroupWidth(tasks.length) }}>
                   <SortableActivity
                     activity={activity}
+                    onClick={() => onEditActivity(activity)}
                     showIndicator={isDropTarget(`activity:${activity.id}`)}
                   />
                   <button
@@ -360,6 +364,7 @@ export function StoryMapCanvas({
                     <SortableTask
                       key={task.id}
                       task={task}
+                      onClick={() => onEditTask(task)}
                       showIndicator={isDropTarget(`task:${task.id}`)}
                     />
                   ))}
@@ -421,33 +426,24 @@ export function StoryMapCanvas({
 
       <DragOverlay>
         {draggedActivity && (
-          <div
-            className="bg-amber-100 border border-amber-300 rounded p-3 shadow-lg"
-            style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}
-          >
+          <MapCard variant="activity" className="shadow-lg cursor-grabbing">
             <div className="font-medium text-sm line-clamp-3">{draggedActivity.name}</div>
-          </div>
+          </MapCard>
         )}
         {draggedTask && (
-          <div
-            className="bg-sky-100 border border-sky-300 rounded p-3 shadow-lg"
-            style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}
-          >
+          <MapCard variant="task" className="shadow-lg cursor-grabbing">
             <div className="text-sm line-clamp-3">{draggedTask.name}</div>
-          </div>
+          </MapCard>
         )}
         {draggedStory && (
-          <div
-            className="bg-white border border-slate-300 rounded shadow-lg p-3 flex flex-col"
-            style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}
-          >
+          <MapCard variant="story" className="shadow-lg cursor-grabbing">
             <div className="text-xs line-clamp-3">{draggedStory.title}</div>
             {draggedStory.status !== 'backlog' && (
-              <Badge variant={STATUS_VARIANTS[draggedStory.status]} className="mt-auto text-[10px]">
+              <Badge variant={STATUS_VARIANTS[draggedStory.status]} className="mt-auto text-[10px] self-start">
                 {STATUS_LABELS[draggedStory.status]}
               </Badge>
             )}
-          </div>
+          </MapCard>
         )}
       </DragOverlay>
     </DndContext>
@@ -487,9 +483,11 @@ function AddTaskDropZone({
 
 function SortableActivity({
   activity,
+  onClick,
   showIndicator,
 }: {
   activity: Activity
+  onClick: () => void
   showIndicator: boolean
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
@@ -499,24 +497,29 @@ function SortableActivity({
   return (
     <div className="flex items-stretch gap-1">
       {showIndicator && <DropLine direction="vertical" />}
-      <div
+      <MapCard
         ref={setNodeRef}
-        style={{ width: CARD_WIDTH, height: CARD_HEIGHT, opacity: isDragging ? 0.5 : 1 }}
-        className="bg-amber-100 border border-amber-200 rounded p-3 cursor-grab active:cursor-grabbing"
+        variant="activity"
+        isDragging={isDragging}
         {...attributes}
         {...listeners}
+        onClick={() => {
+          if (!isDragging) onClick()
+        }}
       >
         <div className="font-medium text-sm line-clamp-3">{activity.name}</div>
-      </div>
+      </MapCard>
     </div>
   )
 }
 
 function SortableTask({
   task,
+  onClick,
   showIndicator,
 }: {
   task: Task
+  onClick: () => void
   showIndicator: boolean
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
@@ -526,15 +529,18 @@ function SortableTask({
   return (
     <div className="flex items-stretch gap-1">
       {showIndicator && <DropLine direction="vertical" />}
-      <div
+      <MapCard
         ref={setNodeRef}
-        style={{ width: CARD_WIDTH, height: CARD_HEIGHT, opacity: isDragging ? 0.5 : 1 }}
-        className="bg-sky-100 border border-sky-200 rounded p-3 cursor-grab active:cursor-grabbing"
+        variant="task"
+        isDragging={isDragging}
         {...attributes}
         {...listeners}
+        onClick={() => {
+          if (!isDragging) onClick()
+        }}
       >
         <div className="text-sm line-clamp-3">{task.name}</div>
-      </div>
+      </MapCard>
     </div>
   )
 }
@@ -741,10 +747,10 @@ function SortableStory({
   return (
     <div className="flex flex-col gap-1">
       {showIndicator && <DropLine direction="horizontal" />}
-      <div
+      <MapCard
         ref={setNodeRef}
-        style={{ width: CARD_WIDTH, height: CARD_HEIGHT, opacity: isDragging ? 0.5 : 1 }}
-        className="bg-white border border-slate-200 rounded shadow-sm hover:shadow cursor-grab active:cursor-grabbing p-3 flex flex-col"
+        variant="story"
+        isDragging={isDragging}
         {...attributes}
         {...listeners}
         onClick={() => {
@@ -757,7 +763,7 @@ function SortableStory({
             {STATUS_LABELS[story.status]}
           </Badge>
         )}
-      </div>
+      </MapCard>
     </div>
   )
 }
