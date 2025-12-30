@@ -37,6 +37,16 @@ const CARD_WIDTH = 140
 const CARD_HEIGHT = 96
 const CARD_GAP = 8
 const GROUP_GAP = 24
+const ADD_BUTTON_WIDTH = 28
+
+// Shared subtle button style for all "Add X" buttons
+const ADD_BUTTON_CLASS =
+  'border border-dashed border-slate-300 rounded text-slate-400 hover:text-slate-600 hover:border-slate-400 transition-colors text-xs flex items-center justify-center'
+
+// Group width = task columns + add button column
+function getGroupWidth(taskCount: number) {
+  return taskCount * (CARD_WIDTH + CARD_GAP) + ADD_BUTTON_WIDTH
+}
 
 type DragType = 'activity' | 'task' | 'story'
 type ActiveDrag = { type: DragType; id: string } | null
@@ -293,27 +303,26 @@ export function StoryMapCanvas({
           <div className="flex" style={{ gap: GROUP_GAP }}>
             {sortedActivities.map((activity) => {
               const tasks = getTasksForActivity(activity.id)
-              const itemCount = tasks.length + 1
-              const groupWidth = itemCount * CARD_WIDTH + (itemCount - 1) * CARD_GAP
 
               return (
-                <div key={activity.id} style={{ width: groupWidth }}>
+                <div key={activity.id} className="flex justify-between" style={{ width: getGroupWidth(tasks.length) }}>
                   <SortableActivity
                     activity={activity}
                     showIndicator={isDropTarget(`activity:${activity.id}`)}
                   />
+                  <button
+                    className={ADD_BUTTON_CLASS}
+                    style={{ width: ADD_BUTTON_WIDTH, height: CARD_HEIGHT }}
+                    onClick={onAddActivity}
+                  >
+                    <span className="flex items-center gap-1 rotate-90 whitespace-nowrap">
+                      <Plus className="h-3 w-3" />
+                      Activity
+                    </span>
+                  </button>
                 </div>
               )
             })}
-            <Button
-              variant="ghost"
-              className="border border-dashed text-muted-foreground hover:text-foreground text-xs flex-col gap-1"
-              style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}
-              onClick={onAddActivity}
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add Activity</span>
-            </Button>
           </div>
         </SortableContext>
 
@@ -325,11 +334,9 @@ export function StoryMapCanvas({
           <div className="flex mt-2" style={{ gap: GROUP_GAP }}>
             {sortedActivities.map((activity) => {
               const tasks = getTasksForActivity(activity.id)
-              const itemCount = tasks.length + 1
-              const groupWidth = itemCount * CARD_WIDTH + (itemCount - 1) * CARD_GAP
 
               return (
-                <div key={activity.id} className="flex items-stretch" style={{ width: groupWidth, gap: CARD_GAP }}>
+                <div key={activity.id} className="flex" style={{ width: getGroupWidth(tasks.length), gap: CARD_GAP }}>
                   {tasks.map((task) => (
                     <SortableTask
                       key={task.id}
@@ -345,7 +352,6 @@ export function StoryMapCanvas({
                 </div>
               )
             })}
-            <div style={{ width: CARD_WIDTH }} />
           </div>
         </SortableContext>
 
@@ -440,18 +446,19 @@ function AddTaskDropZone({
   })
 
   return (
-    <div className="flex items-stretch gap-1">
+    <div className="flex gap-1">
       {showIndicator && <DropLine direction="vertical" />}
-      <Button
+      <button
         ref={setNodeRef}
-        variant="ghost"
-        className="border border-dashed text-muted-foreground hover:text-foreground text-xs flex-col gap-1"
-        style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}
+        className={ADD_BUTTON_CLASS}
+        style={{ width: ADD_BUTTON_WIDTH, height: CARD_HEIGHT }}
         onClick={() => onAddTask(activityId)}
       >
-        <Plus className="h-3 w-3" />
-        <span>Add Task</span>
-      </Button>
+        <span className="flex items-center gap-1 rotate-90 whitespace-nowrap">
+          <Plus className="h-3 w-3" />
+          Task
+        </span>
+      </button>
     </div>
   )
 }
@@ -541,11 +548,9 @@ function ReleaseRow({
       <div className="flex" style={{ gap: GROUP_GAP }}>
         {activities.map((activity) => {
           const tasks = getTasksForActivity(activity.id)
-          const itemCount = tasks.length + 1
-          const groupWidth = itemCount * CARD_WIDTH + (itemCount - 1) * CARD_GAP
 
           return (
-            <div key={activity.id} className="flex" style={{ width: groupWidth, gap: CARD_GAP }}>
+            <div key={activity.id} className="flex" style={{ width: getGroupWidth(tasks.length), gap: CARD_GAP }}>
               {tasks.map((task) => (
                 <StoryCell
                   key={task.id}
@@ -557,11 +562,10 @@ function ReleaseRow({
                   isDropTarget={isDropTarget}
                 />
               ))}
-              <div style={{ width: CARD_WIDTH }} />
+              <div style={{ width: ADD_BUTTON_WIDTH }} />
             </div>
           )
         })}
-        <div style={{ width: CARD_WIDTH }} />
       </div>
     </div>
   )
@@ -622,11 +626,11 @@ function AddStoryDropZone({
       {showIndicator && <DropLine direction="horizontal" />}
       <button
         ref={setNodeRef}
-        className="w-full border border-dashed border-slate-300 rounded h-8 text-slate-400 hover:text-slate-600 hover:border-slate-400 transition-colors text-xs flex items-center justify-center gap-1"
+        className={`w-full h-8 ${ADD_BUTTON_CLASS}`}
         onClick={() => onAddStory(taskId, releaseId)}
       >
         <Plus className="h-3 w-3" />
-        <span>Add Story</span>
+        Story
       </button>
     </div>
   )
