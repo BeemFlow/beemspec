@@ -6,14 +6,13 @@ export async function PUT(request: Request) {
   const body = await request.json()
   const { story_map_id, order } = body as { story_map_id: string; order: string[] }
 
-  const updates = order.map((id, index) =>
-    supabase.from('activities').update({ sort_order: index }).eq('id', id).eq('story_map_id', story_map_id)
-  )
+  const { error } = await supabase.rpc('reorder_activities', {
+    p_story_map_id: story_map_id,
+    p_order: order,
+  })
 
-  const results = await Promise.all(updates)
-  const failed = results.find((r) => r.error)
-  if (failed?.error) {
-    console.error('PUT /api/activities:', failed.error)
+  if (error) {
+    console.error('PUT /api/activities:', error)
     return NextResponse.json({ error: 'Failed to reorder activities' }, { status: 500 })
   }
   return NextResponse.json({ success: true })

@@ -6,21 +6,14 @@ export async function PUT(request: Request) {
   const body = await request.json()
   const { task_id, release_id, order } = body as { task_id: string; release_id: string | null; order: string[] }
 
-  // Must filter by both task_id AND release_id to only reorder stories within the same cell
-  const updates = order.map((id, index) => {
-    let query = supabase.from('stories').update({ sort_order: index }).eq('id', id).eq('task_id', task_id)
-    if (release_id === null) {
-      query = query.is('release_id', null)
-    } else {
-      query = query.eq('release_id', release_id)
-    }
-    return query
+  const { error } = await supabase.rpc('reorder_stories', {
+    p_task_id: task_id,
+    p_release_id: release_id,
+    p_order: order,
   })
 
-  const results = await Promise.all(updates)
-  const failed = results.find((r) => r.error)
-  if (failed?.error) {
-    console.error('PUT /api/stories:', failed.error)
+  if (error) {
+    console.error('PUT /api/stories:', error)
     return NextResponse.json({ error: 'Failed to reorder stories' }, { status: 500 })
   }
   return NextResponse.json({ success: true })

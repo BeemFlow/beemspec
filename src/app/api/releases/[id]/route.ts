@@ -29,34 +29,12 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const { id } = await params
   const supabase = await createClient()
 
-  // Verify release exists first
-  const { data: release, error: fetchError } = await supabase
-    .from('releases')
-    .select('id')
-    .eq('id', id)
-    .single()
-
-  if (fetchError || !release) {
-    return NextResponse.json({ error: 'Release not found' }, { status: 404 })
-  }
-
-  // Delete all stories in this release first
-  // Note: Not atomic - if release delete fails, stories are already gone
-  // @TODO: For true atomicity, use a Supabase RPC DB function with BEGIN/COMMIT
-  const { error: storiesError } = await supabase
-    .from('stories')
-    .delete()
-    .eq('release_id', id)
-
-  if (storiesError) {
-    console.error('DELETE /api/releases/[id] stories:', storiesError)
-    return NextResponse.json({ error: 'Failed to delete release stories' }, { status: 500 })
-  }
-
-  // Then delete the release
-  const { error } = await supabase.from('releases').delete().eq('id', id)
+  const { error } = await supabase.rpc('delete_release', { p_release_id: id })
 
   if (error) {
+    if (error.code === 'P0002') {
+      return NextResponse.json({ error: 'Release not found' }, { status: 404 })
+    }
     console.error('DELETE /api/releases/[id]:', error)
     return NextResponse.json({ error: 'Failed to delete release' }, { status: 500 })
   }
