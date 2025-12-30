@@ -156,6 +156,58 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     }
   }
 
+  async function handleRenameRelease(releaseId: string, currentName: string) {
+    const name = prompt('Rename release:', currentName)
+    if (!name || name === currentName) return
+    try {
+      const res = await fetch(`/api/releases/${releaseId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      if (!res.ok) throw new Error('Failed to rename release')
+      loadStoryMap()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    }
+  }
+
+  async function handleMoveRelease(releaseId: string, direction: 'up' | 'down') {
+    if (!storyMap) return
+    const sortedReleases = [...storyMap.releases].sort((a, b) => a.sort_order - b.sort_order)
+    const index = sortedReleases.findIndex((r) => r.id === releaseId)
+    if (index === -1) return
+    if (direction === 'up' && index === 0) return
+    if (direction === 'down' && index === sortedReleases.length - 1) return
+
+    const swapIndex = direction === 'up' ? index - 1 : index + 1
+    const newOrder = sortedReleases.map((r) => r.id)
+    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+
+    try {
+      const res = await fetch('/api/releases', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ story_map_id: id, order: newOrder }),
+      })
+      if (!res.ok) throw new Error('Failed to reorder releases')
+      loadStoryMap()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    }
+  }
+
+  async function handleDeleteRelease(releaseId: string) {
+    if (!confirm('Delete this release? Stories will be moved to Backlog.')) return
+    try {
+      const res = await fetch(`/api/releases/${releaseId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete release')
+      loadStoryMap()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    }
+  }
+
   if (error) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -189,6 +241,9 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
             onAddActivity={handleAddActivity}
             onAddTask={handleAddTask}
             onAddRelease={handleAddRelease}
+            onRenameRelease={handleRenameRelease}
+            onMoveRelease={handleMoveRelease}
+            onDeleteRelease={handleDeleteRelease}
             onRefresh={loadStoryMap}
           />
         </div>

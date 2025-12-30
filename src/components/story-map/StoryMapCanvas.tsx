@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Pencil, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DndContext,
@@ -30,6 +30,9 @@ interface Props {
   onAddActivity: () => void
   onAddTask: (activityId: string) => void
   onAddRelease: () => void
+  onRenameRelease: (releaseId: string, currentName: string) => void
+  onMoveRelease: (releaseId: string, direction: 'up' | 'down') => void
+  onDeleteRelease: (releaseId: string) => void
   onRefresh: () => void
 }
 
@@ -41,7 +44,7 @@ const ADD_BUTTON_WIDTH = 28
 
 // Shared subtle button style for all "Add X" buttons
 const ADD_BUTTON_CLASS =
-  'border border-dashed border-slate-300 rounded text-slate-400 hover:text-slate-600 hover:border-slate-400 transition-colors text-xs flex items-center justify-center'
+  'border border-dashed border-slate-300 rounded text-slate-400 hover:text-slate-600 hover:border-slate-400 transition-colors text-xs flex items-center justify-center cursor-pointer'
 
 // Group width = task columns + add button column
 function getGroupWidth(taskCount: number) {
@@ -66,6 +69,9 @@ export function StoryMapCanvas({
   onAddActivity,
   onAddTask,
   onAddRelease,
+  onRenameRelease,
+  onMoveRelease,
+  onDeleteRelease,
   onRefresh,
 }: Props) {
   const { activities, releases } = storyMap
@@ -360,32 +366,31 @@ export function StoryMapCanvas({
           items={sortedStories.map((s) => `story:${s.id}`)}
           strategy={verticalListSortingStrategy}
         >
-          <div className="mt-6 space-y-6">
+          <div className="mt-6 space-y-2">
             {[...releases]
               .sort((a, b) => a.sort_order - b.sort_order)
-              .map((release) => (
-                <ReleaseRow
-                  key={release.id}
-                  label={release.name}
-                  releaseId={release.id}
-                  activities={sortedActivities}
-                  getTasksForActivity={getTasksForActivity}
-                  getStoriesForCell={getStoriesForCell}
-                  onAddStory={onAddStory}
-                  onEditStory={onEditStory}
-                  isDropTarget={isDropTarget}
-                />
+              .map((release, index, arr) => (
+                <div key={release.id}>
+                  <ReleaseRow
+                    label={release.name}
+                    releaseId={release.id}
+                    activities={sortedActivities}
+                    getTasksForActivity={getTasksForActivity}
+                    getStoriesForCell={getStoriesForCell}
+                    onAddStory={onAddStory}
+                    onEditStory={onEditStory}
+                    onRename={() => onRenameRelease(release.id, release.name)}
+                    onMoveUp={() => onMoveRelease(release.id, 'up')}
+                    onMoveDown={() => onMoveRelease(release.id, 'down')}
+                    onDelete={() => onDeleteRelease(release.id)}
+                    isFirst={index === 0}
+                    isLast={index === arr.length - 1}
+                    isDropTarget={isDropTarget}
+                  />
+                  {/* Add Release zone after each release */}
+                  <AddReleaseZone onAddRelease={onAddRelease} />
+                </div>
               ))}
-
-            <Button
-              variant="ghost"
-              size="sm"
-              className="border border-dashed text-muted-foreground hover:text-foreground"
-              onClick={onAddRelease}
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              Add Release
-            </Button>
 
             <ReleaseRow
               label="Backlog"
@@ -526,7 +531,28 @@ interface ReleaseRowProps {
   getStoriesForCell: (taskId: string, releaseId: string | null) => Story[]
   onAddStory: (taskId: string, releaseId: string | null) => void
   onEditStory: (story: Story) => void
+  onAddRelease?: () => void
+  onRename?: () => void
+  onMoveUp?: () => void
+  onMoveDown?: () => void
+  onDelete?: () => void
+  isFirst?: boolean
+  isLast?: boolean
   isDropTarget: (itemId: string) => boolean
+}
+
+function AddReleaseZone({ onAddRelease }: { onAddRelease: () => void }) {
+  return (
+    <div className="group/addzone h-6 mt-4 relative">
+      <button
+        className="absolute inset-x-0 top-0 h-8 opacity-0 group-hover/addzone:opacity-100 transition-opacity border border-dashed border-slate-300 rounded text-slate-400 hover:text-slate-600 hover:border-slate-400 text-xs flex items-center gap-1 px-3 bg-white cursor-pointer z-10"
+        onClick={onAddRelease}
+      >
+        <Plus className="h-3 w-3" />
+        Release
+      </button>
+    </div>
+  )
 }
 
 function ReleaseRow({
@@ -538,14 +564,58 @@ function ReleaseRow({
   getStoriesForCell,
   onAddStory,
   onEditStory,
+  onRename,
+  onMoveUp,
+  onMoveDown,
+  onDelete,
+  isFirst,
+  isLast,
   isDropTarget,
-}: ReleaseRowProps) {
+}: Omit<ReleaseRowProps, 'onAddRelease'>) {
+  const showActions = releaseId !== null // Don't show actions for Backlog
+
   return (
     <div className="border-t pt-4">
-      <div className={`text-sm font-medium mb-3 ${labelMuted ? 'text-muted-foreground' : ''}`}>
-        {label}
+      <div className="group flex items-center gap-2 mb-3">
+        <div className={`text-sm font-medium ${labelMuted ? 'text-muted-foreground' : ''}`}>
+          {label}
+        </div>
+        {showActions && (
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 cursor-pointer"
+              onClick={onRename}
+              title="Rename"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+            <button
+              className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              onClick={onMoveUp}
+              disabled={isFirst}
+              title="Move up"
+            >
+              <ArrowUp className="h-3 w-3" />
+            </button>
+            <button
+              className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              onClick={onMoveDown}
+              disabled={isLast}
+              title="Move down"
+            >
+              <ArrowDown className="h-3 w-3" />
+            </button>
+            <button
+              className="p-1 text-slate-400 hover:text-red-500 rounded hover:bg-red-50 cursor-pointer"
+              onClick={onDelete}
+              title="Delete"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        )}
       </div>
-      <div className="flex" style={{ gap: GROUP_GAP }}>
+      <div className="flex items-start" style={{ gap: GROUP_GAP }}>
         {activities.map((activity) => {
           const tasks = getTasksForActivity(activity.id)
 
@@ -626,7 +696,7 @@ function AddStoryDropZone({
       {showIndicator && <DropLine direction="horizontal" />}
       <button
         ref={setNodeRef}
-        className={`w-full h-8 ${ADD_BUTTON_CLASS}`}
+        className={`w-full h-8 gap-1 ${ADD_BUTTON_CLASS}`}
         onClick={() => onAddStory(taskId, releaseId)}
       >
         <Plus className="h-3 w-3" />
@@ -658,7 +728,7 @@ function SortableStory({
         className="bg-white border border-slate-200 rounded shadow-sm hover:shadow cursor-grab active:cursor-grabbing p-3"
         {...attributes}
         {...listeners}
-        onClick={(e) => {
+        onClick={() => {
           if (!isDragging) onClick()
         }}
       >
