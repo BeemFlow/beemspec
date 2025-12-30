@@ -29,6 +29,18 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const { id } = await params
   const supabase = await createClient()
 
+  // Delete all stories in this release first
+  const { error: storiesError } = await supabase
+    .from('stories')
+    .delete()
+    .eq('release_id', id)
+
+  if (storiesError) {
+    console.error('DELETE /api/releases/[id] stories:', storiesError)
+    return NextResponse.json({ error: 'Failed to delete release stories' }, { status: 500 })
+  }
+
+  // Then delete the release
   const { error } = await supabase.from('releases').delete().eq('id', id)
 
   if (error) {

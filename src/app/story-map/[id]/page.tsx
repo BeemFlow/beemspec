@@ -198,7 +198,7 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   }
 
   async function handleDeleteRelease(releaseId: string) {
-    if (!confirm('Delete this release? Stories will be moved to Backlog.')) return
+    if (!confirm('Delete this release and all its stories? This cannot be undone.')) return
     try {
       const res = await fetch(`/api/releases/${releaseId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete release')
