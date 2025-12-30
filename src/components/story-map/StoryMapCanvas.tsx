@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { Plus, Pencil, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Separator } from '@/components/ui/separator'
 import {
   DndContext,
   DragEndEvent,
@@ -21,7 +24,7 @@ import {
   verticalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable'
-import type { StoryMapFull, Story, Activity, Task, TaskWithStories } from '@/types'
+import type { StoryMapFull, Story, Activity, Task, TaskWithStories, StoryStatus } from '@/types'
 
 interface Props {
   storyMap: StoryMapFull
@@ -42,7 +45,24 @@ const CARD_GAP = 8
 const GROUP_GAP = 24
 const ADD_BUTTON_WIDTH = 28
 
-// Shared subtle button style for all "Add X" buttons
+// Status badge variants
+const STATUS_VARIANTS: Record<StoryStatus, 'default' | 'secondary' | 'outline'> = {
+  backlog: 'outline',
+  ready: 'secondary',
+  in_progress: 'default',
+  review: 'secondary',
+  done: 'default',
+}
+
+const STATUS_LABELS: Record<StoryStatus, string> = {
+  backlog: 'Backlog',
+  ready: 'Ready',
+  in_progress: 'In Progress',
+  review: 'Review',
+  done: 'Done',
+}
+
+// Shared subtle button style for all "Add X" buttons (dashed style not available in Button component)
 const ADD_BUTTON_CLASS =
   'border border-dashed border-slate-300 rounded text-slate-400 hover:text-slate-600 hover:border-slate-400 transition-colors text-xs flex items-center justify-center cursor-pointer'
 
@@ -117,8 +137,6 @@ export function StoryMapCanvas({
       setDropTargetId(null)
       return
     }
-    // Simple: track which item we're over. Always insert BEFORE that item.
-    // Drop on "Add X" button or cell to insert at end.
     setDropTargetId(over.id as string)
   }
 
@@ -167,7 +185,6 @@ export function StoryMapCanvas({
         const toIndex = newOrder.indexOf(overItemId)
         newOrder.splice(toIndex, 0, activeItemId)
 
-        // If moving to a different activity, update the task's activity_id first
         if (activeTask.activityId !== targetActivityId) {
           await fetch(`/api/tasks/${activeItemId}`, {
             method: 'PUT',
@@ -190,7 +207,6 @@ export function StoryMapCanvas({
         const newOrder = tasksInTarget.filter((t) => t.id !== activeItemId).map((t) => t.id)
         newOrder.push(activeItemId)
 
-        // If moving to a different activity, update the task's activity_id first
         if (activeTask.activityId !== targetActivityId) {
           await fetch(`/api/tasks/${activeItemId}`, {
             method: 'PUT',
@@ -222,7 +238,6 @@ export function StoryMapCanvas({
         const toIndex = newOrder.indexOf(overItemId)
         newOrder.splice(toIndex, 0, activeItemId)
 
-        // If moving to a different cell, update the story's task_id/release_id first
         if (activeStory.task_id !== overStory.task_id || activeStory.release_id !== overStory.release_id) {
           await fetch(`/api/stories/${activeItemId}`, {
             method: 'PUT',
@@ -246,7 +261,6 @@ export function StoryMapCanvas({
         const newOrder = targetStories.filter((s) => s.id !== activeItemId).map((s) => s.id)
         newOrder.push(activeItemId)
 
-        // If moving to a different cell, update the story's task_id/release_id first
         if (activeStory.task_id !== taskId || activeStory.release_id !== actualReleaseId) {
           await fetch(`/api/stories/${activeItemId}`, {
             method: 'PUT',
@@ -275,7 +289,6 @@ export function StoryMapCanvas({
     ? allStories.find((s) => s.id === activeDrag.id.split(':')[1])
     : null
 
-  // Helper to check if an item is the drop target (always shows "before" indicator)
   function isDropTarget(itemId: string): boolean {
     return dropTargetId === itemId
   }
@@ -387,7 +400,6 @@ export function StoryMapCanvas({
                     isLast={index === arr.length - 1}
                     isDropTarget={isDropTarget}
                   />
-                  {/* Add Release zone after each release */}
                   <AddReleaseZone onAddRelease={onAddRelease} />
                 </div>
               ))}
@@ -426,10 +438,15 @@ export function StoryMapCanvas({
         )}
         {draggedStory && (
           <div
-            className="bg-white border border-slate-300 rounded shadow-lg p-3"
-            style={{ width: CARD_WIDTH, minHeight: CARD_HEIGHT }}
+            className="bg-white border border-slate-300 rounded shadow-lg p-3 flex flex-col"
+            style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}
           >
-            <div className="text-sm line-clamp-4">{draggedStory.title}</div>
+            <div className="text-xs line-clamp-3">{draggedStory.title}</div>
+            {draggedStory.status !== 'backlog' && (
+              <Badge variant={STATUS_VARIANTS[draggedStory.status]} className="mt-auto text-[10px]">
+                {STATUS_LABELS[draggedStory.status]}
+              </Badge>
+            )}
           </div>
         )}
       </DragOverlay>
@@ -531,7 +548,6 @@ interface ReleaseRowProps {
   getStoriesForCell: (taskId: string, releaseId: string | null) => Story[]
   onAddStory: (taskId: string, releaseId: string | null) => void
   onEditStory: (story: Story) => void
-  onAddRelease?: () => void
   onRename?: () => void
   onMoveUp?: () => void
   onMoveDown?: () => void
@@ -571,47 +587,50 @@ function ReleaseRow({
   isFirst,
   isLast,
   isDropTarget,
-}: Omit<ReleaseRowProps, 'onAddRelease'>) {
-  const showActions = releaseId !== null // Don't show actions for Backlog
+}: ReleaseRowProps) {
+  const showActions = releaseId !== null
 
   return (
-    <div className="border-t pt-4">
+    <div className="pt-4">
+      <Separator className="mb-4" />
       <div className="group flex items-center gap-2 mb-3">
         <div className={`text-sm font-medium ${labelMuted ? 'text-muted-foreground' : ''}`}>
           {label}
         </div>
         {showActions && (
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 cursor-pointer"
-              onClick={onRename}
-              title="Rename"
-            >
-              <Pencil className="h-3 w-3" />
-            </button>
-            <button
-              className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-              onClick={onMoveUp}
-              disabled={isFirst}
-              title="Move up"
-            >
-              <ArrowUp className="h-3 w-3" />
-            </button>
-            <button
-              className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-              onClick={onMoveDown}
-              disabled={isLast}
-              title="Move down"
-            >
-              <ArrowDown className="h-3 w-3" />
-            </button>
-            <button
-              className="p-1 text-slate-400 hover:text-red-500 rounded hover:bg-red-50 cursor-pointer"
-              onClick={onDelete}
-              title="Delete"
-            >
-              <Trash2 className="h-3 w-3" />
-            </button>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-5 w-5 cursor-pointer" onClick={onRename}>
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Rename</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-5 w-5 cursor-pointer" onClick={onMoveUp} disabled={isFirst}>
+                  <ArrowUp className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Move up</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-5 w-5 cursor-pointer" onClick={onMoveDown} disabled={isLast}>
+                  <ArrowDown className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Move down</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-5 w-5 cursor-pointer hover:text-destructive" onClick={onDelete}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Delete</TooltipContent>
+            </Tooltip>
           </div>
         )}
       </div>
@@ -657,7 +676,7 @@ function StoryCell({
   isDropTarget: (itemId: string) => boolean
 }) {
   return (
-    <div className="flex flex-col gap-1 min-h-[40px]" style={{ width: CARD_WIDTH }}>
+    <div className="flex flex-col gap-2 min-h-[40px]" style={{ width: CARD_WIDTH }}>
       {stories.map((story) => (
         <SortableStory
           key={story.id}
@@ -724,15 +743,20 @@ function SortableStory({
       {showIndicator && <DropLine direction="horizontal" />}
       <div
         ref={setNodeRef}
-        style={{ minHeight: CARD_HEIGHT, opacity: isDragging ? 0.5 : 1 }}
-        className="bg-white border border-slate-200 rounded shadow-sm hover:shadow cursor-grab active:cursor-grabbing p-3"
+        style={{ width: CARD_WIDTH, height: CARD_HEIGHT, opacity: isDragging ? 0.5 : 1 }}
+        className="bg-white border border-slate-200 rounded shadow-sm hover:shadow cursor-grab active:cursor-grabbing p-3 flex flex-col"
         {...attributes}
         {...listeners}
         onClick={() => {
           if (!isDragging) onClick()
         }}
       >
-        <div className="text-sm line-clamp-4">{story.title}</div>
+        <div className="text-xs line-clamp-3">{story.title}</div>
+        {story.status !== 'backlog' && (
+          <Badge variant={STATUS_VARIANTS[story.status]} className="mt-auto text-[10px] self-start">
+            {STATUS_LABELS[story.status]}
+          </Badge>
+        )}
       </div>
     </div>
   )

@@ -5,9 +5,17 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
+import { PromptDialog } from '@/components/ui/prompt-dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas'
 import { StoryDialog } from '@/components/story-map/StoryDialog'
 import type { StoryMapFull, Story } from '@/types'
+
+type PromptType =
+  | { type: 'activity' }
+  | { type: 'task'; activityId: string }
+  | { type: 'release' }
+  | { type: 'renameRelease'; releaseId: string; currentName: string }
 
 export default function StoryMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -16,6 +24,14 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   const [selectedStory, setSelectedStory] = useState<Story | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [newStoryContext, setNewStoryContext] = useState<{ taskId: string; releaseId: string | null } | null>(null)
+
+  // Prompt dialog state
+  const [promptOpen, setPromptOpen] = useState(false)
+  const [promptContext, setPromptContext] = useState<PromptType | null>(null)
+
+  // Confirm dialog state
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleteReleaseId, setDeleteReleaseId] = useState<string | null>(null)
 
   const loadStoryMap = useCallback(async () => {
     try {
@@ -56,7 +72,6 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         })
         if (!res.ok) throw new Error('Failed to save story')
       } else if (newStoryContext) {
-        // Find existing stories in this cell to calculate sort_order
         const activity = storyMap?.activities.find((a) =>
           a.tasks?.some((t) => t.id === newStoryContext.taskId)
         )
@@ -98,74 +113,81 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     }
   }
 
-  async function handleAddActivity() {
-    const name = prompt('Activity name:')
-    if (!name) return
-    try {
-      const maxSort = storyMap?.activities.length
-        ? Math.max(...storyMap.activities.map((a) => a.sort_order))
-        : -1
-      const res = await fetch('/api/activities', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ story_map_id: id, name, sort_order: maxSort + 1 }),
-      })
-      if (!res.ok) throw new Error('Failed to create activity')
-      loadStoryMap()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-    }
+  // Open prompt dialogs
+  function handleAddActivity() {
+    setPromptContext({ type: 'activity' })
+    setPromptOpen(true)
   }
 
-  async function handleAddTask(activityId: string) {
-    const name = prompt('Task name:')
-    if (!name) return
-    try {
-      const activity = storyMap?.activities.find((a) => a.id === activityId)
-      const maxSort = activity?.tasks?.length
-        ? Math.max(...activity.tasks.map((t) => t.sort_order))
-        : -1
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ activity_id: activityId, name, sort_order: maxSort + 1 }),
-      })
-      if (!res.ok) throw new Error('Failed to create task')
-      loadStoryMap()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-    }
+  function handleAddTask(activityId: string) {
+    setPromptContext({ type: 'task', activityId })
+    setPromptOpen(true)
   }
 
-  async function handleAddRelease() {
-    const name = prompt('Release name:')
-    if (!name) return
-    try {
-      const maxSort = storyMap?.releases.length
-        ? Math.max(...storyMap.releases.map((r) => r.sort_order))
-        : -1
-      const res = await fetch('/api/releases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ story_map_id: id, name, sort_order: maxSort + 1 }),
-      })
-      if (!res.ok) throw new Error('Failed to create release')
-      loadStoryMap()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-    }
+  function handleAddRelease() {
+    setPromptContext({ type: 'release' })
+    setPromptOpen(true)
   }
 
-  async function handleRenameRelease(releaseId: string, currentName: string) {
-    const name = prompt('Rename release:', currentName)
-    if (!name || name === currentName) return
+  function handleRenameRelease(releaseId: string, currentName: string) {
+    setPromptContext({ type: 'renameRelease', releaseId, currentName })
+    setPromptOpen(true)
+  }
+
+  // Handle prompt submissions
+  async function handlePromptSubmit(value: string) {
+    if (!promptContext) return
+
     try {
-      const res = await fetch(`/api/releases/${releaseId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      })
-      if (!res.ok) throw new Error('Failed to rename release')
+      switch (promptContext.type) {
+        case 'activity': {
+          const maxSort = storyMap?.activities.length
+            ? Math.max(...storyMap.activities.map((a) => a.sort_order))
+            : -1
+          const res = await fetch('/api/activities', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ story_map_id: id, name: value, sort_order: maxSort + 1 }),
+          })
+          if (!res.ok) throw new Error('Failed to create activity')
+          break
+        }
+        case 'task': {
+          const activity = storyMap?.activities.find((a) => a.id === promptContext.activityId)
+          const maxSort = activity?.tasks?.length
+            ? Math.max(...activity.tasks.map((t) => t.sort_order))
+            : -1
+          const res = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ activity_id: promptContext.activityId, name: value, sort_order: maxSort + 1 }),
+          })
+          if (!res.ok) throw new Error('Failed to create task')
+          break
+        }
+        case 'release': {
+          const maxSort = storyMap?.releases.length
+            ? Math.max(...storyMap.releases.map((r) => r.sort_order))
+            : -1
+          const res = await fetch('/api/releases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ story_map_id: id, name: value, sort_order: maxSort + 1 }),
+          })
+          if (!res.ok) throw new Error('Failed to create release')
+          break
+        }
+        case 'renameRelease': {
+          if (value === promptContext.currentName) return
+          const res = await fetch(`/api/releases/${promptContext.releaseId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: value }),
+          })
+          if (!res.ok) throw new Error('Failed to rename release')
+          break
+        }
+      }
       loadStoryMap()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -197,14 +219,34 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     }
   }
 
-  async function handleDeleteRelease(releaseId: string) {
-    if (!confirm('Delete this release and all its stories? This cannot be undone.')) return
+  function handleDeleteRelease(releaseId: string) {
+    setDeleteReleaseId(releaseId)
+    setConfirmOpen(true)
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteReleaseId) return
     try {
-      const res = await fetch(`/api/releases/${releaseId}`, { method: 'DELETE' })
+      const res = await fetch(`/api/releases/${deleteReleaseId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete release')
       loadStoryMap()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
+    }
+  }
+
+  // Get prompt dialog props based on context
+  function getPromptProps() {
+    if (!promptContext) return { title: '', placeholder: '', defaultValue: '' }
+    switch (promptContext.type) {
+      case 'activity':
+        return { title: 'New Activity', placeholder: 'Activity name', defaultValue: '' }
+      case 'task':
+        return { title: 'New Task', placeholder: 'Task name', defaultValue: '' }
+      case 'release':
+        return { title: 'New Release', placeholder: 'Release name', defaultValue: '' }
+      case 'renameRelease':
+        return { title: 'Rename Release', placeholder: 'Release name', defaultValue: promptContext.currentName }
     }
   }
 
@@ -220,6 +262,8 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   }
 
   if (!storyMap) return <div className="p-8">Loading...</div>
+
+  const promptProps = getPromptProps()
 
   return (
     <div className="flex h-screen flex-col">
@@ -258,6 +302,25 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         defaultReleaseId={newStoryContext?.releaseId}
         onSave={handleSaveStory}
         onDelete={selectedStory ? () => handleDeleteStory(selectedStory.id) : undefined}
+      />
+
+      <PromptDialog
+        open={promptOpen}
+        onOpenChange={setPromptOpen}
+        title={promptProps.title}
+        placeholder={promptProps.placeholder}
+        defaultValue={promptProps.defaultValue}
+        onSubmit={handlePromptSubmit}
+      />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete Release"
+        description="This will delete the release and all its stories. This cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={handleConfirmDelete}
       />
     </div>
   )
