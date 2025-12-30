@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { STATUS_OPTIONS } from '@/lib/status'
 import type { Story, Release, StoryStatus } from '@/types'
 
 interface Props {
@@ -30,14 +31,6 @@ interface Props {
   onSave: (story: Partial<Story>) => void
   onDelete?: () => void
 }
-
-const STATUSES: { value: StoryStatus; label: string }[] = [
-  { value: 'backlog', label: 'Backlog' },
-  { value: 'ready', label: 'Ready' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'review', label: 'Review' },
-  { value: 'done', label: 'Done' },
-]
 
 const NO_RELEASE = '__none__'
 
@@ -170,7 +163,7 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUSES.map((s) => (
+                  {STATUS_OPTIONS.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {s.label}
                     </SelectItem>

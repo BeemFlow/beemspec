@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
 import { MapCard, CARD_WIDTH, CARD_HEIGHT } from '@/components/story-map/MapCard'
+import { AddButton } from '@/components/story-map/AddButton'
+import { STATUS_LABELS, STATUS_VARIANTS } from '@/lib/status'
 import {
   DndContext,
   DragEndEvent,
@@ -45,27 +47,6 @@ interface Props {
 const CARD_GAP = 8
 const GROUP_GAP = 24
 const ADD_BUTTON_WIDTH = 28
-
-// Status badge variants
-const STATUS_VARIANTS: Record<StoryStatus, 'default' | 'secondary' | 'outline'> = {
-  backlog: 'outline',
-  ready: 'secondary',
-  in_progress: 'default',
-  review: 'secondary',
-  done: 'default',
-}
-
-const STATUS_LABELS: Record<StoryStatus, string> = {
-  backlog: 'Backlog',
-  ready: 'Ready',
-  in_progress: 'In Progress',
-  review: 'Review',
-  done: 'Done',
-}
-
-// Shared subtle button style for all "Add X" buttons (dashed style not available in Button component)
-const ADD_BUTTON_CLASS =
-  'border border-dashed border-slate-300 rounded text-slate-400 hover:text-slate-600 hover:border-slate-400 transition-colors text-xs flex items-center justify-center cursor-pointer'
 
 // Group width = task columns + add button column
 function getGroupWidth(taskCount: number) {
@@ -333,16 +314,12 @@ export function StoryMapCanvas({
                     onClick={() => onEditActivity(activity)}
                     showIndicator={isDropTarget(`activity:${activity.id}`)}
                   />
-                  <button
-                    className={ADD_BUTTON_CLASS}
+                  <AddButton
+                    label="Activity"
+                    orientation="vertical"
                     style={{ width: ADD_BUTTON_WIDTH, height: CARD_HEIGHT }}
                     onClick={onAddActivity}
-                  >
-                    <span className="flex items-center gap-1 rotate-90 whitespace-nowrap">
-                      <Plus className="h-3 w-3" />
-                      Activity
-                    </span>
-                  </button>
+                  />
                 </div>
               )
             })}
@@ -466,17 +443,13 @@ function AddTaskDropZone({
   return (
     <div className="flex gap-1">
       {showIndicator && <DropLine direction="vertical" />}
-      <button
+      <AddButton
         ref={setNodeRef}
-        className={ADD_BUTTON_CLASS}
+        label="Task"
+        orientation="vertical"
         style={{ width: ADD_BUTTON_WIDTH, height: CARD_HEIGHT }}
         onClick={() => onAddTask(activityId)}
-      >
-        <span className="flex items-center gap-1 rotate-90 whitespace-nowrap">
-          <Plus className="h-3 w-3" />
-          Task
-        </span>
-      </button>
+      />
     </div>
   )
 }
@@ -566,13 +539,11 @@ interface ReleaseRowProps {
 function AddReleaseZone({ onAddRelease }: { onAddRelease: () => void }) {
   return (
     <div className="group/addzone h-6 mt-4 relative">
-      <button
-        className="absolute inset-x-0 top-0 h-8 opacity-0 group-hover/addzone:opacity-100 transition-opacity border border-dashed border-slate-300 rounded text-slate-400 hover:text-slate-600 hover:border-slate-400 text-xs flex items-center gap-1 px-3 bg-white cursor-pointer z-10"
+      <AddButton
+        label="Release"
+        className="absolute inset-x-0 top-0 h-8 opacity-0 group-hover/addzone:opacity-100 transition-opacity px-3 bg-white z-10 justify-start"
         onClick={onAddRelease}
-      >
-        <Plus className="h-3 w-3" />
-        Release
-      </button>
+      />
     </div>
   )
 }
@@ -719,14 +690,12 @@ function AddStoryDropZone({
   return (
     <div className="flex flex-col gap-1">
       {showIndicator && <DropLine direction="horizontal" />}
-      <button
+      <AddButton
         ref={setNodeRef}
-        className={`w-full h-8 gap-1 ${ADD_BUTTON_CLASS}`}
+        label="Story"
+        className="w-full h-8"
         onClick={() => onAddStory(taskId, releaseId)}
-      >
-        <Plus className="h-3 w-3" />
-        Story
-      </button>
+      />
     </div>
   )
 }
