@@ -1,8 +1,6 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-
-const CARD_WIDTH = 140
-const CARD_HEIGHT = 96
+import { CARD_WIDTH, CARD_HEIGHT } from '@/components/story-map/constants'
 
 type MapCardVariant = 'activity' | 'task' | 'story'
 
@@ -43,5 +41,5 @@ const MapCard = React.forwardRef<HTMLDivElement, MapCardProps>(
 
 MapCard.displayName = 'MapCard'
 
-export { MapCard, CARD_WIDTH, CARD_HEIGHT }
+export { MapCard }
 export type { MapCardVariant }

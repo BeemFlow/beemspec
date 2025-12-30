@@ -1,5 +1,9 @@
 import type { StoryStatus } from '@/types'
 
+// =============================================================================
+// Story Status
+// =============================================================================
+
 export const STATUS_LABELS: Record<StoryStatus, string> = {
   backlog: 'Backlog',
   ready: 'Ready',
@@ -16,7 +20,6 @@ export const STATUS_VARIANTS: Record<StoryStatus, 'default' | 'secondary' | 'out
   done: 'default',
 }
 
-// For use in Select components
 export const STATUS_OPTIONS: { value: StoryStatus; label: string }[] = [
   { value: 'backlog', label: 'Backlog' },
   { value: 'ready', label: 'Ready' },

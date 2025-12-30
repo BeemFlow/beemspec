@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { STATUS_OPTIONS } from '@/lib/status'
+import { STATUS_OPTIONS } from '@/lib/constants'
 import type { Story, Release, StoryStatus } from '@/types'
 
 interface Props {

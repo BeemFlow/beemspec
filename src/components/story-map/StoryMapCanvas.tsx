@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
-import { MapCard, CARD_WIDTH, CARD_HEIGHT } from '@/components/story-map/MapCard'
+import { MapCard } from '@/components/story-map/MapCard'
 import { AddButton } from '@/components/story-map/AddButton'
-import { STATUS_LABELS, STATUS_VARIANTS } from '@/lib/status'
+import { CARD_WIDTH, CARD_HEIGHT, CARD_GAP, GROUP_GAP, ADD_BUTTON_WIDTH } from '@/components/story-map/constants'
+import { STATUS_LABELS, STATUS_VARIANTS } from '@/lib/constants'
 import {
   DndContext,
   DragEndEvent,
@@ -43,10 +44,6 @@ interface Props {
   onDeleteRelease: (releaseId: string) => void
   onRefresh: () => void
 }
-
-const CARD_GAP = 8
-const GROUP_GAP = 24
-const ADD_BUTTON_WIDTH = 28
 
 // Group width = task columns + add button column
 function getGroupWidth(taskCount: number) {
