@@ -255,6 +255,7 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         onOpenChange={setDialogOpen}
         story={selectedStory}
         releases={storyMap.releases}
+        defaultReleaseId={newStoryContext?.releaseId}
         onSave={handleSaveStory}
         onDelete={selectedStory ? () => handleDeleteStory(selectedStory.id) : undefined}
       />

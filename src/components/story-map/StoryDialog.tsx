@@ -26,6 +26,7 @@ interface Props {
   onOpenChange: (open: boolean) => void
   story: Story | null
   releases: Release[]
+  defaultReleaseId?: string | null
   onSave: (story: Partial<Story>) => void
   onDelete?: () => void
 }
@@ -40,7 +41,7 @@ const STATUSES: { value: StoryStatus; label: string }[] = [
 
 const NO_RELEASE = '__none__'
 
-export function StoryDialog({ open, onOpenChange, story, releases, onSave, onDelete }: Props) {
+export function StoryDialog({ open, onOpenChange, story, releases, defaultReleaseId, onSave, onDelete }: Props) {
   const [title, setTitle] = useState('')
   const [requirements, setRequirements] = useState('')
   const [acceptanceCriteria, setAcceptanceCriteria] = useState('')
@@ -68,9 +69,10 @@ export function StoryDialog({ open, onOpenChange, story, releases, onSave, onDel
       setEdgeCases('')
       setTechnicalGuidelines('')
       setStatus('backlog')
-      setReleaseId(NO_RELEASE)
+      // Default to the release that was clicked, or no release
+      setReleaseId(defaultReleaseId || NO_RELEASE)
     }
-  }, [story, open])
+  }, [story, open, defaultReleaseId])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
