@@ -1,25 +1,32 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import {
+  validateRequest,
+  updateTaskSchema,
+  isValidUuid,
+  invalidIdResponse,
+  pickDefined,
+} from '@/lib/validations'
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  if (!isValidUuid(id)) return invalidIdResponse()
+
+  const validation = await validateRequest(request, updateTaskSchema)
+  if (!validation.success) return validation.response
+
   const supabase = await createClient()
-  const body = await request.json()
-
-  const updateData: Record<string, unknown> = {}
-  if (body.activity_id !== undefined) updateData.activity_id = body.activity_id
-  if (body.name !== undefined) updateData.name = body.name
-  if (body.description !== undefined) updateData.description = body.description
-  if (body.sort_order !== undefined) updateData.sort_order = body.sort_order
-
   const { data, error } = await supabase
     .from('tasks')
-    .update(updateData)
+    .update(pickDefined(validation.data))
     .eq('id', id)
     .select()
     .single()
 
   if (error) {
+    if (error.code === 'PGRST116') {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
     console.error('PUT /api/tasks/[id]:', error)
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 })
   }
@@ -28,13 +35,22 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
+  if (!isValidUuid(id)) return invalidIdResponse()
 
-  const { error } = await supabase.from('tasks').delete().eq('id', id)
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', id)
+    .select()
+    .single()
 
   if (error) {
+    if (error.code === 'PGRST116') {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
     console.error('DELETE /api/tasks/[id]:', error)
     return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 })
   }
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, deleted: data })
 }

@@ -81,17 +81,6 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         })
         if (!res.ok) throw new Error('Failed to save story')
       } else if (newStoryContext) {
-        const activity = storyMap?.activities.find((a) =>
-          a.tasks?.some((t) => t.id === newStoryContext.taskId)
-        )
-        const task = activity?.tasks?.find((t) => t.id === newStoryContext.taskId)
-        const cellStories = task?.stories?.filter(
-          (s) => s.release_id === newStoryContext.releaseId
-        ) ?? []
-        const maxSort = cellStories.length
-          ? Math.max(...cellStories.map((s) => s.sort_order))
-          : -1
-
         const res = await fetch('/api/stories', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -99,7 +88,6 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
             ...story,
             task_id: newStoryContext.taskId,
             release_id: newStoryContext.releaseId,
-            sort_order: maxSort + 1,
           }),
         })
         if (!res.ok) throw new Error('Failed to create story')
@@ -143,13 +131,10 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         })
         if (!res.ok) throw new Error('Failed to update activity')
       } else {
-        const maxSort = storyMap?.activities.length
-          ? Math.max(...storyMap.activities.map((a) => a.sort_order))
-          : -1
         const res = await fetch('/api/activities', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ story_map_id: id, name: data.name, sort_order: maxSort + 1 }),
+          body: JSON.stringify({ story_map_id: id, name: data.name }),
         })
         if (!res.ok) throw new Error('Failed to create activity')
       }
@@ -195,14 +180,10 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         })
         if (!res.ok) throw new Error('Failed to update task')
       } else if (newTaskActivityId) {
-        const activity = storyMap?.activities.find((a) => a.id === newTaskActivityId)
-        const maxSort = activity?.tasks?.length
-          ? Math.max(...activity.tasks.map((t) => t.sort_order))
-          : -1
         const res = await fetch('/api/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity_id: newTaskActivityId, name: data.name, sort_order: maxSort + 1 }),
+          body: JSON.stringify({ activity_id: newTaskActivityId, name: data.name }),
         })
         if (!res.ok) throw new Error('Failed to create task')
       }
@@ -243,13 +224,10 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     try {
       switch (promptContext.type) {
         case 'release': {
-          const maxSort = storyMap?.releases.length
-            ? Math.max(...storyMap.releases.map((r) => r.sort_order))
-            : -1
           const res = await fetch('/api/releases', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ story_map_id: id, name: value, sort_order: maxSort + 1 }),
+            body: JSON.stringify({ story_map_id: id, name: value }),
           })
           if (!res.ok) throw new Error('Failed to create release')
           break
