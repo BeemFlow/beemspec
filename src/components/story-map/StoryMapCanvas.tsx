@@ -105,7 +105,8 @@ interface Props {
 }
 
 function getGroupWidth(taskCount: number): number {
-  return taskCount * (CARD_WIDTH + CARD_GAP) + ADD_BUTTON_WIDTH
+  // Ensure minimum width of 1 card space even when no tasks exist
+  return Math.max(taskCount, 1) * (CARD_WIDTH + CARD_GAP) + ADD_BUTTON_WIDTH
 }
 
 function DropLine({ direction }: { direction: 'vertical' | 'horizontal' }) {

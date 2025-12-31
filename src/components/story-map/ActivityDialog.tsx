@@ -41,7 +41,7 @@ export function ActivityDialog({ open, onOpenChange, activity, onSave, onDelete 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{activity ? 'Edit Activity' : 'New Activity'}</DialogTitle>
         </DialogHeader>
