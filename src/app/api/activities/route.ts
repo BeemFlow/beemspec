@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { validateRequest, reorderActivitiesSchema, createActivitySchema } from '@/lib/validations'
+import { serverErrorResponse } from '@/lib/errors'
 
 export async function PUT(request: Request) {
   const validation = await validateRequest(request, reorderActivitiesSchema)
@@ -13,8 +14,7 @@ export async function PUT(request: Request) {
   })
 
   if (error) {
-    console.error('PUT /api/activities:', error)
-    return NextResponse.json({ error: 'Failed to reorder activities' }, { status: 500 })
+    return serverErrorResponse('Failed to reorder activities', error)
   }
   return NextResponse.json({ success: true })
 }
@@ -35,8 +35,7 @@ export async function POST(request: Request) {
     .single()
 
   if (error) {
-    console.error('POST /api/activities:', error)
-    return NextResponse.json({ error: 'Failed to create activity' }, { status: 500 })
+    return serverErrorResponse('Failed to create activity', error)
   }
   return NextResponse.json(data)
 }

@@ -1,12 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import {
-  validateRequest,
-  updateStoryMapSchema,
-  isValidUuid,
-  invalidIdResponse,
-  pickDefined,
-} from '@/lib/validations'
+import { validateRequest, updateStoryMapSchema, isValidUuid, invalidIdResponse, pickDefined } from '@/lib/validations'
+import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors'
+import type { StoryMapFull } from '@/types'
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -27,20 +23,33 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     supabase.from('personas').select('*').eq('story_map_id', id).order('sort_order'),
   ])
 
+  // Check main map first
   if (mapResult.error) {
-    if (mapResult.error.code === 'PGRST116') {
-      return NextResponse.json({ error: 'Story map not found' }, { status: 404 })
+    if (mapResult.error.code === DbErrorCode.NOT_FOUND) {
+      return notFoundResponse('Story map')
     }
-    console.error('GET /api/story-maps/[id]:', mapResult.error)
-    return NextResponse.json({ error: 'Failed to load story map' }, { status: 500 })
+    return serverErrorResponse('Failed to load story map', mapResult.error)
   }
 
-  return NextResponse.json({
+  // Check related data
+  if (activitiesResult.error) {
+    return serverErrorResponse('Failed to load activities', activitiesResult.error)
+  }
+  if (releasesResult.error) {
+    return serverErrorResponse('Failed to load releases', releasesResult.error)
+  }
+  if (personasResult.error) {
+    return serverErrorResponse('Failed to load personas', personasResult.error)
+  }
+
+  const fullMap: StoryMapFull = {
     ...mapResult.data,
-    activities: activitiesResult.data ?? [],
-    releases: releasesResult.data ?? [],
-    personas: personasResult.data ?? [],
-  })
+    activities: activitiesResult.data,
+    releases: releasesResult.data,
+    personas: personasResult.data,
+  }
+
+  return NextResponse.json(fullMap)
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -64,11 +73,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      return NextResponse.json({ error: 'Story map not found' }, { status: 404 })
+    if (error.code === DbErrorCode.NOT_FOUND) {
+      return notFoundResponse('Story map')
     }
-    console.error('PUT /api/story-maps/[id]:', error)
-    return NextResponse.json({ error: 'Failed to update story map' }, { status: 500 })
+    return serverErrorResponse('Failed to update story map', error)
   }
   return NextResponse.json(data)
 }
@@ -86,11 +94,10 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      return NextResponse.json({ error: 'Story map not found' }, { status: 404 })
+    if (error.code === DbErrorCode.NOT_FOUND) {
+      return notFoundResponse('Story map')
     }
-    console.error('DELETE /api/story-maps/[id]:', error)
-    return NextResponse.json({ error: 'Failed to delete story map' }, { status: 500 })
+    return serverErrorResponse('Failed to delete story map', error)
   }
   return NextResponse.json({ success: true, deleted: data })
 }

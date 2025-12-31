@@ -10,6 +10,7 @@ import { MapCard } from '@/components/story-map/MapCard'
 import { AddButton } from '@/components/story-map/AddButton'
 import { CARD_WIDTH, CARD_HEIGHT, CARD_GAP, GROUP_GAP, ADD_BUTTON_WIDTH } from '@/components/story-map/constants'
 import { STATUS_LABELS, STATUS_VARIANTS } from '@/lib/constants'
+import { assertNever } from '@/lib/errors'
 import {
   DndContext,
   DragEndEvent,
@@ -28,7 +29,65 @@ import {
   verticalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable'
-import type { StoryMapFull, Story, Activity, Task, TaskWithStories, StoryStatus } from '@/types'
+import type { StoryMapFull, Story, Activity, Task, TaskWithStories } from '@/types'
+
+/**
+ * Type-safe drag ID system using discriminated unions
+ * Replaces error-prone string parsing with proper types
+ */
+type DragId =
+  | { type: 'activity'; id: string }
+  | { type: 'task'; id: string }
+  | { type: 'story'; id: string }
+  | { type: 'task-end'; activityId: string }
+  | { type: 'story-end'; taskId: string; releaseId: string | null }
+
+const BACKLOG_MARKER = 'backlog' as const
+
+function encodeDragId(dragId: DragId): string {
+  switch (dragId.type) {
+    case 'activity':
+      return `activity:${dragId.id}`
+    case 'task':
+      return `task:${dragId.id}`
+    case 'story':
+      return `story:${dragId.id}`
+    case 'task-end':
+      return `task-end:${dragId.activityId}`
+    case 'story-end':
+      return `story-end:${dragId.taskId}:${dragId.releaseId ?? BACKLOG_MARKER}`
+    default:
+      assertNever(dragId)
+  }
+}
+
+function parseDragId(encoded: string): DragId | null {
+  const parts = encoded.split(':')
+  const type = parts[0]
+
+  switch (type) {
+    case 'activity':
+      return parts[1] ? { type: 'activity', id: parts[1] } : null
+    case 'task':
+      return parts[1] ? { type: 'task', id: parts[1] } : null
+    case 'story':
+      return parts[1] ? { type: 'story', id: parts[1] } : null
+    case 'task-end':
+      return parts[1] ? { type: 'task-end', activityId: parts[1] } : null
+    case 'story-end': {
+      const taskId = parts[1]
+      const releaseMarker = parts[2]
+      if (!taskId || !releaseMarker) return null
+      return {
+        type: 'story-end',
+        taskId,
+        releaseId: releaseMarker === BACKLOG_MARKER ? null : releaseMarker,
+      }
+    }
+    default:
+      return null
+  }
+}
 
 interface Props {
   storyMap: StoryMapFull
@@ -45,15 +104,10 @@ interface Props {
   onRefresh: () => void
 }
 
-// Group width = task columns + add button column
-function getGroupWidth(taskCount: number) {
+function getGroupWidth(taskCount: number): number {
   return taskCount * (CARD_WIDTH + CARD_GAP) + ADD_BUTTON_WIDTH
 }
 
-type DragType = 'activity' | 'task' | 'story'
-type ActiveDrag = { type: DragType; id: string } | null
-
-// Drop indicator line component
 function DropLine({ direction }: { direction: 'vertical' | 'horizontal' }) {
   if (direction === 'vertical') {
     return <div className="w-0.5 h-full bg-blue-500 rounded-full min-h-[96px]" />
@@ -76,7 +130,7 @@ export function StoryMapCanvas({
   onRefresh,
 }: Props) {
   const { activities, releases } = storyMap
-  const [activeDrag, setActiveDrag] = useState<ActiveDrag>(null)
+  const [activeDrag, setActiveDrag] = useState<DragId | null>(null)
   const [dropTargetId, setDropTargetId] = useState<string | null>(null)
 
   const sensors = useSensors(
@@ -101,15 +155,14 @@ export function StoryMapCanvas({
   }
 
   function getStoriesForCell(taskId: string, releaseId: string | null): Story[] {
-    return sortedStories.filter(
-      (s) => s.task_id === taskId && (releaseId ? s.release_id === releaseId : !s.release_id)
+    return sortedStories.filter((s) =>
+      s.task_id === taskId && (releaseId ? s.release_id === releaseId : !s.release_id)
     )
   }
 
   function handleDragStart(event: DragStartEvent) {
-    const id = event.active.id as string
-    const [type] = id.split(':')
-    setActiveDrag({ type: type as DragType, id })
+    const parsed = parseDragId(String(event.active.id))
+    setActiveDrag(parsed)
   }
 
   function handleDragOver(event: DragOverEvent) {
@@ -118,7 +171,7 @@ export function StoryMapCanvas({
       setDropTargetId(null)
       return
     }
-    setDropTargetId(over.id as string)
+    setDropTargetId(String(over.id))
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -127,21 +180,21 @@ export function StoryMapCanvas({
     setDropTargetId(null)
     if (!over) return
 
-    const activeId = active.id as string
-    const overId = over.id as string
+    const activeId = String(active.id)
+    const overId = String(over.id)
     if (activeId === overId) return
 
-    const [activeType, activeItemId] = activeId.split(':')
-    const [overType, ...overParts] = overId.split(':')
-    const overItemId = overParts[0]
+    const activeParsed = parseDragId(activeId)
+    const overParsed = parseDragId(overId)
+    if (!activeParsed || !overParsed) return
 
     // Activity reordering
-    if (activeType === 'activity' && overType === 'activity') {
+    if (activeParsed.type === 'activity' && overParsed.type === 'activity') {
       const newOrder = sortedActivities.map((a) => a.id)
-      const fromIndex = newOrder.indexOf(activeItemId)
-      const toIndex = newOrder.indexOf(overItemId)
+      const fromIndex = newOrder.indexOf(activeParsed.id)
+      const toIndex = newOrder.indexOf(overParsed.id)
       newOrder.splice(fromIndex, 1)
-      newOrder.splice(toIndex, 0, activeItemId)
+      newOrder.splice(toIndex, 0, activeParsed.id)
 
       await fetch('/api/activities', {
         method: 'PUT',
@@ -149,25 +202,26 @@ export function StoryMapCanvas({
         body: JSON.stringify({ story_map_id: storyMap.id, order: newOrder }),
       })
       onRefresh()
+      return
     }
 
     // Task movement
-    if (activeType === 'task') {
-      const activeTask = allTasksOrdered.find((t) => t.id === activeItemId)
+    if (activeParsed.type === 'task') {
+      const activeTask = allTasksOrdered.find((t) => t.id === activeParsed.id)
       if (!activeTask) return
 
-      if (overType === 'task') {
-        const overTask = allTasksOrdered.find((t) => t.id === overItemId)
+      if (overParsed.type === 'task') {
+        const overTask = allTasksOrdered.find((t) => t.id === overParsed.id)
         if (!overTask) return
 
         const targetActivityId = overTask.activityId
         const tasksInTarget = getTasksForActivity(targetActivityId)
-        const newOrder = tasksInTarget.filter((t) => t.id !== activeItemId).map((t) => t.id)
-        const toIndex = newOrder.indexOf(overItemId)
-        newOrder.splice(toIndex, 0, activeItemId)
+        const newOrder = tasksInTarget.filter((t) => t.id !== activeParsed.id).map((t) => t.id)
+        const toIndex = newOrder.indexOf(overParsed.id)
+        newOrder.splice(toIndex, 0, activeParsed.id)
 
         if (activeTask.activityId !== targetActivityId) {
-          await fetch(`/api/tasks/${activeItemId}`, {
+          await fetch(`/api/tasks/${activeParsed.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ activity_id: targetActivityId }),
@@ -180,16 +234,17 @@ export function StoryMapCanvas({
           body: JSON.stringify({ activity_id: targetActivityId, order: newOrder }),
         })
         onRefresh()
+        return
       }
 
-      if (overType === 'task-end') {
-        const targetActivityId = overItemId
+      if (overParsed.type === 'task-end') {
+        const targetActivityId = overParsed.activityId
         const tasksInTarget = getTasksForActivity(targetActivityId)
-        const newOrder = tasksInTarget.filter((t) => t.id !== activeItemId).map((t) => t.id)
-        newOrder.push(activeItemId)
+        const newOrder = tasksInTarget.filter((t) => t.id !== activeParsed.id).map((t) => t.id)
+        newOrder.push(activeParsed.id)
 
         if (activeTask.activityId !== targetActivityId) {
-          await fetch(`/api/tasks/${activeItemId}`, {
+          await fetch(`/api/tasks/${activeParsed.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ activity_id: targetActivityId }),
@@ -202,25 +257,26 @@ export function StoryMapCanvas({
           body: JSON.stringify({ activity_id: targetActivityId, order: newOrder }),
         })
         onRefresh()
+        return
       }
     }
 
     // Story movement
-    if (activeType === 'story') {
-      const activeStory = sortedStories.find((s) => s.id === activeItemId)
+    if (activeParsed.type === 'story') {
+      const activeStory = sortedStories.find((s) => s.id === activeParsed.id)
       if (!activeStory) return
 
-      if (overType === 'story') {
-        const overStory = sortedStories.find((s) => s.id === overItemId)
+      if (overParsed.type === 'story') {
+        const overStory = sortedStories.find((s) => s.id === overParsed.id)
         if (!overStory) return
 
         const targetStories = getStoriesForCell(overStory.task_id, overStory.release_id)
-        const newOrder = targetStories.filter((s) => s.id !== activeItemId).map((s) => s.id)
-        const toIndex = newOrder.indexOf(overItemId)
-        newOrder.splice(toIndex, 0, activeItemId)
+        const newOrder = targetStories.filter((s) => s.id !== activeParsed.id).map((s) => s.id)
+        const toIndex = newOrder.indexOf(overParsed.id)
+        newOrder.splice(toIndex, 0, activeParsed.id)
 
         if (activeStory.task_id !== overStory.task_id || activeStory.release_id !== overStory.release_id) {
-          await fetch(`/api/stories/${activeItemId}`, {
+          await fetch(`/api/stories/${activeParsed.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ task_id: overStory.task_id, release_id: overStory.release_id }),
@@ -233,41 +289,43 @@ export function StoryMapCanvas({
           body: JSON.stringify({ task_id: overStory.task_id, release_id: overStory.release_id, order: newOrder }),
         })
         onRefresh()
+        return
       }
 
-      if (overType === 'story-end') {
-        const [taskId, releaseId] = overParts
-        const actualReleaseId = releaseId === 'backlog' ? null : releaseId
-        const targetStories = getStoriesForCell(taskId, actualReleaseId)
-        const newOrder = targetStories.filter((s) => s.id !== activeItemId).map((s) => s.id)
-        newOrder.push(activeItemId)
+      if (overParsed.type === 'story-end') {
+        const { taskId, releaseId } = overParsed
+        const targetStories = getStoriesForCell(taskId, releaseId)
+        const newOrder = targetStories.filter((s) => s.id !== activeParsed.id).map((s) => s.id)
+        newOrder.push(activeParsed.id)
 
-        if (activeStory.task_id !== taskId || activeStory.release_id !== actualReleaseId) {
-          await fetch(`/api/stories/${activeItemId}`, {
+        if (activeStory.task_id !== taskId || activeStory.release_id !== releaseId) {
+          await fetch(`/api/stories/${activeParsed.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ task_id: taskId, release_id: actualReleaseId }),
+            body: JSON.stringify({ task_id: taskId, release_id: releaseId }),
           })
         }
 
         await fetch('/api/stories', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ task_id: taskId, release_id: actualReleaseId, order: newOrder }),
+          body: JSON.stringify({ task_id: taskId, release_id: releaseId, order: newOrder }),
         })
         onRefresh()
+        return
       }
     }
   }
 
+  // Derive dragged item from state - no string parsing needed
   const draggedActivity = activeDrag?.type === 'activity'
-    ? activities.find((a) => a.id === activeDrag.id.split(':')[1])
+    ? activities.find((a) => a.id === activeDrag.id)
     : null
   const draggedTask = activeDrag?.type === 'task'
-    ? allTasksOrdered.find((t) => t.id === activeDrag.id.split(':')[1])
+    ? allTasksOrdered.find((t) => t.id === activeDrag.id)
     : null
   const draggedStory = activeDrag?.type === 'story'
-    ? allStories.find((s) => s.id === activeDrag.id.split(':')[1])
+    ? allStories.find((s) => s.id === activeDrag.id)
     : null
 
   function isDropTarget(itemId: string): boolean {
@@ -297,7 +355,7 @@ export function StoryMapCanvas({
       <div className="inline-flex flex-col">
         {/* Activities Row */}
         <SortableContext
-          items={sortedActivities.map((a) => `activity:${a.id}`)}
+          items={sortedActivities.map((a) => encodeDragId({ type: 'activity', id: a.id }))}
           strategy={horizontalListSortingStrategy}
         >
           <div className="flex" style={{ gap: GROUP_GAP }}>
@@ -309,7 +367,7 @@ export function StoryMapCanvas({
                   <SortableActivity
                     activity={activity}
                     onClick={() => onEditActivity(activity)}
-                    showIndicator={isDropTarget(`activity:${activity.id}`)}
+                    showIndicator={isDropTarget(encodeDragId({ type: 'activity', id: activity.id }))}
                   />
                   <AddButton
                     label="Activity"
@@ -325,7 +383,7 @@ export function StoryMapCanvas({
 
         {/* Tasks Row */}
         <SortableContext
-          items={allTasksOrdered.map((t) => `task:${t.id}`)}
+          items={allTasksOrdered.map((t) => encodeDragId({ type: 'task', id: t.id }))}
           strategy={horizontalListSortingStrategy}
         >
           <div className="flex mt-2" style={{ gap: GROUP_GAP }}>
@@ -339,13 +397,13 @@ export function StoryMapCanvas({
                       key={task.id}
                       task={task}
                       onClick={() => onEditTask(task)}
-                      showIndicator={isDropTarget(`task:${task.id}`)}
+                      showIndicator={isDropTarget(encodeDragId({ type: 'task', id: task.id }))}
                     />
                   ))}
                   <AddTaskDropZone
                     activityId={activity.id}
                     onAddTask={onAddTask}
-                    showIndicator={isDropTarget(`task-end:${activity.id}`)}
+                    showIndicator={isDropTarget(encodeDragId({ type: 'task-end', activityId: activity.id }))}
                   />
                 </div>
               )
@@ -355,7 +413,7 @@ export function StoryMapCanvas({
 
         {/* Release Rows */}
         <SortableContext
-          items={sortedStories.map((s) => `story:${s.id}`)}
+          items={sortedStories.map((s) => encodeDragId({ type: 'story', id: s.id }))}
           strategy={verticalListSortingStrategy}
         >
           <div className="mt-6 space-y-2">
@@ -434,7 +492,7 @@ function AddTaskDropZone({
   showIndicator: boolean
 }) {
   const { setNodeRef } = useDroppable({
-    id: `task-end:${activityId}`,
+    id: encodeDragId({ type: 'task-end', activityId }),
   })
 
   return (
@@ -461,7 +519,7 @@ function SortableActivity({
   showIndicator: boolean
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
-    id: `activity:${activity.id}`,
+    id: encodeDragId({ type: 'activity', id: activity.id }),
   })
 
   return (
@@ -493,7 +551,7 @@ function SortableTask({
   showIndicator: boolean
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
-    id: `task:${task.id}`,
+    id: encodeDragId({ type: 'task', id: task.id }),
   })
 
   return (
@@ -656,14 +714,14 @@ function StoryCell({
           key={story.id}
           story={story}
           onClick={() => onEditStory(story)}
-          showIndicator={isDropTarget(`story:${story.id}`)}
+          showIndicator={isDropTarget(encodeDragId({ type: 'story', id: story.id }))}
         />
       ))}
       <AddStoryDropZone
         taskId={taskId}
         releaseId={releaseId}
         onAddStory={onAddStory}
-        showIndicator={isDropTarget(`story-end:${taskId}:${releaseId ?? 'backlog'}`)}
+        showIndicator={isDropTarget(encodeDragId({ type: 'story-end', taskId, releaseId }))}
       />
     </div>
   )
@@ -681,7 +739,7 @@ function AddStoryDropZone({
   showIndicator: boolean
 }) {
   const { setNodeRef } = useDroppable({
-    id: `story-end:${taskId}:${releaseId ?? 'backlog'}`,
+    id: encodeDragId({ type: 'story-end', taskId, releaseId }),
   })
 
   return (
@@ -707,7 +765,7 @@ function SortableStory({
   showIndicator: boolean
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
-    id: `story:${story.id}`,
+    id: encodeDragId({ type: 'story', id: story.id }),
   })
 
   return (

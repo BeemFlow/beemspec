@@ -1,12 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import {
-  validateRequest,
-  updateActivitySchema,
-  isValidUuid,
-  invalidIdResponse,
-  pickDefined,
-} from '@/lib/validations'
+import { validateRequest, updateActivitySchema, isValidUuid, invalidIdResponse, pickDefined } from '@/lib/validations'
+import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors'
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -24,11 +19,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      return NextResponse.json({ error: 'Activity not found' }, { status: 404 })
+    if (error.code === DbErrorCode.NOT_FOUND) {
+      return notFoundResponse('Activity')
     }
-    console.error('PUT /api/activities/[id]:', error)
-    return NextResponse.json({ error: 'Failed to update activity' }, { status: 500 })
+    return serverErrorResponse('Failed to update activity', error)
   }
   return NextResponse.json(data)
 }
@@ -46,11 +40,10 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      return NextResponse.json({ error: 'Activity not found' }, { status: 404 })
+    if (error.code === DbErrorCode.NOT_FOUND) {
+      return notFoundResponse('Activity')
     }
-    console.error('DELETE /api/activities/[id]:', error)
-    return NextResponse.json({ error: 'Failed to delete activity' }, { status: 500 })
+    return serverErrorResponse('Failed to delete activity', error)
   }
   return NextResponse.json({ success: true, deleted: data })
 }

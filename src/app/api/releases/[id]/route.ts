@@ -1,12 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import {
-  validateRequest,
-  updateReleaseSchema,
-  isValidUuid,
-  invalidIdResponse,
-  pickDefined,
-} from '@/lib/validations'
+import { validateRequest, updateReleaseSchema, isValidUuid, invalidIdResponse, pickDefined } from '@/lib/validations'
+import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors'
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -24,11 +19,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      return NextResponse.json({ error: 'Release not found' }, { status: 404 })
+    if (error.code === DbErrorCode.NOT_FOUND) {
+      return notFoundResponse('Release')
     }
-    console.error('PUT /api/releases/[id]:', error)
-    return NextResponse.json({ error: 'Failed to update release' }, { status: 500 })
+    return serverErrorResponse('Failed to update release', error)
   }
   return NextResponse.json(data)
 }
@@ -41,11 +35,10 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const { error } = await supabase.rpc('delete_release', { p_release_id: id })
 
   if (error) {
-    if (error.code === 'P0002') {
-      return NextResponse.json({ error: 'Release not found' }, { status: 404 })
+    if (error.code === DbErrorCode.NOT_FOUND || error.code === DbErrorCode.RPC_NOT_FOUND) {
+      return notFoundResponse('Release')
     }
-    console.error('DELETE /api/releases/[id]:', error)
-    return NextResponse.json({ error: 'Failed to delete release' }, { status: 500 })
+    return serverErrorResponse('Failed to delete release', error)
   }
   return NextResponse.json({ success: true })
 }

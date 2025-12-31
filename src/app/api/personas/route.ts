@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { validateRequest, createPersonaSchema } from '@/lib/validations'
+import { serverErrorResponse } from '@/lib/errors'
 
 export async function POST(request: Request) {
   const validation = await validateRequest(request, createPersonaSchema)
@@ -19,8 +20,7 @@ export async function POST(request: Request) {
     .single()
 
   if (error) {
-    console.error('POST /api/personas:', error)
-    return NextResponse.json({ error: 'Failed to create persona' }, { status: 500 })
+    return serverErrorResponse('Failed to create persona', error)
   }
   return NextResponse.json(data)
 }

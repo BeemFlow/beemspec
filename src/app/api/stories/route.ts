@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { validateRequest, reorderStoriesSchema, createStorySchema } from '@/lib/validations'
+import { serverErrorResponse } from '@/lib/errors'
 
 export async function PUT(request: Request) {
   const validation = await validateRequest(request, reorderStoriesSchema)
@@ -14,8 +15,7 @@ export async function PUT(request: Request) {
   })
 
   if (error) {
-    console.error('PUT /api/stories:', error)
-    return NextResponse.json({ error: 'Failed to reorder stories' }, { status: 500 })
+    return serverErrorResponse('Failed to reorder stories', error)
   }
   return NextResponse.json({ success: true })
 }
@@ -42,8 +42,7 @@ export async function POST(request: Request) {
     .single()
 
   if (error) {
-    console.error('POST /api/stories:', error)
-    return NextResponse.json({ error: 'Failed to create story' }, { status: 500 })
+    return serverErrorResponse('Failed to create story', error)
   }
   return NextResponse.json(data)
 }

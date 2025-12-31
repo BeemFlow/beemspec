@@ -1,12 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import {
-  validateRequest,
-  updateStorySchema,
-  isValidUuid,
-  invalidIdResponse,
-  pickDefined,
-} from '@/lib/validations'
+import { validateRequest, updateStorySchema, isValidUuid, invalidIdResponse, pickDefined } from '@/lib/validations'
+import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors'
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -16,11 +11,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { data, error } = await supabase.from('stories').select('*').eq('id', id).single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      return NextResponse.json({ error: 'Story not found' }, { status: 404 })
+    if (error.code === DbErrorCode.NOT_FOUND) {
+      return notFoundResponse('Story')
     }
-    console.error('GET /api/stories/[id]:', error)
-    return NextResponse.json({ error: 'Failed to load story' }, { status: 500 })
+    return serverErrorResponse('Failed to load story', error)
   }
   return NextResponse.json(data)
 }
@@ -46,11 +40,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      return NextResponse.json({ error: 'Story not found' }, { status: 404 })
+    if (error.code === DbErrorCode.NOT_FOUND) {
+      return notFoundResponse('Story')
     }
-    console.error('PUT /api/stories/[id]:', error)
-    return NextResponse.json({ error: 'Failed to update story' }, { status: 500 })
+    return serverErrorResponse('Failed to update story', error)
   }
   return NextResponse.json(data)
 }
@@ -68,11 +61,10 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      return NextResponse.json({ error: 'Story not found' }, { status: 404 })
+    if (error.code === DbErrorCode.NOT_FOUND) {
+      return notFoundResponse('Story')
     }
-    console.error('DELETE /api/stories/[id]:', error)
-    return NextResponse.json({ error: 'Failed to delete story' }, { status: 500 })
+    return serverErrorResponse('Failed to delete story', error)
   }
   return NextResponse.json({ success: true, deleted: data })
 }

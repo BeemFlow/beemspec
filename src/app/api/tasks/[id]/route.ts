@@ -1,12 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import {
-  validateRequest,
-  updateTaskSchema,
-  isValidUuid,
-  invalidIdResponse,
-  pickDefined,
-} from '@/lib/validations'
+import { validateRequest, updateTaskSchema, isValidUuid, invalidIdResponse, pickDefined } from '@/lib/validations'
+import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors'
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -24,11 +19,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    if (error.code === DbErrorCode.NOT_FOUND) {
+      return notFoundResponse('Task')
     }
-    console.error('PUT /api/tasks/[id]:', error)
-    return NextResponse.json({ error: 'Failed to update task' }, { status: 500 })
+    return serverErrorResponse('Failed to update task', error)
   }
   return NextResponse.json(data)
 }
@@ -46,11 +40,10 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    if (error.code === DbErrorCode.NOT_FOUND) {
+      return notFoundResponse('Task')
     }
-    console.error('DELETE /api/tasks/[id]:', error)
-    return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 })
+    return serverErrorResponse('Failed to delete task', error)
   }
   return NextResponse.json({ success: true, deleted: data })
 }

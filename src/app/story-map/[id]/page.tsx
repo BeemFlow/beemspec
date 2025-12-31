@@ -11,47 +11,57 @@ import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas'
 import { StoryDialog } from '@/components/story-map/StoryDialog'
 import { ActivityDialog } from '@/components/story-map/ActivityDialog'
 import { TaskDialog } from '@/components/story-map/TaskDialog'
+import { errorMessage } from '@/lib/errors'
 import type { StoryMapFull, Story, Activity, Task } from '@/types'
 
-type PromptType =
-  | { type: 'release' }
-  | { type: 'renameRelease'; releaseId: string; currentName: string }
+/** Extract error message from failed fetch response */
+async function extractError(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.json()
+    return body.error || fallback
+  } catch {
+    return fallback
+  }
+}
+
+/**
+ * Dialog state machine - discriminated union ensuring only one dialog can be open
+ * and all required data is present for each dialog type.
+ *
+ * This replaces 13 separate useState calls with a single state variable.
+ */
+type DialogState =
+  | { type: 'closed' }
+  // Story dialogs
+  | { type: 'story:edit'; story: Story }
+  | { type: 'story:create'; taskId: string; releaseId: string | null }
+  // Activity dialogs
+  | { type: 'activity:edit'; activity: Activity }
+  | { type: 'activity:create' }
+  // Task dialogs
+  | { type: 'task:edit'; task: Task }
+  | { type: 'task:create'; activityId: string }
+  // Release dialogs
+  | { type: 'release:create' }
+  | { type: 'release:rename'; releaseId: string; currentName: string }
+  | { type: 'release:delete'; releaseId: string }
+
+const CLOSED: DialogState = { type: 'closed' }
 
 export default function StoryMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [storyMap, setStoryMap] = useState<StoryMapFull | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [selectedStory, setSelectedStory] = useState<Story | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [newStoryContext, setNewStoryContext] = useState<{ taskId: string; releaseId: string | null } | null>(null)
-
-  // Prompt dialog state
-  const [promptOpen, setPromptOpen] = useState(false)
-  const [promptContext, setPromptContext] = useState<PromptType | null>(null)
-
-  // Confirm dialog state
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [deleteReleaseId, setDeleteReleaseId] = useState<string | null>(null)
-
-  // Activity dialog state
-  const [activityDialogOpen, setActivityDialogOpen] = useState(false)
-  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
-
-  // Task dialog state
-  const [taskDialogOpen, setTaskDialogOpen] = useState(false)
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [newTaskActivityId, setNewTaskActivityId] = useState<string | null>(null)
+  const [dialog, setDialog] = useState<DialogState>(CLOSED)
 
   const loadStoryMap = useCallback(async () => {
     try {
       const res = await fetch(`/api/story-maps/${id}`)
-      if (!res.ok) throw new Error('Failed to load story map')
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      setStoryMap(data)
+      if (!res.ok) throw new Error(await extractError(res, 'Failed to load story map'))
+      setStoryMap(await res.json())
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(errorMessage(err))
     }
   }, [id])
 
@@ -59,193 +69,192 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     loadStoryMap()
   }, [loadStoryMap])
 
-  function handleAddStory(taskId: string, releaseId: string | null) {
-    setNewStoryContext({ taskId, releaseId })
-    setSelectedStory(null)
-    setDialogOpen(true)
+  const closeDialog = () => setDialog(CLOSED)
+
+  // Story handlers
+  const handleAddStory = (taskId: string, releaseId: string | null) => {
+    setDialog({ type: 'story:create', taskId, releaseId })
   }
 
-  function handleEditStory(story: Story) {
-    setNewStoryContext(null)
-    setSelectedStory(story)
-    setDialogOpen(true)
+  const handleEditStory = (story: Story) => {
+    setDialog({ type: 'story:edit', story })
   }
 
-  async function handleSaveStory(story: Partial<Story>) {
+  async function handleSaveStory(storyData: Partial<Story>) {
     try {
-      if (selectedStory) {
-        const res = await fetch(`/api/stories/${selectedStory.id}`, {
+      if (dialog.type === 'story:edit') {
+        const res = await fetch(`/api/stories/${dialog.story.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(story),
+          body: JSON.stringify(storyData),
         })
-        if (!res.ok) throw new Error('Failed to save story')
-      } else if (newStoryContext) {
+        if (!res.ok) throw new Error(await extractError(res, 'Failed to save story'))
+      } else if (dialog.type === 'story:create') {
         const res = await fetch('/api/stories', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ...story,
-            task_id: newStoryContext.taskId,
-            release_id: newStoryContext.releaseId,
+            ...storyData,
+            task_id: dialog.taskId,
+            release_id: dialog.releaseId,
           }),
         })
-        if (!res.ok) throw new Error('Failed to create story')
+        if (!res.ok) throw new Error(await extractError(res, 'Failed to create story'))
       }
-      setDialogOpen(false)
+      closeDialog()
       loadStoryMap()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(errorMessage(err))
     }
   }
 
-  async function handleDeleteStory(storyId: string) {
+  async function handleDeleteStory() {
+    if (dialog.type !== 'story:edit') return
     try {
-      const res = await fetch(`/api/stories/${storyId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete story')
-      setDialogOpen(false)
+      const res = await fetch(`/api/stories/${dialog.story.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete story'))
+      closeDialog()
       loadStoryMap()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(errorMessage(err))
     }
   }
 
   // Activity handlers
-  function handleAddActivity() {
-    setSelectedActivity(null)
-    setActivityDialogOpen(true)
+  const handleAddActivity = () => {
+    setDialog({ type: 'activity:create' })
   }
 
-  function handleEditActivity(activity: Activity) {
-    setSelectedActivity(activity)
-    setActivityDialogOpen(true)
+  const handleEditActivity = (activity: Activity) => {
+    setDialog({ type: 'activity:edit', activity })
   }
 
   async function handleSaveActivity(data: { name: string }) {
     try {
-      if (selectedActivity) {
-        const res = await fetch(`/api/activities/${selectedActivity.id}`, {
+      if (dialog.type === 'activity:edit') {
+        const res = await fetch(`/api/activities/${dialog.activity.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
         })
-        if (!res.ok) throw new Error('Failed to update activity')
-      } else {
+        if (!res.ok) throw new Error(await extractError(res, 'Failed to update activity'))
+      } else if (dialog.type === 'activity:create') {
         const res = await fetch('/api/activities', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ story_map_id: id, name: data.name }),
         })
-        if (!res.ok) throw new Error('Failed to create activity')
+        if (!res.ok) throw new Error(await extractError(res, 'Failed to create activity'))
       }
-      setActivityDialogOpen(false)
+      closeDialog()
       loadStoryMap()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(errorMessage(err))
     }
   }
 
   async function handleDeleteActivity() {
-    if (!selectedActivity) return
+    if (dialog.type !== 'activity:edit') return
     try {
-      const res = await fetch(`/api/activities/${selectedActivity.id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete activity')
-      setActivityDialogOpen(false)
+      const res = await fetch(`/api/activities/${dialog.activity.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete activity'))
+      closeDialog()
       loadStoryMap()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(errorMessage(err))
     }
   }
 
   // Task handlers
-  function handleAddTask(activityId: string) {
-    setSelectedTask(null)
-    setNewTaskActivityId(activityId)
-    setTaskDialogOpen(true)
+  const handleAddTask = (activityId: string) => {
+    setDialog({ type: 'task:create', activityId })
   }
 
-  function handleEditTask(task: Task) {
-    setSelectedTask(task)
-    setNewTaskActivityId(null)
-    setTaskDialogOpen(true)
+  const handleEditTask = (task: Task) => {
+    setDialog({ type: 'task:edit', task })
   }
 
   async function handleSaveTask(data: { name: string }) {
     try {
-      if (selectedTask) {
-        const res = await fetch(`/api/tasks/${selectedTask.id}`, {
+      if (dialog.type === 'task:edit') {
+        const res = await fetch(`/api/tasks/${dialog.task.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
         })
-        if (!res.ok) throw new Error('Failed to update task')
-      } else if (newTaskActivityId) {
+        if (!res.ok) throw new Error(await extractError(res, 'Failed to update task'))
+      } else if (dialog.type === 'task:create') {
         const res = await fetch('/api/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity_id: newTaskActivityId, name: data.name }),
+          body: JSON.stringify({ activity_id: dialog.activityId, name: data.name }),
         })
-        if (!res.ok) throw new Error('Failed to create task')
+        if (!res.ok) throw new Error(await extractError(res, 'Failed to create task'))
       }
-      setTaskDialogOpen(false)
+      closeDialog()
       loadStoryMap()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(errorMessage(err))
     }
   }
 
   async function handleDeleteTask() {
-    if (!selectedTask) return
+    if (dialog.type !== 'task:edit') return
     try {
-      const res = await fetch(`/api/tasks/${selectedTask.id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete task')
-      setTaskDialogOpen(false)
+      const res = await fetch(`/api/tasks/${dialog.task.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete task'))
+      closeDialog()
       loadStoryMap()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(errorMessage(err))
     }
   }
 
   // Release handlers
-  function handleAddRelease() {
-    setPromptContext({ type: 'release' })
-    setPromptOpen(true)
+  const handleAddRelease = () => {
+    setDialog({ type: 'release:create' })
   }
 
-  function handleRenameRelease(releaseId: string, currentName: string) {
-    setPromptContext({ type: 'renameRelease', releaseId, currentName })
-    setPromptOpen(true)
+  const handleRenameRelease = (releaseId: string, currentName: string) => {
+    setDialog({ type: 'release:rename', releaseId, currentName })
   }
 
-  // Handle prompt submissions (releases only)
+  const handleDeleteRelease = (releaseId: string) => {
+    setDialog({ type: 'release:delete', releaseId })
+  }
+
   async function handlePromptSubmit(value: string) {
-    if (!promptContext) return
-
     try {
-      switch (promptContext.type) {
-        case 'release': {
+      switch (dialog.type) {
+        case 'release:create': {
           const res = await fetch('/api/releases', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ story_map_id: id, name: value }),
           })
-          if (!res.ok) throw new Error('Failed to create release')
+          if (!res.ok) throw new Error(await extractError(res, 'Failed to create release'))
           break
         }
-        case 'renameRelease': {
-          if (value === promptContext.currentName) return
-          const res = await fetch(`/api/releases/${promptContext.releaseId}`, {
+        case 'release:rename': {
+          if (value === dialog.currentName) {
+            closeDialog()
+            return
+          }
+          const res = await fetch(`/api/releases/${dialog.releaseId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: value }),
           })
-          if (!res.ok) throw new Error('Failed to rename release')
+          if (!res.ok) throw new Error(await extractError(res, 'Failed to rename release'))
           break
         }
+        default:
+          return
       }
+      closeDialog()
       loadStoryMap()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(errorMessage(err))
     }
   }
 
@@ -267,40 +276,38 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ story_map_id: id, order: newOrder }),
       })
-      if (!res.ok) throw new Error('Failed to reorder releases')
+      if (!res.ok) throw new Error(await extractError(res, 'Failed to reorder releases'))
       loadStoryMap()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(errorMessage(err))
     }
-  }
-
-  function handleDeleteRelease(releaseId: string) {
-    setDeleteReleaseId(releaseId)
-    setConfirmOpen(true)
   }
 
   async function handleConfirmDelete() {
-    if (!deleteReleaseId) return
+    if (dialog.type !== 'release:delete') return
     try {
-      const res = await fetch(`/api/releases/${deleteReleaseId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete release')
+      const res = await fetch(`/api/releases/${dialog.releaseId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete release'))
+      closeDialog()
       loadStoryMap()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(errorMessage(err))
     }
   }
 
-  // Get prompt dialog props based on context (releases only)
-  function getPromptProps() {
-    if (!promptContext) return { title: '', placeholder: '', defaultValue: '' }
-    switch (promptContext.type) {
-      case 'release':
+  // Derive prompt dialog props from state
+  function getPromptProps(): { title: string; placeholder: string; defaultValue: string } {
+    switch (dialog.type) {
+      case 'release:create':
         return { title: 'New Release', placeholder: 'Release name', defaultValue: '' }
-      case 'renameRelease':
-        return { title: 'Rename Release', placeholder: 'Release name', defaultValue: promptContext.currentName }
+      case 'release:rename':
+        return { title: 'Rename Release', placeholder: 'Release name', defaultValue: dialog.currentName }
+      default:
+        return { title: '', placeholder: '', defaultValue: '' }
     }
   }
 
+  // Render states
   if (error) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -315,6 +322,7 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   if (!storyMap) return <div className="p-8">Loading...</div>
 
   const promptProps = getPromptProps()
+  const isPromptOpen = dialog.type === 'release:create' || dialog.type === 'release:rename'
 
   return (
     <div className="flex h-screen flex-col">
@@ -348,18 +356,18 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
       </ScrollArea>
 
       <StoryDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        story={selectedStory}
+        open={dialog.type === 'story:edit' || dialog.type === 'story:create'}
+        onOpenChange={(open) => !open && closeDialog()}
+        story={dialog.type === 'story:edit' ? dialog.story : null}
         releases={storyMap.releases}
-        defaultReleaseId={newStoryContext?.releaseId}
+        defaultReleaseId={dialog.type === 'story:create' ? dialog.releaseId : undefined}
         onSave={handleSaveStory}
-        onDelete={selectedStory ? () => handleDeleteStory(selectedStory.id) : undefined}
+        onDelete={dialog.type === 'story:edit' ? handleDeleteStory : undefined}
       />
 
       <PromptDialog
-        open={promptOpen}
-        onOpenChange={setPromptOpen}
+        open={isPromptOpen}
+        onOpenChange={(open) => !open && closeDialog()}
         title={promptProps.title}
         placeholder={promptProps.placeholder}
         defaultValue={promptProps.defaultValue}
@@ -367,8 +375,8 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
       />
 
       <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
+        open={dialog.type === 'release:delete'}
+        onOpenChange={(open) => !open && closeDialog()}
         title="Delete Release"
         description="This will delete the release and all its stories. This cannot be undone."
         confirmLabel="Delete"
@@ -377,19 +385,19 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
       />
 
       <ActivityDialog
-        open={activityDialogOpen}
-        onOpenChange={setActivityDialogOpen}
-        activity={selectedActivity}
+        open={dialog.type === 'activity:edit' || dialog.type === 'activity:create'}
+        onOpenChange={(open) => !open && closeDialog()}
+        activity={dialog.type === 'activity:edit' ? dialog.activity : null}
         onSave={handleSaveActivity}
-        onDelete={selectedActivity ? handleDeleteActivity : undefined}
+        onDelete={dialog.type === 'activity:edit' ? handleDeleteActivity : undefined}
       />
 
       <TaskDialog
-        open={taskDialogOpen}
-        onOpenChange={setTaskDialogOpen}
-        task={selectedTask}
+        open={dialog.type === 'task:edit' || dialog.type === 'task:create'}
+        onOpenChange={(open) => !open && closeDialog()}
+        task={dialog.type === 'task:edit' ? dialog.task : null}
         onSave={handleSaveTask}
-        onDelete={selectedTask ? handleDeleteTask : undefined}
+        onDelete={dialog.type === 'task:edit' ? handleDeleteTask : undefined}
       />
     </div>
   )

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { validateRequest, createStoryMapSchema } from '@/lib/validations'
+import { serverErrorResponse } from '@/lib/errors'
 
 export async function GET() {
   const supabase = await createClient()
@@ -10,8 +11,7 @@ export async function GET() {
     .order('updated_at', { ascending: false })
 
   if (error) {
-    console.error('GET /api/story-maps:', error)
-    return NextResponse.json({ error: 'Failed to load story maps' }, { status: 500 })
+    return serverErrorResponse('Failed to load story maps', error)
   }
   return NextResponse.json(data)
 }
@@ -31,8 +31,7 @@ export async function POST(request: Request) {
     .single()
 
   if (error) {
-    console.error('POST /api/story-maps:', error)
-    return NextResponse.json({ error: 'Failed to create story map' }, { status: 500 })
+    return serverErrorResponse('Failed to create story map', error)
   }
   return NextResponse.json(data)
 }
