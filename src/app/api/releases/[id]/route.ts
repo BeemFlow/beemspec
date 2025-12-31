@@ -32,13 +32,18 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   if (!isValidUuid(id)) return invalidIdResponse()
 
   const supabase = await createClient()
-  const { error } = await supabase.rpc('delete_release', { p_release_id: id })
+  const { data, error } = await supabase
+    .from('releases')
+    .delete()
+    .eq('id', id)
+    .select()
+    .single()
 
   if (error) {
-    if (error.code === DbErrorCode.NOT_FOUND || error.code === DbErrorCode.RPC_NOT_FOUND) {
+    if (error.code === DbErrorCode.NOT_FOUND) {
       return notFoundResponse('Release')
     }
     return serverErrorResponse('Failed to delete release', error)
   }
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, deleted: data })
 }

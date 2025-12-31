@@ -6,10 +6,6 @@ import { NextResponse } from 'next/server'
 export const DbErrorCode = {
   /** PostgREST: No rows returned when .single() expected one */
   NOT_FOUND: 'PGRST116',
-  /** PostgreSQL: Raised exception in stored procedure */
-  RPC_RAISE: 'P0001',
-  /** PostgreSQL: No data found in stored procedure */
-  RPC_NOT_FOUND: 'P0002',
 } as const
 
 /**
