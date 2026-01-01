@@ -442,6 +442,8 @@ export function StoryMapCanvas({
                 </div>
               ))}
 
+            {releases.length === 0 && <AddReleaseZone onAddRelease={onAddRelease} alwaysVisible />}
+
             <ReleaseRow
               label="Backlog"
               labelMuted
@@ -592,12 +594,14 @@ interface ReleaseRowProps {
   isDropTarget: (itemId: string) => boolean
 }
 
-function AddReleaseZone({ onAddRelease }: { onAddRelease: () => void }) {
+function AddReleaseZone({ onAddRelease, alwaysVisible }: { onAddRelease: () => void; alwaysVisible?: boolean }) {
   return (
     <div className="group/addzone h-6 mt-4 relative">
       <AddButton
         label="Release"
-        className="absolute inset-x-0 top-0 h-8 opacity-0 group-hover/addzone:opacity-100 transition-opacity px-3 bg-white z-10 justify-start"
+        className={`absolute inset-x-0 top-0 h-8 transition-opacity px-3 bg-white z-10 justify-start ${
+          alwaysVisible ? '' : 'opacity-0 group-hover/addzone:opacity-100'
+        }`}
         onClick={onAddRelease}
       />
     </div>
