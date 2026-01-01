@@ -1,26 +1,26 @@
-'use client'
+'use client';
 
-import { useEffect, useState, use, useCallback } from 'react'
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
-import { PromptDialog } from '@/components/ui/prompt-dialog'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas'
-import { StoryDialog } from '@/components/story-map/StoryDialog'
-import { ActivityDialog } from '@/components/story-map/ActivityDialog'
-import { TaskDialog } from '@/components/story-map/TaskDialog'
-import { errorMessage } from '@/lib/errors'
-import type { StoryMapFull, Story, Activity, Task } from '@/types'
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+import { use, useCallback, useEffect, useState } from 'react';
+import { ActivityDialog } from '@/components/story-map/ActivityDialog';
+import { StoryDialog } from '@/components/story-map/StoryDialog';
+import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas';
+import { TaskDialog } from '@/components/story-map/TaskDialog';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { PromptDialog } from '@/components/ui/prompt-dialog';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { errorMessage } from '@/lib/errors';
+import type { Activity, Story, StoryMapFull, Task } from '@/types';
 
 /** Extract error message from failed fetch response */
 async function extractError(res: Response, fallback: string): Promise<string> {
   try {
-    const body = await res.json()
-    return body.error || fallback
+    const body = await res.json();
+    return body.error || fallback;
   } catch {
-    return fallback
+    return fallback;
   }
 }
 
@@ -44,41 +44,41 @@ type DialogState =
   // Release dialogs
   | { type: 'release:create' }
   | { type: 'release:rename'; releaseId: string; currentName: string }
-  | { type: 'release:delete'; releaseId: string }
+  | { type: 'release:delete'; releaseId: string };
 
-const CLOSED: DialogState = { type: 'closed' }
+const CLOSED: DialogState = { type: 'closed' };
 
 export default function StoryMapPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
-  const [storyMap, setStoryMap] = useState<StoryMapFull | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [dialog, setDialog] = useState<DialogState>(CLOSED)
+  const { id } = use(params);
+  const [storyMap, setStoryMap] = useState<StoryMapFull | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<DialogState>(CLOSED);
 
   const loadStoryMap = useCallback(async () => {
     try {
-      const res = await fetch(`/api/story-maps/${id}`)
-      if (!res.ok) throw new Error(await extractError(res, 'Failed to load story map'))
-      setStoryMap(await res.json())
-      setError(null)
+      const res = await fetch(`/api/story-maps/${id}`);
+      if (!res.ok) throw new Error(await extractError(res, 'Failed to load story map'));
+      setStoryMap(await res.json());
+      setError(null);
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err));
     }
-  }, [id])
+  }, [id]);
 
   useEffect(() => {
-    loadStoryMap()
-  }, [loadStoryMap])
+    loadStoryMap();
+  }, [loadStoryMap]);
 
-  const closeDialog = () => setDialog(CLOSED)
+  const closeDialog = () => setDialog(CLOSED);
 
   // Story handlers
   const handleAddStory = (taskId: string, releaseId: string | null) => {
-    setDialog({ type: 'story:create', taskId, releaseId })
-  }
+    setDialog({ type: 'story:create', taskId, releaseId });
+  };
 
   const handleEditStory = (story: Story) => {
-    setDialog({ type: 'story:edit', story })
-  }
+    setDialog({ type: 'story:edit', story });
+  };
 
   async function handleSaveStory(storyData: Partial<Story>) {
     try {
@@ -87,8 +87,8 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(storyData),
-        })
-        if (!res.ok) throw new Error(await extractError(res, 'Failed to save story'))
+        });
+        if (!res.ok) throw new Error(await extractError(res, 'Failed to save story'));
       } else if (dialog.type === 'story:create') {
         const res = await fetch('/api/stories', {
           method: 'POST',
@@ -98,36 +98,36 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
             task_id: dialog.taskId,
             release_id: dialog.releaseId,
           }),
-        })
-        if (!res.ok) throw new Error(await extractError(res, 'Failed to create story'))
+        });
+        if (!res.ok) throw new Error(await extractError(res, 'Failed to create story'));
       }
-      closeDialog()
-      loadStoryMap()
+      closeDialog();
+      loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err));
     }
   }
 
   async function handleDeleteStory() {
-    if (dialog.type !== 'story:edit') return
+    if (dialog.type !== 'story:edit') return;
     try {
-      const res = await fetch(`/api/stories/${dialog.story.id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete story'))
-      closeDialog()
-      loadStoryMap()
+      const res = await fetch(`/api/stories/${dialog.story.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete story'));
+      closeDialog();
+      loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err));
     }
   }
 
   // Activity handlers
   const handleAddActivity = () => {
-    setDialog({ type: 'activity:create' })
-  }
+    setDialog({ type: 'activity:create' });
+  };
 
   const handleEditActivity = (activity: Activity) => {
-    setDialog({ type: 'activity:edit', activity })
-  }
+    setDialog({ type: 'activity:edit', activity });
+  };
 
   async function handleSaveActivity(data: { name: string }) {
     try {
@@ -136,43 +136,43 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
-        })
-        if (!res.ok) throw new Error(await extractError(res, 'Failed to update activity'))
+        });
+        if (!res.ok) throw new Error(await extractError(res, 'Failed to update activity'));
       } else if (dialog.type === 'activity:create') {
         const res = await fetch('/api/activities', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ story_map_id: id, name: data.name }),
-        })
-        if (!res.ok) throw new Error(await extractError(res, 'Failed to create activity'))
+        });
+        if (!res.ok) throw new Error(await extractError(res, 'Failed to create activity'));
       }
-      closeDialog()
-      loadStoryMap()
+      closeDialog();
+      loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err));
     }
   }
 
   async function handleDeleteActivity() {
-    if (dialog.type !== 'activity:edit') return
+    if (dialog.type !== 'activity:edit') return;
     try {
-      const res = await fetch(`/api/activities/${dialog.activity.id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete activity'))
-      closeDialog()
-      loadStoryMap()
+      const res = await fetch(`/api/activities/${dialog.activity.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete activity'));
+      closeDialog();
+      loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err));
     }
   }
 
   // Task handlers
   const handleAddTask = (activityId: string) => {
-    setDialog({ type: 'task:create', activityId })
-  }
+    setDialog({ type: 'task:create', activityId });
+  };
 
   const handleEditTask = (task: Task) => {
-    setDialog({ type: 'task:edit', task })
-  }
+    setDialog({ type: 'task:edit', task });
+  };
 
   async function handleSaveTask(data: { name: string }) {
     try {
@@ -181,47 +181,47 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
-        })
-        if (!res.ok) throw new Error(await extractError(res, 'Failed to update task'))
+        });
+        if (!res.ok) throw new Error(await extractError(res, 'Failed to update task'));
       } else if (dialog.type === 'task:create') {
         const res = await fetch('/api/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ activity_id: dialog.activityId, name: data.name }),
-        })
-        if (!res.ok) throw new Error(await extractError(res, 'Failed to create task'))
+        });
+        if (!res.ok) throw new Error(await extractError(res, 'Failed to create task'));
       }
-      closeDialog()
-      loadStoryMap()
+      closeDialog();
+      loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err));
     }
   }
 
   async function handleDeleteTask() {
-    if (dialog.type !== 'task:edit') return
+    if (dialog.type !== 'task:edit') return;
     try {
-      const res = await fetch(`/api/tasks/${dialog.task.id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete task'))
-      closeDialog()
-      loadStoryMap()
+      const res = await fetch(`/api/tasks/${dialog.task.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete task'));
+      closeDialog();
+      loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err));
     }
   }
 
   // Release handlers
   const handleAddRelease = () => {
-    setDialog({ type: 'release:create' })
-  }
+    setDialog({ type: 'release:create' });
+  };
 
   const handleRenameRelease = (releaseId: string, currentName: string) => {
-    setDialog({ type: 'release:rename', releaseId, currentName })
-  }
+    setDialog({ type: 'release:rename', releaseId, currentName });
+  };
 
   const handleDeleteRelease = (releaseId: string) => {
-    setDialog({ type: 'release:delete', releaseId })
-  }
+    setDialog({ type: 'release:delete', releaseId });
+  };
 
   async function handlePromptSubmit(value: string) {
     try {
@@ -231,67 +231,67 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ story_map_id: id, name: value }),
-          })
-          if (!res.ok) throw new Error(await extractError(res, 'Failed to create release'))
-          break
+          });
+          if (!res.ok) throw new Error(await extractError(res, 'Failed to create release'));
+          break;
         }
         case 'release:rename': {
           if (value === dialog.currentName) {
-            closeDialog()
-            return
+            closeDialog();
+            return;
           }
           const res = await fetch(`/api/releases/${dialog.releaseId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: value }),
-          })
-          if (!res.ok) throw new Error(await extractError(res, 'Failed to rename release'))
-          break
+          });
+          if (!res.ok) throw new Error(await extractError(res, 'Failed to rename release'));
+          break;
         }
         default:
-          return
+          return;
       }
-      closeDialog()
-      loadStoryMap()
+      closeDialog();
+      loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err));
     }
   }
 
   async function handleMoveRelease(releaseId: string, direction: 'up' | 'down') {
-    if (!storyMap) return
-    const sortedReleases = [...storyMap.releases].sort((a, b) => a.sort_order - b.sort_order)
-    const index = sortedReleases.findIndex((r) => r.id === releaseId)
-    if (index === -1) return
-    if (direction === 'up' && index === 0) return
-    if (direction === 'down' && index === sortedReleases.length - 1) return
+    if (!storyMap) return;
+    const sortedReleases = [...storyMap.releases].sort((a, b) => a.sort_order - b.sort_order);
+    const index = sortedReleases.findIndex((r) => r.id === releaseId);
+    if (index === -1) return;
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === sortedReleases.length - 1) return;
 
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    const newOrder = sortedReleases.map((r) => r.id)
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    const newOrder = sortedReleases.map((r) => r.id);
+    [newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]];
 
     try {
       const res = await fetch('/api/releases', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ story_map_id: id, order: newOrder }),
-      })
-      if (!res.ok) throw new Error(await extractError(res, 'Failed to reorder releases'))
-      loadStoryMap()
+      });
+      if (!res.ok) throw new Error(await extractError(res, 'Failed to reorder releases'));
+      loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err));
     }
   }
 
   async function handleConfirmDelete() {
-    if (dialog.type !== 'release:delete') return
+    if (dialog.type !== 'release:delete') return;
     try {
-      const res = await fetch(`/api/releases/${dialog.releaseId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete release'))
-      closeDialog()
-      loadStoryMap()
+      const res = await fetch(`/api/releases/${dialog.releaseId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete release'));
+      closeDialog();
+      loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err));
     }
   }
 
@@ -299,11 +299,15 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   function getPromptProps(): { title: string; placeholder: string; defaultValue: string } {
     switch (dialog.type) {
       case 'release:create':
-        return { title: 'New Release', placeholder: 'Release name', defaultValue: '' }
+        return { title: 'New Release', placeholder: 'Release name', defaultValue: '' };
       case 'release:rename':
-        return { title: 'Rename Release', placeholder: 'Release name', defaultValue: dialog.currentName }
+        return {
+          title: 'Rename Release',
+          placeholder: 'Release name',
+          defaultValue: dialog.currentName,
+        };
       default:
-        return { title: '', placeholder: '', defaultValue: '' }
+        return { title: '', placeholder: '', defaultValue: '' };
     }
   }
 
@@ -313,16 +317,18 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <p className="text-destructive mb-4">{error}</p>
-          <Button variant="outline" onClick={loadStoryMap}>Retry</Button>
+          <Button variant="outline" onClick={loadStoryMap}>
+            Retry
+          </Button>
         </div>
       </div>
-    )
+    );
   }
 
-  if (!storyMap) return <div className="p-8">Loading...</div>
+  if (!storyMap) return <div className="p-8">Loading...</div>;
 
-  const promptProps = getPromptProps()
-  const isPromptOpen = dialog.type === 'release:create' || dialog.type === 'release:rename'
+  const promptProps = getPromptProps();
+  const isPromptOpen = dialog.type === 'release:create' || dialog.type === 'release:rename';
 
   return (
     <div className="flex h-screen flex-col">
@@ -400,5 +406,5 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         onDelete={dialog.type === 'task:edit' ? handleDeleteTask : undefined}
       />
     </div>
-  )
+  );
 }

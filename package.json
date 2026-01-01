@@ -6,8 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "biome lint ./src",
-    "lint:fix": "biome lint ./src --write"
+    "lint": "biome check ./src",
+    "lint:fix": "biome check ./src --write"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

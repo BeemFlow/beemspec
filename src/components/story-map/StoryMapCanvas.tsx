@@ -1,35 +1,35 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { Plus, Pencil, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Separator } from '@/components/ui/separator'
-import { MapCard } from '@/components/story-map/MapCard'
-import { AddButton } from '@/components/story-map/AddButton'
-import { CARD_WIDTH, CARD_HEIGHT, CARD_GAP, GROUP_GAP, ADD_BUTTON_WIDTH } from '@/components/story-map/constants'
-import { STATUS_LABELS, STATUS_VARIANTS } from '@/lib/constants'
-import { assertNever } from '@/lib/errors'
 import {
   DndContext,
   type DragEndEvent,
   type DragOverEvent,
   DragOverlay,
   type DragStartEvent,
-  rectIntersection,
   PointerSensor,
+  rectIntersection,
+  useDroppable,
   useSensor,
   useSensors,
-  useDroppable,
-} from '@dnd-kit/core'
+} from '@dnd-kit/core';
 import {
-  SortableContext,
   horizontalListSortingStrategy,
-  verticalListSortingStrategy,
+  SortableContext,
   useSortable,
-} from '@dnd-kit/sortable'
-import type { StoryMapFull, Story, Activity, Task, TaskWithStories } from '@/types'
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { AddButton } from '@/components/story-map/AddButton';
+import { ADD_BUTTON_WIDTH, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, GROUP_GAP } from '@/components/story-map/constants';
+import { MapCard } from '@/components/story-map/MapCard';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { STATUS_LABELS, STATUS_VARIANTS } from '@/lib/constants';
+import { assertNever } from '@/lib/errors';
+import type { Activity, Story, StoryMapFull, Task, TaskWithStories } from '@/types';
 
 /**
  * Type-safe drag ID system using discriminated unions
@@ -40,80 +40,80 @@ type DragId =
   | { type: 'task'; id: string }
   | { type: 'story'; id: string }
   | { type: 'task-end'; activityId: string }
-  | { type: 'story-end'; taskId: string; releaseId: string | null }
+  | { type: 'story-end'; taskId: string; releaseId: string | null };
 
-const BACKLOG_MARKER = 'backlog' as const
+const BACKLOG_MARKER = 'backlog' as const;
 
 function encodeDragId(dragId: DragId): string {
   switch (dragId.type) {
     case 'activity':
-      return `activity:${dragId.id}`
+      return `activity:${dragId.id}`;
     case 'task':
-      return `task:${dragId.id}`
+      return `task:${dragId.id}`;
     case 'story':
-      return `story:${dragId.id}`
+      return `story:${dragId.id}`;
     case 'task-end':
-      return `task-end:${dragId.activityId}`
+      return `task-end:${dragId.activityId}`;
     case 'story-end':
-      return `story-end:${dragId.taskId}:${dragId.releaseId ?? BACKLOG_MARKER}`
+      return `story-end:${dragId.taskId}:${dragId.releaseId ?? BACKLOG_MARKER}`;
     default:
-      assertNever(dragId)
+      assertNever(dragId);
   }
 }
 
 function parseDragId(encoded: string): DragId | null {
-  const parts = encoded.split(':')
-  const type = parts[0]
+  const parts = encoded.split(':');
+  const type = parts[0];
 
   switch (type) {
     case 'activity':
-      return parts[1] ? { type: 'activity', id: parts[1] } : null
+      return parts[1] ? { type: 'activity', id: parts[1] } : null;
     case 'task':
-      return parts[1] ? { type: 'task', id: parts[1] } : null
+      return parts[1] ? { type: 'task', id: parts[1] } : null;
     case 'story':
-      return parts[1] ? { type: 'story', id: parts[1] } : null
+      return parts[1] ? { type: 'story', id: parts[1] } : null;
     case 'task-end':
-      return parts[1] ? { type: 'task-end', activityId: parts[1] } : null
+      return parts[1] ? { type: 'task-end', activityId: parts[1] } : null;
     case 'story-end': {
-      const taskId = parts[1]
-      const releaseMarker = parts[2]
-      if (!taskId || !releaseMarker) return null
+      const taskId = parts[1];
+      const releaseMarker = parts[2];
+      if (!taskId || !releaseMarker) return null;
       return {
         type: 'story-end',
         taskId,
         releaseId: releaseMarker === BACKLOG_MARKER ? null : releaseMarker,
-      }
+      };
     }
     default:
-      return null
+      return null;
   }
 }
 
 interface Props {
-  storyMap: StoryMapFull
-  onAddStory: (taskId: string, releaseId: string | null) => void
-  onEditStory: (story: Story) => void
-  onAddActivity: () => void
-  onEditActivity: (activity: Activity) => void
-  onAddTask: (activityId: string) => void
-  onEditTask: (task: Task) => void
-  onAddRelease: () => void
-  onRenameRelease: (releaseId: string, currentName: string) => void
-  onMoveRelease: (releaseId: string, direction: 'up' | 'down') => void
-  onDeleteRelease: (releaseId: string) => void
-  onRefresh: () => void
+  storyMap: StoryMapFull;
+  onAddStory: (taskId: string, releaseId: string | null) => void;
+  onEditStory: (story: Story) => void;
+  onAddActivity: () => void;
+  onEditActivity: (activity: Activity) => void;
+  onAddTask: (activityId: string) => void;
+  onEditTask: (task: Task) => void;
+  onAddRelease: () => void;
+  onRenameRelease: (releaseId: string, currentName: string) => void;
+  onMoveRelease: (releaseId: string, direction: 'up' | 'down') => void;
+  onDeleteRelease: (releaseId: string) => void;
+  onRefresh: () => void;
 }
 
 function getGroupWidth(taskCount: number): number {
   // Ensure minimum width of 1 card space even when no tasks exist
-  return Math.max(taskCount, 1) * (CARD_WIDTH + CARD_GAP) + ADD_BUTTON_WIDTH
+  return Math.max(taskCount, 1) * (CARD_WIDTH + CARD_GAP) + ADD_BUTTON_WIDTH;
 }
 
 function DropLine({ direction }: { direction: 'vertical' | 'horizontal' }) {
   if (direction === 'vertical') {
-    return <div className="w-0.5 h-full bg-blue-500 rounded-full min-h-[96px]" />
+    return <div className="w-0.5 h-full bg-blue-500 rounded-full min-h-[96px]" />;
   }
-  return <div className="h-0.5 w-full bg-blue-500 rounded-full" />
+  return <div className="h-0.5 w-full bg-blue-500 rounded-full" />;
 }
 
 export function StoryMapCanvas({
@@ -130,207 +130,203 @@ export function StoryMapCanvas({
   onDeleteRelease,
   onRefresh,
 }: Props) {
-  const { activities, releases } = storyMap
-  const [activeDrag, setActiveDrag] = useState<DragId | null>(null)
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null)
+  const { activities, releases } = storyMap;
+  const [activeDrag, setActiveDrag] = useState<DragId | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  )
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  const sortedActivities = [...activities].sort((a, b) => a.sort_order - b.sort_order)
+  const sortedActivities = [...activities].sort((a, b) => a.sort_order - b.sort_order);
 
-  const allTasksOrdered: (TaskWithStories & { activityId: string })[] = []
+  const allTasksOrdered: (TaskWithStories & { activityId: string })[] = [];
   for (const activity of sortedActivities) {
-    const tasks = [...(activity.tasks || [])].sort((a, b) => a.sort_order - b.sort_order)
+    const tasks = [...(activity.tasks || [])].sort((a, b) => a.sort_order - b.sort_order);
     for (const task of tasks) {
-      allTasksOrdered.push({ ...task, activityId: activity.id })
+      allTasksOrdered.push({ ...task, activityId: activity.id });
     }
   }
 
-  const allStories = allTasksOrdered.flatMap((t) => t.stories)
-  const sortedStories = [...allStories].sort((a, b) => a.sort_order - b.sort_order)
+  const allStories = allTasksOrdered.flatMap((t) => t.stories);
+  const sortedStories = [...allStories].sort((a, b) => a.sort_order - b.sort_order);
 
   function getTasksForActivity(activityId: string) {
-    return allTasksOrdered.filter((t) => t.activityId === activityId)
+    return allTasksOrdered.filter((t) => t.activityId === activityId);
   }
 
   function getStoriesForCell(taskId: string, releaseId: string | null): Story[] {
-    return sortedStories.filter((s) =>
-      s.task_id === taskId && (releaseId ? s.release_id === releaseId : !s.release_id)
-    )
+    return sortedStories.filter(
+      (s) => s.task_id === taskId && (releaseId ? s.release_id === releaseId : !s.release_id),
+    );
   }
 
   function handleDragStart(event: DragStartEvent) {
-    const parsed = parseDragId(String(event.active.id))
-    setActiveDrag(parsed)
+    const parsed = parseDragId(String(event.active.id));
+    setActiveDrag(parsed);
   }
 
   function handleDragOver(event: DragOverEvent) {
-    const { active, over } = event
+    const { active, over } = event;
     if (!over || active.id === over.id) {
-      setDropTargetId(null)
-      return
+      setDropTargetId(null);
+      return;
     }
-    setDropTargetId(String(over.id))
+    setDropTargetId(String(over.id));
   }
 
   async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    setActiveDrag(null)
-    setDropTargetId(null)
-    if (!over) return
+    const { active, over } = event;
+    setActiveDrag(null);
+    setDropTargetId(null);
+    if (!over) return;
 
-    const activeId = String(active.id)
-    const overId = String(over.id)
-    if (activeId === overId) return
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    if (activeId === overId) return;
 
-    const activeParsed = parseDragId(activeId)
-    const overParsed = parseDragId(overId)
-    if (!activeParsed || !overParsed) return
+    const activeParsed = parseDragId(activeId);
+    const overParsed = parseDragId(overId);
+    if (!activeParsed || !overParsed) return;
 
     // Activity reordering
     if (activeParsed.type === 'activity' && overParsed.type === 'activity') {
-      const newOrder = sortedActivities.map((a) => a.id)
-      const fromIndex = newOrder.indexOf(activeParsed.id)
-      const toIndex = newOrder.indexOf(overParsed.id)
-      newOrder.splice(fromIndex, 1)
-      newOrder.splice(toIndex, 0, activeParsed.id)
+      const newOrder = sortedActivities.map((a) => a.id);
+      const fromIndex = newOrder.indexOf(activeParsed.id);
+      const toIndex = newOrder.indexOf(overParsed.id);
+      newOrder.splice(fromIndex, 1);
+      newOrder.splice(toIndex, 0, activeParsed.id);
 
       await fetch('/api/activities', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ story_map_id: storyMap.id, order: newOrder }),
-      })
-      onRefresh()
-      return
+      });
+      onRefresh();
+      return;
     }
 
     // Task movement
     if (activeParsed.type === 'task') {
-      const activeTask = allTasksOrdered.find((t) => t.id === activeParsed.id)
-      if (!activeTask) return
+      const activeTask = allTasksOrdered.find((t) => t.id === activeParsed.id);
+      if (!activeTask) return;
 
       if (overParsed.type === 'task') {
-        const overTask = allTasksOrdered.find((t) => t.id === overParsed.id)
-        if (!overTask) return
+        const overTask = allTasksOrdered.find((t) => t.id === overParsed.id);
+        if (!overTask) return;
 
-        const targetActivityId = overTask.activityId
-        const tasksInTarget = getTasksForActivity(targetActivityId)
-        const newOrder = tasksInTarget.filter((t) => t.id !== activeParsed.id).map((t) => t.id)
-        const toIndex = newOrder.indexOf(overParsed.id)
-        newOrder.splice(toIndex, 0, activeParsed.id)
+        const targetActivityId = overTask.activityId;
+        const tasksInTarget = getTasksForActivity(targetActivityId);
+        const newOrder = tasksInTarget.filter((t) => t.id !== activeParsed.id).map((t) => t.id);
+        const toIndex = newOrder.indexOf(overParsed.id);
+        newOrder.splice(toIndex, 0, activeParsed.id);
 
         if (activeTask.activityId !== targetActivityId) {
           await fetch(`/api/tasks/${activeParsed.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ activity_id: targetActivityId }),
-          })
+          });
         }
 
         await fetch('/api/tasks', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ activity_id: targetActivityId, order: newOrder }),
-        })
-        onRefresh()
-        return
+        });
+        onRefresh();
+        return;
       }
 
       if (overParsed.type === 'task-end') {
-        const targetActivityId = overParsed.activityId
-        const tasksInTarget = getTasksForActivity(targetActivityId)
-        const newOrder = tasksInTarget.filter((t) => t.id !== activeParsed.id).map((t) => t.id)
-        newOrder.push(activeParsed.id)
+        const targetActivityId = overParsed.activityId;
+        const tasksInTarget = getTasksForActivity(targetActivityId);
+        const newOrder = tasksInTarget.filter((t) => t.id !== activeParsed.id).map((t) => t.id);
+        newOrder.push(activeParsed.id);
 
         if (activeTask.activityId !== targetActivityId) {
           await fetch(`/api/tasks/${activeParsed.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ activity_id: targetActivityId }),
-          })
+          });
         }
 
         await fetch('/api/tasks', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ activity_id: targetActivityId, order: newOrder }),
-        })
-        onRefresh()
-        return
+        });
+        onRefresh();
+        return;
       }
     }
 
     // Story movement
     if (activeParsed.type === 'story') {
-      const activeStory = sortedStories.find((s) => s.id === activeParsed.id)
-      if (!activeStory) return
+      const activeStory = sortedStories.find((s) => s.id === activeParsed.id);
+      if (!activeStory) return;
 
       if (overParsed.type === 'story') {
-        const overStory = sortedStories.find((s) => s.id === overParsed.id)
-        if (!overStory) return
+        const overStory = sortedStories.find((s) => s.id === overParsed.id);
+        if (!overStory) return;
 
-        const targetStories = getStoriesForCell(overStory.task_id, overStory.release_id)
-        const newOrder = targetStories.filter((s) => s.id !== activeParsed.id).map((s) => s.id)
-        const toIndex = newOrder.indexOf(overParsed.id)
-        newOrder.splice(toIndex, 0, activeParsed.id)
+        const targetStories = getStoriesForCell(overStory.task_id, overStory.release_id);
+        const newOrder = targetStories.filter((s) => s.id !== activeParsed.id).map((s) => s.id);
+        const toIndex = newOrder.indexOf(overParsed.id);
+        newOrder.splice(toIndex, 0, activeParsed.id);
 
         if (activeStory.task_id !== overStory.task_id || activeStory.release_id !== overStory.release_id) {
           await fetch(`/api/stories/${activeParsed.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ task_id: overStory.task_id, release_id: overStory.release_id }),
-          })
+          });
         }
 
         await fetch('/api/stories', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ task_id: overStory.task_id, release_id: overStory.release_id, order: newOrder }),
-        })
-        onRefresh()
-        return
+          body: JSON.stringify({
+            task_id: overStory.task_id,
+            release_id: overStory.release_id,
+            order: newOrder,
+          }),
+        });
+        onRefresh();
+        return;
       }
 
       if (overParsed.type === 'story-end') {
-        const { taskId, releaseId } = overParsed
-        const targetStories = getStoriesForCell(taskId, releaseId)
-        const newOrder = targetStories.filter((s) => s.id !== activeParsed.id).map((s) => s.id)
-        newOrder.push(activeParsed.id)
+        const { taskId, releaseId } = overParsed;
+        const targetStories = getStoriesForCell(taskId, releaseId);
+        const newOrder = targetStories.filter((s) => s.id !== activeParsed.id).map((s) => s.id);
+        newOrder.push(activeParsed.id);
 
         if (activeStory.task_id !== taskId || activeStory.release_id !== releaseId) {
           await fetch(`/api/stories/${activeParsed.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ task_id: taskId, release_id: releaseId }),
-          })
+          });
         }
 
         await fetch('/api/stories', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ task_id: taskId, release_id: releaseId, order: newOrder }),
-        })
-        onRefresh()
-        return
+        });
+        onRefresh();
+        return;
       }
     }
   }
 
   // Derive dragged item from state - no string parsing needed
-  const draggedActivity = activeDrag?.type === 'activity'
-    ? activities.find((a) => a.id === activeDrag.id)
-    : null
-  const draggedTask = activeDrag?.type === 'task'
-    ? allTasksOrdered.find((t) => t.id === activeDrag.id)
-    : null
-  const draggedStory = activeDrag?.type === 'story'
-    ? allStories.find((s) => s.id === activeDrag.id)
-    : null
+  const draggedActivity = activeDrag?.type === 'activity' ? activities.find((a) => a.id === activeDrag.id) : null;
+  const draggedTask = activeDrag?.type === 'task' ? allTasksOrdered.find((t) => t.id === activeDrag.id) : null;
+  const draggedStory = activeDrag?.type === 'story' ? allStories.find((s) => s.id === activeDrag.id) : null;
 
   function isDropTarget(itemId: string): boolean {
-    return dropTargetId === itemId
+    return dropTargetId === itemId;
   }
 
   if (activities.length === 0) {
@@ -342,7 +338,7 @@ export function StoryMapCanvas({
           Add Activity
         </Button>
       </div>
-    )
+    );
   }
 
   return (
@@ -361,7 +357,7 @@ export function StoryMapCanvas({
         >
           <div className="flex" style={{ gap: GROUP_GAP }}>
             {sortedActivities.map((activity) => {
-              const tasks = getTasksForActivity(activity.id)
+              const tasks = getTasksForActivity(activity.id);
 
               return (
                 <div key={activity.id} className="flex justify-between" style={{ width: getGroupWidth(tasks.length) }}>
@@ -377,7 +373,7 @@ export function StoryMapCanvas({
                     onClick={onAddActivity}
                   />
                 </div>
-              )
+              );
             })}
           </div>
         </SortableContext>
@@ -389,7 +385,7 @@ export function StoryMapCanvas({
         >
           <div className="flex mt-2" style={{ gap: GROUP_GAP }}>
             {sortedActivities.map((activity) => {
-              const tasks = getTasksForActivity(activity.id)
+              const tasks = getTasksForActivity(activity.id);
 
               return (
                 <div key={activity.id} className="flex" style={{ width: getGroupWidth(tasks.length), gap: CARD_GAP }}>
@@ -407,7 +403,7 @@ export function StoryMapCanvas({
                     showIndicator={isDropTarget(encodeDragId({ type: 'task-end', activityId: activity.id }))}
                   />
                 </div>
-              )
+              );
             })}
           </div>
         </SortableContext>
@@ -482,7 +478,7 @@ export function StoryMapCanvas({
         )}
       </DragOverlay>
     </DndContext>
-  )
+  );
 }
 
 function AddTaskDropZone({
@@ -490,13 +486,13 @@ function AddTaskDropZone({
   onAddTask,
   showIndicator,
 }: {
-  activityId: string
-  onAddTask: (activityId: string) => void
-  showIndicator: boolean
+  activityId: string;
+  onAddTask: (activityId: string) => void;
+  showIndicator: boolean;
 }) {
   const { setNodeRef } = useDroppable({
     id: encodeDragId({ type: 'task-end', activityId }),
-  })
+  });
 
   return (
     <div className="flex gap-1">
@@ -509,7 +505,7 @@ function AddTaskDropZone({
         onClick={() => onAddTask(activityId)}
       />
     </div>
-  )
+  );
 }
 
 function SortableActivity({
@@ -517,13 +513,13 @@ function SortableActivity({
   onClick,
   showIndicator,
 }: {
-  activity: Activity
-  onClick: () => void
-  showIndicator: boolean
+  activity: Activity;
+  onClick: () => void;
+  showIndicator: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: encodeDragId({ type: 'activity', id: activity.id }),
-  })
+  });
 
   return (
     <div className="flex items-stretch gap-1">
@@ -535,27 +531,19 @@ function SortableActivity({
         {...attributes}
         {...listeners}
         onClick={() => {
-          if (!isDragging) onClick()
+          if (!isDragging) onClick();
         }}
       >
         <div className="font-medium text-sm line-clamp-3">{activity.name}</div>
       </MapCard>
     </div>
-  )
+  );
 }
 
-function SortableTask({
-  task,
-  onClick,
-  showIndicator,
-}: {
-  task: Task
-  onClick: () => void
-  showIndicator: boolean
-}) {
+function SortableTask({ task, onClick, showIndicator }: { task: Task; onClick: () => void; showIndicator: boolean }) {
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: encodeDragId({ type: 'task', id: task.id }),
-  })
+  });
 
   return (
     <div className="flex items-stretch gap-1">
@@ -567,31 +555,31 @@ function SortableTask({
         {...attributes}
         {...listeners}
         onClick={() => {
-          if (!isDragging) onClick()
+          if (!isDragging) onClick();
         }}
       >
         <div className="text-sm line-clamp-3">{task.name}</div>
       </MapCard>
     </div>
-  )
+  );
 }
 
 interface ReleaseRowProps {
-  label: string
-  labelMuted?: boolean
-  releaseId: string | null
-  activities: Activity[]
-  getTasksForActivity: (activityId: string) => (TaskWithStories & { activityId: string })[]
-  getStoriesForCell: (taskId: string, releaseId: string | null) => Story[]
-  onAddStory: (taskId: string, releaseId: string | null) => void
-  onEditStory: (story: Story) => void
-  onRename?: () => void
-  onMoveUp?: () => void
-  onMoveDown?: () => void
-  onDelete?: () => void
-  isFirst?: boolean
-  isLast?: boolean
-  isDropTarget: (itemId: string) => boolean
+  label: string;
+  labelMuted?: boolean;
+  releaseId: string | null;
+  activities: Activity[];
+  getTasksForActivity: (activityId: string) => (TaskWithStories & { activityId: string })[];
+  getStoriesForCell: (taskId: string, releaseId: string | null) => Story[];
+  onAddStory: (taskId: string, releaseId: string | null) => void;
+  onEditStory: (story: Story) => void;
+  onRename?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onDelete?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
+  isDropTarget: (itemId: string) => boolean;
 }
 
 function AddReleaseZone({ onAddRelease, alwaysVisible }: { onAddRelease: () => void; alwaysVisible?: boolean }) {
@@ -605,7 +593,7 @@ function AddReleaseZone({ onAddRelease, alwaysVisible }: { onAddRelease: () => v
         onClick={onAddRelease}
       />
     </div>
-  )
+  );
 }
 
 function ReleaseRow({
@@ -625,15 +613,13 @@ function ReleaseRow({
   isLast,
   isDropTarget,
 }: ReleaseRowProps) {
-  const showActions = releaseId !== null
+  const showActions = releaseId !== null;
 
   return (
     <div className="pt-4">
       <Separator className="mb-4" />
       <div className="group flex items-center gap-2 mb-3">
-        <div className={`text-sm font-medium ${labelMuted ? 'text-muted-foreground' : ''}`}>
-          {label}
-        </div>
+        <div className={`text-sm font-medium ${labelMuted ? 'text-muted-foreground' : ''}`}>{label}</div>
         {showActions && (
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             <Tooltip>
@@ -646,7 +632,13 @@ function ReleaseRow({
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-5 w-5 cursor-pointer" onClick={onMoveUp} disabled={isFirst}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 cursor-pointer"
+                  onClick={onMoveUp}
+                  disabled={isFirst}
+                >
                   <ArrowUp className="h-3 w-3" />
                 </Button>
               </TooltipTrigger>
@@ -654,7 +646,13 @@ function ReleaseRow({
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-5 w-5 cursor-pointer" onClick={onMoveDown} disabled={isLast}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 cursor-pointer"
+                  onClick={onMoveDown}
+                  disabled={isLast}
+                >
                   <ArrowDown className="h-3 w-3" />
                 </Button>
               </TooltipTrigger>
@@ -662,7 +660,12 @@ function ReleaseRow({
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-5 w-5 cursor-pointer hover:text-destructive" onClick={onDelete}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 cursor-pointer hover:text-destructive"
+                  onClick={onDelete}
+                >
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </TooltipTrigger>
@@ -673,7 +676,7 @@ function ReleaseRow({
       </div>
       <div className="flex items-start" style={{ gap: GROUP_GAP }}>
         {activities.map((activity) => {
-          const tasks = getTasksForActivity(activity.id)
+          const tasks = getTasksForActivity(activity.id);
 
           return (
             <div key={activity.id} className="flex" style={{ width: getGroupWidth(tasks.length), gap: CARD_GAP }}>
@@ -690,11 +693,11 @@ function ReleaseRow({
               ))}
               <div style={{ width: ADD_BUTTON_WIDTH }} />
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }
 
 function StoryCell({
@@ -705,12 +708,12 @@ function StoryCell({
   onEditStory,
   isDropTarget,
 }: {
-  taskId: string
-  releaseId: string | null
-  stories: Story[]
-  onAddStory: (taskId: string, releaseId: string | null) => void
-  onEditStory: (story: Story) => void
-  isDropTarget: (itemId: string) => boolean
+  taskId: string;
+  releaseId: string | null;
+  stories: Story[];
+  onAddStory: (taskId: string, releaseId: string | null) => void;
+  onEditStory: (story: Story) => void;
+  isDropTarget: (itemId: string) => boolean;
 }) {
   return (
     <div className="flex flex-col gap-2 min-h-[40px]" style={{ width: CARD_WIDTH }}>
@@ -729,7 +732,7 @@ function StoryCell({
         showIndicator={isDropTarget(encodeDragId({ type: 'story-end', taskId, releaseId }))}
       />
     </div>
-  )
+  );
 }
 
 function AddStoryDropZone({
@@ -738,26 +741,21 @@ function AddStoryDropZone({
   onAddStory,
   showIndicator,
 }: {
-  taskId: string
-  releaseId: string | null
-  onAddStory: (taskId: string, releaseId: string | null) => void
-  showIndicator: boolean
+  taskId: string;
+  releaseId: string | null;
+  onAddStory: (taskId: string, releaseId: string | null) => void;
+  showIndicator: boolean;
 }) {
   const { setNodeRef } = useDroppable({
     id: encodeDragId({ type: 'story-end', taskId, releaseId }),
-  })
+  });
 
   return (
     <div className="flex flex-col gap-1">
       {showIndicator && <DropLine direction="horizontal" />}
-      <AddButton
-        ref={setNodeRef}
-        label="Story"
-        className="w-full h-8"
-        onClick={() => onAddStory(taskId, releaseId)}
-      />
+      <AddButton ref={setNodeRef} label="Story" className="w-full h-8" onClick={() => onAddStory(taskId, releaseId)} />
     </div>
-  )
+  );
 }
 
 function SortableStory({
@@ -765,13 +763,13 @@ function SortableStory({
   onClick,
   showIndicator,
 }: {
-  story: Story
-  onClick: () => void
-  showIndicator: boolean
+  story: Story;
+  onClick: () => void;
+  showIndicator: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({
     id: encodeDragId({ type: 'story', id: story.id }),
-  })
+  });
 
   return (
     <div className="flex flex-col gap-1">
@@ -783,7 +781,7 @@ function SortableStory({
         {...attributes}
         {...listeners}
         onClick={() => {
-          if (!isDragging) onClick()
+          if (!isDragging) onClick();
         }}
       >
         <div className="text-xs line-clamp-3">{story.title}</div>
@@ -794,5 +792,5 @@ function SortableStory({
         )}
       </MapCard>
     </div>
-  )
+  );
 }

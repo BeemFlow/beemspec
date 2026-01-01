@@ -1,13 +1,13 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
-import { validateRequest, createPersonaSchema } from '@/lib/validations'
-import { serverErrorResponse } from '@/lib/errors'
+import { NextResponse } from 'next/server';
+import { serverErrorResponse } from '@/lib/errors';
+import { createClient } from '@/lib/supabase/server';
+import { createPersonaSchema, validateRequest } from '@/lib/validations';
 
 export async function POST(request: Request) {
-  const validation = await validateRequest(request, createPersonaSchema)
-  if (!validation.success) return validation.response
+  const validation = await validateRequest(request, createPersonaSchema);
+  if (!validation.success) return validation.response;
 
-  const supabase = await createClient()
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('personas')
     .insert({
@@ -17,10 +17,10 @@ export async function POST(request: Request) {
       goals: validation.data.goals ?? null,
     })
     .select()
-    .single()
+    .single();
 
   if (error) {
-    return serverErrorResponse('Failed to create persona', error)
+    return serverErrorResponse('Failed to create persona', error);
   }
-  return NextResponse.json(data)
+  return NextResponse.json(data);
 }

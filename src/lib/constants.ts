@@ -1,4 +1,4 @@
-import type { StoryStatus } from '@/types'
+import type { StoryStatus } from '@/types';
 
 // =============================================================================
 // Story Status
@@ -10,7 +10,7 @@ export const STATUS_LABELS: Record<StoryStatus, string> = {
   in_progress: 'In Progress',
   review: 'Review',
   done: 'Done',
-}
+};
 
 export const STATUS_VARIANTS: Record<StoryStatus, 'default' | 'secondary' | 'outline'> = {
   backlog: 'outline',
@@ -18,7 +18,7 @@ export const STATUS_VARIANTS: Record<StoryStatus, 'default' | 'secondary' | 'out
   in_progress: 'default',
   review: 'secondary',
   done: 'default',
-}
+};
 
 export const STATUS_OPTIONS: { value: StoryStatus; label: string }[] = [
   { value: 'backlog', label: 'Backlog' },
@@ -26,4 +26,4 @@ export const STATUS_OPTIONS: { value: StoryStatus; label: string }[] = [
   { value: 'in_progress', label: 'In Progress' },
   { value: 'review', label: 'Review' },
   { value: 'done', label: 'Done' },
-]
+];

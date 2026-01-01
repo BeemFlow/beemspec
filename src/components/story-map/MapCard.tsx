@@ -1,18 +1,18 @@
-import * as React from 'react'
-import { cn } from '@/lib/utils'
-import { CARD_WIDTH, CARD_HEIGHT } from '@/components/story-map/constants'
+import * as React from 'react';
+import { CARD_HEIGHT, CARD_WIDTH } from '@/components/story-map/constants';
+import { cn } from '@/lib/utils';
 
-type MapCardVariant = 'activity' | 'task' | 'story'
+type MapCardVariant = 'activity' | 'task' | 'story';
 
 const variantStyles: Record<MapCardVariant, string> = {
   activity: 'bg-amber-100 border-amber-200',
   task: 'bg-sky-100 border-sky-200',
   story: 'bg-white border-slate-200 shadow-sm',
-}
+};
 
 interface MapCardProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant: MapCardVariant
-  isDragging?: boolean
+  variant: MapCardVariant;
+  isDragging?: boolean;
 }
 
 const MapCard = React.forwardRef<HTMLDivElement, MapCardProps>(
@@ -29,17 +29,17 @@ const MapCard = React.forwardRef<HTMLDivElement, MapCardProps>(
         className={cn(
           'rounded border p-3 cursor-grab active:cursor-grabbing hover:shadow flex flex-col',
           variantStyles[variant],
-          className
+          className,
         )}
         {...props}
       >
         {children}
       </div>
-    )
-  }
-)
+    );
+  },
+);
 
-MapCard.displayName = 'MapCard'
+MapCard.displayName = 'MapCard';
 
-export { MapCard }
-export type { MapCardVariant }
+export { MapCard };
+export type { MapCardVariant };

@@ -1,49 +1,44 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
-import { validateRequest, updateTaskSchema, isValidUuid, invalidIdResponse, pickDefined } from '@/lib/validations'
-import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors'
+import { NextResponse } from 'next/server';
+import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
+import { createClient } from '@/lib/supabase/server';
+import { invalidIdResponse, isValidUuid, pickDefined, updateTaskSchema, validateRequest } from '@/lib/validations';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  if (!isValidUuid(id)) return invalidIdResponse()
+  const { id } = await params;
+  if (!isValidUuid(id)) return invalidIdResponse();
 
-  const validation = await validateRequest(request, updateTaskSchema)
-  if (!validation.success) return validation.response
+  const validation = await validateRequest(request, updateTaskSchema);
+  if (!validation.success) return validation.response;
 
-  const supabase = await createClient()
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('tasks')
     .update(pickDefined(validation.data))
     .eq('id', id)
     .select()
-    .single()
+    .single();
 
   if (error) {
     if (error.code === DbErrorCode.NOT_FOUND) {
-      return notFoundResponse('Task')
+      return notFoundResponse('Task');
     }
-    return serverErrorResponse('Failed to update task', error)
+    return serverErrorResponse('Failed to update task', error);
   }
-  return NextResponse.json(data)
+  return NextResponse.json(data);
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  if (!isValidUuid(id)) return invalidIdResponse()
+  const { id } = await params;
+  if (!isValidUuid(id)) return invalidIdResponse();
 
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('tasks')
-    .delete()
-    .eq('id', id)
-    .select()
-    .single()
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('tasks').delete().eq('id', id).select().single();
 
   if (error) {
     if (error.code === DbErrorCode.NOT_FOUND) {
-      return notFoundResponse('Task')
+      return notFoundResponse('Task');
     }
-    return serverErrorResponse('Failed to delete task', error)
+    return serverErrorResponse('Failed to delete task', error);
   }
-  return NextResponse.json({ success: true, deleted: data })
+  return NextResponse.json({ success: true, deleted: data });
 }

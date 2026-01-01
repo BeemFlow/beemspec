@@ -1,15 +1,15 @@
-import * as React from 'react'
-import { Plus } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Plus } from 'lucide-react';
+import * as React from 'react';
+import { cn } from '@/lib/utils';
 
 interface AddButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  label: string
-  orientation?: 'horizontal' | 'vertical'
+  label: string;
+  orientation?: 'horizontal' | 'vertical';
 }
 
 const AddButton = React.forwardRef<HTMLButtonElement, AddButtonProps>(
   ({ label, orientation = 'horizontal', className, ...props }, ref) => {
-    const isVertical = orientation === 'vertical'
+    const isVertical = orientation === 'vertical';
 
     return (
       <button
@@ -19,7 +19,7 @@ const AddButton = React.forwardRef<HTMLButtonElement, AddButtonProps>(
           'hover:text-slate-600 hover:border-slate-400',
           'transition-colors text-xs flex items-center justify-center cursor-pointer',
           isVertical ? 'gap-0' : 'gap-1',
-          className
+          className,
         )}
         {...props}
       >
@@ -35,10 +35,10 @@ const AddButton = React.forwardRef<HTMLButtonElement, AddButtonProps>(
           </>
         )}
       </button>
-    )
-  }
-)
+    );
+  },
+);
 
-AddButton.displayName = 'AddButton'
+AddButton.displayName = 'AddButton';
 
-export { AddButton }
+export { AddButton };

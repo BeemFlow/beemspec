@@ -1,58 +1,52 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import type { StoryMap } from '@/types'
+import { Plus } from 'lucide-react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import type { StoryMap } from '@/types';
 
 export default function Dashboard() {
-  const [storyMaps, setStoryMaps] = useState<StoryMap[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
+  const [storyMaps, setStoryMaps] = useState<StoryMap[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
 
   useEffect(() => {
     fetch('/api/story-maps')
       .then((r) => r.json())
       .then((data) => {
         if (data.error) {
-          setError(data.error)
+          setError(data.error);
         } else {
-          setStoryMaps(data)
+          setStoryMaps(data);
         }
       })
-      .catch((err) => setError(err.message))
-  }, [])
+      .catch((err) => setError(err.message));
+  }, []);
 
   async function createStoryMap(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault();
     const res = await fetch('/api/story-maps', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, description }),
-    })
-    const data = await res.json()
+    });
+    const data = await res.json();
     if (data.error) {
-      setError(data.error)
-      return
+      setError(data.error);
+      return;
     }
-    setStoryMaps([data, ...storyMaps])
-    setName('')
-    setDescription('')
-    setOpen(false)
+    setStoryMaps([data, ...storyMaps]);
+    setName('');
+    setDescription('');
+    setOpen(false);
   }
 
   return (
@@ -119,5 +113,5 @@ export default function Dashboard() {
         )}
       </div>
     </main>
-  )
+  );
 }

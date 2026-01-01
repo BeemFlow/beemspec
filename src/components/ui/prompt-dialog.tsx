@@ -1,25 +1,19 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface PromptDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  title: string
-  label?: string
-  placeholder?: string
-  defaultValue?: string
-  onSubmit: (value: string) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  label?: string;
+  placeholder?: string;
+  defaultValue?: string;
+  onSubmit: (value: string) => void;
 }
 
 export function PromptDialog({
@@ -31,19 +25,19 @@ export function PromptDialog({
   defaultValue = '',
   onSubmit,
 }: PromptDialogProps) {
-  const [value, setValue] = useState(defaultValue)
+  const [value, setValue] = useState(defaultValue);
 
   useEffect(() => {
     if (open) {
-      setValue(defaultValue)
+      setValue(defaultValue);
     }
-  }, [open, defaultValue])
+  }, [open, defaultValue]);
 
   function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault();
     if (value.trim()) {
-      onSubmit(value.trim())
-      onOpenChange(false)
+      onSubmit(value.trim());
+      onOpenChange(false);
     }
   }
 
@@ -75,5 +69,5 @@ export function PromptDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

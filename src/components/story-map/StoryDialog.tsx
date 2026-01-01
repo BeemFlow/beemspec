@@ -1,75 +1,64 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { STATUS_OPTIONS } from '@/lib/constants'
-import type { Story, Release, StoryStatus } from '@/types'
+import { Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { STATUS_OPTIONS } from '@/lib/constants';
+import type { Release, Story, StoryStatus } from '@/types';
 
 interface Props {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  story: Story | null
-  releases: Release[]
-  defaultReleaseId?: string | null
-  onSave: (story: Partial<Story>) => void
-  onDelete?: () => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  story: Story | null;
+  releases: Release[];
+  defaultReleaseId?: string | null;
+  onSave: (story: Partial<Story>) => void;
+  onDelete?: () => void;
 }
 
-const NO_RELEASE = '__none__'
+const NO_RELEASE = '__none__';
 
 export function StoryDialog({ open, onOpenChange, story, releases, defaultReleaseId, onSave, onDelete }: Props) {
-  const [title, setTitle] = useState('')
-  const [requirements, setRequirements] = useState('')
-  const [acceptanceCriteria, setAcceptanceCriteria] = useState('')
-  const [figmaLink, setFigmaLink] = useState('')
-  const [edgeCases, setEdgeCases] = useState('')
-  const [technicalGuidelines, setTechnicalGuidelines] = useState('')
-  const [status, setStatus] = useState<StoryStatus>('backlog')
-  const [releaseId, setReleaseId] = useState<string>(NO_RELEASE)
+  const [title, setTitle] = useState('');
+  const [requirements, setRequirements] = useState('');
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
+  const [figmaLink, setFigmaLink] = useState('');
+  const [edgeCases, setEdgeCases] = useState('');
+  const [technicalGuidelines, setTechnicalGuidelines] = useState('');
+  const [status, setStatus] = useState<StoryStatus>('backlog');
+  const [releaseId, setReleaseId] = useState<string>(NO_RELEASE);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: open is intentionally included to reset form when dialog opens
   useEffect(() => {
     if (story) {
-      setTitle(story.title)
-      setRequirements(story.requirements)
-      setAcceptanceCriteria(story.acceptance_criteria)
-      setFigmaLink(story.figma_link || '')
-      setEdgeCases(story.edge_cases || '')
-      setTechnicalGuidelines(story.technical_guidelines || '')
-      setStatus(story.status)
-      setReleaseId(story.release_id || NO_RELEASE)
+      setTitle(story.title);
+      setRequirements(story.requirements);
+      setAcceptanceCriteria(story.acceptance_criteria);
+      setFigmaLink(story.figma_link || '');
+      setEdgeCases(story.edge_cases || '');
+      setTechnicalGuidelines(story.technical_guidelines || '');
+      setStatus(story.status);
+      setReleaseId(story.release_id || NO_RELEASE);
     } else {
-      setTitle('')
-      setRequirements('')
-      setAcceptanceCriteria('')
-      setFigmaLink('')
-      setEdgeCases('')
-      setTechnicalGuidelines('')
-      setStatus('backlog')
+      setTitle('');
+      setRequirements('');
+      setAcceptanceCriteria('');
+      setFigmaLink('');
+      setEdgeCases('');
+      setTechnicalGuidelines('');
+      setStatus('backlog');
       // Default to the release that was clicked, or no release
-      setReleaseId(defaultReleaseId || NO_RELEASE)
+      setReleaseId(defaultReleaseId || NO_RELEASE);
     }
-  }, [story, open, defaultReleaseId])
+  }, [story, open, defaultReleaseId]);
 
   function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault();
     onSave({
       title,
       requirements,
@@ -79,12 +68,15 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
       technical_guidelines: technicalGuidelines || null,
       status,
       release_id: releaseId === NO_RELEASE ? null : releaseId,
-    })
+    });
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => story && e.preventDefault()}>
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        onOpenAutoFocus={(e) => story && e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{story ? 'Edit Story' : 'New Story'}</DialogTitle>
         </DialogHeader>
@@ -208,5 +200,5 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

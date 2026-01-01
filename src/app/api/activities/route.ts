@@ -1,29 +1,29 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
-import { validateRequest, reorderActivitiesSchema, createActivitySchema } from '@/lib/validations'
-import { serverErrorResponse } from '@/lib/errors'
+import { NextResponse } from 'next/server';
+import { serverErrorResponse } from '@/lib/errors';
+import { createClient } from '@/lib/supabase/server';
+import { createActivitySchema, reorderActivitiesSchema, validateRequest } from '@/lib/validations';
 
 export async function PUT(request: Request) {
-  const validation = await validateRequest(request, reorderActivitiesSchema)
-  if (!validation.success) return validation.response
+  const validation = await validateRequest(request, reorderActivitiesSchema);
+  if (!validation.success) return validation.response;
 
-  const supabase = await createClient()
+  const supabase = await createClient();
   const { error } = await supabase.rpc('reorder_activities', {
     p_story_map_id: validation.data.story_map_id,
     p_order: validation.data.order,
-  })
+  });
 
   if (error) {
-    return serverErrorResponse('Failed to reorder activities', error)
+    return serverErrorResponse('Failed to reorder activities', error);
   }
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true });
 }
 
 export async function POST(request: Request) {
-  const validation = await validateRequest(request, createActivitySchema)
-  if (!validation.success) return validation.response
+  const validation = await validateRequest(request, createActivitySchema);
+  if (!validation.success) return validation.response;
 
-  const supabase = await createClient()
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('activities')
     .insert({
@@ -32,10 +32,10 @@ export async function POST(request: Request) {
       description: validation.data.description ?? null,
     })
     .select()
-    .single()
+    .single();
 
   if (error) {
-    return serverErrorResponse('Failed to create activity', error)
+    return serverErrorResponse('Failed to create activity', error);
   }
-  return NextResponse.json(data)
+  return NextResponse.json(data);
 }

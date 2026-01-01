@@ -1,7 +1,39 @@
 {
+  "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+  "files": {
+    "includes": ["**", "!!.next/**", "!!.vercel/**", "!!out/**", "!!build/**", "!**/*.d.ts"]
+  },
   "css": {
     "parser": {
+      "cssModules": true,
       "tailwindDirectives": true
+    },
+    "formatter": {
+      "enabled": true,
+      "indentStyle": "space"
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always"
+    }
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "lineWidth": 120
+  },
+  "linter": {
+    "rules": {
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "warn"
+      },
+      "suspicious": {
+        "noConsole": "warn"
+      },
+      "style": {
+        "useDefaultSwitchClause": "warn"
+      }
     }
   }
 }

@@ -1,42 +1,37 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import type { Activity } from '@/types'
+import { Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import type { Activity } from '@/types';
 
 interface Props {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  activity: Activity | null
-  onSave: (data: { name: string }) => void
-  onDelete?: () => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  activity: Activity | null;
+  onSave: (data: { name: string }) => void;
+  onDelete?: () => void;
 }
 
 export function ActivityDialog({ open, onOpenChange, activity, onSave, onDelete }: Props) {
-  const [name, setName] = useState('')
+  const [name, setName] = useState('');
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: open is intentionally included to reset form when dialog opens
   useEffect(() => {
     if (activity) {
-      setName(activity.name)
+      setName(activity.name);
     } else {
-      setName('')
+      setName('');
     }
-  }, [activity, open])
+  }, [activity, open]);
 
   function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault();
     if (name.trim()) {
-      onSave({ name: name.trim() })
+      onSave({ name: name.trim() });
     }
   }
 
@@ -77,5 +72,5 @@ export function ActivityDialog({ open, onOpenChange, activity, onSave, onDelete 
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
