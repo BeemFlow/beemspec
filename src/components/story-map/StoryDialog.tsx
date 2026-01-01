@@ -44,6 +44,7 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
   const [status, setStatus] = useState<StoryStatus>('backlog')
   const [releaseId, setReleaseId] = useState<string>(NO_RELEASE)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: open is intentionally included to reset form when dialog opens
   useEffect(() => {
     if (story) {
       setTitle(story.title)

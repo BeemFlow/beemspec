@@ -24,6 +24,7 @@ interface Props {
 export function TaskDialog({ open, onOpenChange, task, onSave, onDelete }: Props) {
   const [name, setName] = useState('')
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: open is intentionally included to reset form when dialog opens
   useEffect(() => {
     if (task) {
       setName(task.name)

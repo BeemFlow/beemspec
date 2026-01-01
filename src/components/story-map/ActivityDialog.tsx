@@ -24,6 +24,7 @@ interface Props {
 export function ActivityDialog({ open, onOpenChange, activity, onSave, onDelete }: Props) {
   const [name, setName] = useState('')
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: open is intentionally included to reset form when dialog opens
   useEffect(() => {
     if (activity) {
       setName(activity.name)

@@ -13,10 +13,10 @@ import { STATUS_LABELS, STATUS_VARIANTS } from '@/lib/constants'
 import { assertNever } from '@/lib/errors'
 import {
   DndContext,
-  DragEndEvent,
-  DragOverEvent,
+  type DragEndEvent,
+  type DragOverEvent,
   DragOverlay,
-  DragStartEvent,
+  type DragStartEvent,
   rectIntersection,
   PointerSensor,
   useSensor,
