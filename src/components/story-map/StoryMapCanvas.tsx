@@ -111,9 +111,9 @@ function getGroupWidth(taskCount: number): number {
 
 function DropLine({ direction }: { direction: 'vertical' | 'horizontal' }) {
   if (direction === 'vertical') {
-    return <div className="w-0.5 h-full bg-blue-500 rounded-full min-h-[96px]" />;
+    return <div className="w-0.5 h-full bg-primary rounded-full min-h-[96px]" />;
   }
-  return <div className="h-0.5 w-full bg-blue-500 rounded-full" />;
+  return <div className="h-0.5 w-full bg-primary rounded-full" />;
 }
 
 export function StoryMapCanvas({
@@ -587,7 +587,7 @@ function AddReleaseZone({ onAddRelease, alwaysVisible }: { onAddRelease: () => v
     <div className="group/addzone h-6 mt-4 relative">
       <AddButton
         label="Release"
-        className={`absolute inset-x-0 top-0 h-8 transition-opacity px-3 bg-white z-10 justify-start ${
+        className={`absolute inset-x-0 top-0 h-8 transition-opacity px-3 bg-background z-10 justify-start ${
           alwaysVisible ? '' : 'opacity-0 group-hover/addzone:opacity-100'
         }`}
         onClick={onAddRelease}

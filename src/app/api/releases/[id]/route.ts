@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, pickDefined, updateReleaseSchema, validateRequest } from '@/lib/validations';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAuth();
+  if (!auth.success) return auth.response;
+
   const { id } = await params;
   if (!isValidUuid(id)) return invalidIdResponse();
 
@@ -28,6 +32,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAuth();
+  if (!auth.success) return auth.response;
+
   const { id } = await params;
   if (!isValidUuid(id)) return invalidIdResponse();
 

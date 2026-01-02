@@ -15,8 +15,8 @@ const AddButton = React.forwardRef<HTMLButtonElement, AddButtonProps>(
       <button
         ref={ref}
         className={cn(
-          'border border-dashed border-slate-300 rounded text-slate-400',
-          'hover:text-slate-600 hover:border-slate-400',
+          'border border-dashed border-muted-foreground/30 rounded text-muted-foreground',
+          'hover:text-foreground hover:border-muted-foreground',
           'transition-colors text-xs flex items-center justify-center cursor-pointer',
           isVertical ? 'gap-0' : 'gap-1',
           className,

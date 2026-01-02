@@ -1,7 +1,29 @@
 export type StoryStatus = 'backlog' | 'ready' | 'in_progress' | 'review' | 'done';
 
+export type TeamRole = 'owner' | 'member';
+
+export interface Team {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamMember {
+  id: string;
+  team_id: string;
+  user_id: string;
+  role: TeamRole;
+  created_at: string;
+}
+
+export interface TeamWithRole extends Team {
+  role: TeamRole;
+}
+
 export interface StoryMap {
   id: string;
+  team_id: string;
   name: string;
   description: string | null;
   created_at: string;

@@ -5,9 +5,9 @@ import { cn } from '@/lib/utils';
 type MapCardVariant = 'activity' | 'task' | 'story';
 
 const variantStyles: Record<MapCardVariant, string> = {
-  activity: 'bg-amber-100 border-amber-200',
-  task: 'bg-sky-100 border-sky-200',
-  story: 'bg-white border-slate-200 shadow-sm',
+  activity: 'bg-amber-100 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800',
+  task: 'bg-sky-100 border-sky-200 dark:bg-sky-900/30 dark:border-sky-800',
+  story: 'bg-card border shadow-sm',
 };
 
 interface MapCardProps extends React.HTMLAttributes<HTMLDivElement> {

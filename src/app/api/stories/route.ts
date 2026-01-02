@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { createStorySchema, reorderStoriesSchema, validateRequest } from '@/lib/validations';
 
 export async function PUT(request: Request) {
+  const auth = await requireAuth();
+  if (!auth.success) return auth.response;
+
   const validation = await validateRequest(request, reorderStoriesSchema);
   if (!validation.success) return validation.response;
 
@@ -21,6 +25,9 @@ export async function PUT(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAuth();
+  if (!auth.success) return auth.response;
+
   const validation = await validateRequest(request, createStorySchema);
   if (!validation.success) return validation.response;
 

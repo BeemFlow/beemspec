@@ -9,17 +9,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useTeam } from '@/lib/contexts/team-context';
 import type { StoryMap } from '@/types';
 
 export default function Dashboard() {
+  const { currentTeam, loading: teamLoading } = useTeam();
   const [storyMaps, setStoryMaps] = useState<StoryMap[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
   useEffect(() => {
-    fetch('/api/story-maps')
+    if (teamLoading || !currentTeam) return;
+
+    setLoading(true);
+    fetch(`/api/story-maps?team_id=${currentTeam.id}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) {
@@ -27,16 +33,22 @@ export default function Dashboard() {
         } else {
           setStoryMaps(data);
         }
+        setLoading(false);
       })
-      .catch((err) => setError(err.message));
-  }, []);
+      .catch((err) => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [currentTeam, teamLoading]);
 
   async function createStoryMap(e: React.FormEvent) {
     e.preventDefault();
+    if (!currentTeam) return;
+
     const res = await fetch('/api/story-maps', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, description }),
+      body: JSON.stringify({ team_id: currentTeam.id, name, description }),
     });
     const data = await res.json();
     if (data.error) {
@@ -56,7 +68,7 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold">Story Maps</h1>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button disabled={!currentTeam || teamLoading}>
                 <Plus className="mr-2 h-4 w-4" />
                 New Story Map
               </Button>
@@ -95,6 +107,10 @@ export default function Dashboard() {
 
         {error ? (
           <p className="text-destructive">{error}</p>
+        ) : teamLoading || loading ? (
+          <p className="text-muted-foreground">Loading...</p>
+        ) : !currentTeam ? (
+          <p className="text-muted-foreground">Setting up your workspace...</p>
         ) : storyMaps.length === 0 ? (
           <p className="text-muted-foreground">No story maps yet. Create one to get started.</p>
         ) : (

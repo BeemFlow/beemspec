@@ -83,13 +83,17 @@ const atLeastOneFieldMessage = { message: 'At least one field must be provided' 
 // =============================================================================
 
 const storyMapBase = z.object({
+  team_id: uuid,
   name,
   description: nullableString,
 });
 
 export const createStoryMapSchema = storyMapBase.partial({ description: true });
 
-export const updateStoryMapSchema = storyMapBase.partial().refine(atLeastOneField, atLeastOneFieldMessage);
+export const updateStoryMapSchema = storyMapBase
+  .omit({ team_id: true })
+  .partial()
+  .refine(atLeastOneField, atLeastOneFieldMessage);
 
 const releaseBase = z.object({
   story_map_id: uuid,
