@@ -28,6 +28,20 @@ CREATE TABLE team_members (
 CREATE INDEX idx_team_members_team ON team_members(team_id);
 CREATE INDEX idx_team_members_user ON team_members(user_id);
 
+-- Team invites (for inviting users to join teams)
+CREATE TABLE team_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  invited_by UUID NOT NULL REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  accepted_at TIMESTAMPTZ,
+  UNIQUE(team_id, email)
+);
+
+CREATE INDEX idx_team_invites_team ON team_invites(team_id);
+CREATE INDEX idx_team_invites_email ON team_invites(email);
+
 -- =============================================================================
 -- Add team_id to story_maps
 -- =============================================================================
@@ -70,6 +84,7 @@ $$;
 
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE team_invites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE story_maps ENABLE ROW LEVEL SECURITY;
 ALTER TABLE personas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
@@ -110,13 +125,27 @@ CREATE POLICY "Team members can view membership"
   ON team_members FOR SELECT
   USING (is_team_member(team_id));
 
-CREATE POLICY "Team owners can add members"
+CREATE POLICY "Team owners can add members or users can join via invite"
   ON team_members FOR INSERT
   TO authenticated
-  WITH CHECK (is_team_owner(team_id) OR (
-    -- Allow owner to add themselves when creating a team
-    user_id = (SELECT auth.uid()) AND role = 'owner'
-  ));
+  WITH CHECK (
+    is_team_owner(team_id)
+    OR (
+      -- Allow owner to add themselves when creating a team
+      user_id = (SELECT auth.uid()) AND role = 'owner'
+    )
+    OR (
+      -- Allow users to join via valid pending invite
+      user_id = (SELECT auth.uid())
+      AND role = 'member'
+      AND EXISTS (
+        SELECT 1 FROM team_invites
+        WHERE team_id = team_members.team_id
+        AND LOWER(email) = LOWER((SELECT email FROM auth.users WHERE id = auth.uid()))
+        AND accepted_at IS NULL
+      )
+    )
+  );
 
 CREATE POLICY "Team owners can update members"
   ON team_members FOR UPDATE
@@ -126,6 +155,28 @@ CREATE POLICY "Team owners can update members"
 CREATE POLICY "Team owners can remove members or self-remove"
   ON team_members FOR DELETE
   USING (is_team_owner(team_id) OR user_id = (SELECT auth.uid()));
+
+-- =============================================================================
+-- Team Invites Policies
+-- =============================================================================
+
+CREATE POLICY "Team members can view invites"
+  ON team_invites FOR SELECT
+  USING (is_team_member(team_id));
+
+CREATE POLICY "Team owners can create invites"
+  ON team_invites FOR INSERT
+  TO authenticated
+  WITH CHECK (is_team_owner(team_id));
+
+CREATE POLICY "Team owners can update invites"
+  ON team_invites FOR UPDATE
+  USING (is_team_owner(team_id))
+  WITH CHECK (is_team_owner(team_id));
+
+CREATE POLICY "Team owners can delete invites"
+  ON team_invites FOR DELETE
+  USING (is_team_owner(team_id));
 
 -- =============================================================================
 -- Story Maps Policies
@@ -526,3 +577,86 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_teams_updated_at
   BEFORE UPDATE ON teams
   FOR EACH ROW EXECUTE FUNCTION update_teams_updated_at();
+
+-- =============================================================================
+-- Member Management Functions (SECURITY DEFINER for auth.users access)
+-- =============================================================================
+
+-- Get team members with emails
+CREATE OR REPLACE FUNCTION get_team_members(p_team_id UUID)
+RETURNS TABLE (
+  id UUID,
+  user_id UUID,
+  role TEXT,
+  email TEXT,
+  created_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+BEGIN
+  -- Verify caller is team member
+  IF NOT EXISTS (
+    SELECT 1 FROM public.team_members
+    WHERE team_id = p_team_id
+    AND user_id = (SELECT auth.uid())
+  ) THEN
+    RAISE EXCEPTION 'Not authorized';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    tm.id,
+    tm.user_id,
+    tm.role,
+    u.email,
+    tm.created_at
+  FROM public.team_members tm
+  JOIN auth.users u ON u.id = tm.user_id
+  WHERE tm.team_id = p_team_id
+  ORDER BY tm.created_at;
+END;
+$$;
+
+-- Remove team member
+CREATE OR REPLACE FUNCTION remove_team_member(p_team_id UUID, p_user_id UUID)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  v_caller_id UUID;
+  v_target_role TEXT;
+BEGIN
+  v_caller_id := (SELECT auth.uid());
+
+  -- Get target user's role
+  SELECT role INTO v_target_role
+  FROM public.team_members
+  WHERE team_id = p_team_id AND user_id = p_user_id;
+
+  IF v_target_role IS NULL THEN
+    RETURN json_build_object('error', 'Member not found');
+  END IF;
+
+  -- Owners cannot be removed
+  IF v_target_role = 'owner' THEN
+    RETURN json_build_object('error', 'Cannot remove team owner');
+  END IF;
+
+  -- Only owners or self can remove
+  IF NOT EXISTS (
+    SELECT 1 FROM public.team_members
+    WHERE team_id = p_team_id
+    AND user_id = v_caller_id
+    AND role = 'owner'
+  ) AND v_caller_id != p_user_id THEN
+    RAISE EXCEPTION 'Only team owners can remove other members';
+  END IF;
+
+  DELETE FROM public.team_members
+  WHERE team_id = p_team_id AND user_id = p_user_id;
+
+  RETURN json_build_object('success', true);
+END;
+$$;

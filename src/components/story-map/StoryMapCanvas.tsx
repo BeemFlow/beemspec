@@ -18,13 +18,14 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { AddButton } from '@/components/story-map/AddButton';
 import { ADD_BUTTON_WIDTH, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, GROUP_GAP } from '@/components/story-map/constants';
 import { MapCard } from '@/components/story-map/MapCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { DeleteButton } from '@/components/ui/delete-button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { STATUS_LABELS, STATUS_VARIANTS } from '@/lib/constants';
@@ -173,6 +174,7 @@ export function StoryMapCanvas({
     setDropTargetId(String(over.id));
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Drag-drop handler must branch on entity types (activity, task, story) and drop targets - complexity is inherent to multi-type DnD
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     setActiveDrag(null);
@@ -658,19 +660,19 @@ function ReleaseRow({
               </TooltipTrigger>
               <TooltipContent>Move down</TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 cursor-pointer hover:text-destructive"
-                  onClick={onDelete}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Delete</TooltipContent>
-            </Tooltip>
+            {onDelete && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DeleteButton
+                    onDelete={onDelete}
+                    iconOnly
+                    confirmTitle="Delete release?"
+                    confirmDescription="All stories in this release will be permanently deleted."
+                  />
+                </TooltipTrigger>
+                <TooltipContent>Delete</TooltipContent>
+              </Tooltip>
+            )}
           </div>
         )}
       </div>

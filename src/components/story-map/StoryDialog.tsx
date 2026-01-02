@@ -1,8 +1,8 @@
 'use client';
 
-import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { DeleteButton } from '@/components/ui/delete-button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -185,10 +185,11 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
 
           <div className="flex justify-between pt-4">
             {onDelete && (
-              <Button type="button" variant="destructive" onClick={onDelete}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
+              <DeleteButton
+                onDelete={onDelete}
+                confirmTitle="Delete story?"
+                confirmDescription="This story will be permanently deleted."
+              />
             )}
             <div className="ml-auto flex gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

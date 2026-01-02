@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { Map as MapIcon, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -13,16 +13,16 @@ import { useTeam } from '@/lib/contexts/team-context';
 import type { StoryMap } from '@/types';
 
 export default function Dashboard() {
-  const { currentTeam, loading: teamLoading } = useTeam();
+  const { currentTeam } = useTeam();
   const [storyMaps, setStoryMaps] = useState<StoryMap[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
   useEffect(() => {
-    if (teamLoading || !currentTeam) return;
+    if (!currentTeam) return;
 
     setLoading(true);
     fetch(`/api/story-maps?team_id=${currentTeam.id}`)
@@ -39,7 +39,7 @@ export default function Dashboard() {
         setError(err.message);
         setLoading(false);
       });
-  }, [currentTeam, teamLoading]);
+  }, [currentTeam]);
 
   async function createStoryMap(e: React.FormEvent) {
     e.preventDefault();
@@ -61,14 +61,17 @@ export default function Dashboard() {
     setOpen(false);
   }
 
+  const showEmpty = !loading && currentTeam && storyMaps.length === 0;
+  const showGrid = !loading && currentTeam && storyMaps.length > 0;
+
   return (
-    <main className="min-h-screen p-8">
+    <div className="p-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-8 flex items-center justify-between">
           <h1 className="text-3xl font-bold">Story Maps</h1>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button disabled={!currentTeam || teamLoading}>
+              <Button disabled={!currentTeam}>
                 <Plus className="mr-2 h-4 w-4" />
                 New Story Map
               </Button>
@@ -106,14 +109,47 @@ export default function Dashboard() {
         </div>
 
         {error ? (
-          <p className="text-destructive">{error}</p>
-        ) : teamLoading || loading ? (
+          <Card className="border-destructive bg-destructive/5 p-6">
+            <p className="text-destructive">{error}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => {
+                setError(null);
+                setLoading(true);
+                fetch(`/api/story-maps?team_id=${currentTeam?.id}`)
+                  .then((r) => r.json())
+                  .then((data) => {
+                    if (data.error) setError(data.error);
+                    else setStoryMaps(data);
+                    setLoading(false);
+                  })
+                  .catch((err) => {
+                    setError(err.message);
+                    setLoading(false);
+                  });
+              }}
+            >
+              Retry
+            </Button>
+          </Card>
+        ) : loading ? (
           <p className="text-muted-foreground">Loading...</p>
-        ) : !currentTeam ? (
-          <p className="text-muted-foreground">Setting up your workspace...</p>
-        ) : storyMaps.length === 0 ? (
-          <p className="text-muted-foreground">No story maps yet. Create one to get started.</p>
-        ) : (
+        ) : showEmpty ? (
+          <Card className="border-dashed p-8 text-center">
+            <MapIcon className="mx-auto h-12 w-12 text-muted-foreground/50" />
+            <h3 className="mt-4 font-medium">No story maps yet</h3>
+            <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
+              Story maps help you plan your product from the user&apos;s perspective. Start by mapping out the user
+              journey.
+            </p>
+            <Button className="mt-6" onClick={() => setOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create your first story map
+            </Button>
+          </Card>
+        ) : showGrid ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {storyMaps.map((map) => (
               <Link key={map.id} href={`/story-map/${map.id}`}>
@@ -126,8 +162,8 @@ export default function Dashboard() {
               </Link>
             ))}
           </div>
-        )}
+        ) : null}
       </div>
-    </main>
+    </div>
   );
 }

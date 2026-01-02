@@ -9,16 +9,26 @@ export interface Team {
   updated_at: string;
 }
 
+/** Shape returned by get_team_members RPC (includes email from auth.users) */
 export interface TeamMember {
   id: string;
-  team_id: string;
   user_id: string;
   role: TeamRole;
+  email: string;
   created_at: string;
 }
 
 export interface TeamWithRole extends Team {
   role: TeamRole;
+}
+
+export interface TeamInvite {
+  id: string;
+  team_id: string;
+  email: string;
+  invited_by: string;
+  created_at: string;
+  accepted_at: string | null;
 }
 
 export interface StoryMap {

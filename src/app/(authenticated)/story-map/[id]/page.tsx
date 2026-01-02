@@ -258,6 +258,7 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     }
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Release reordering requires checking bounds and swapping - inherently branchy
   async function handleMoveRelease(releaseId: string, direction: 'up' | 'down') {
     if (!storyMap) return;
     const sortedReleases = [...storyMap.releases].sort((a, b) => a.sort_order - b.sort_order);
@@ -314,7 +315,7 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   // Render states
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-[calc(100vh-var(--header-height))] items-center justify-center">
         <div className="text-center">
           <p className="text-destructive mb-4">{error}</p>
           <Button variant="outline" onClick={loadStoryMap}>
@@ -325,13 +326,19 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     );
   }
 
-  if (!storyMap) return <div className="p-8">Loading...</div>;
+  if (!storyMap) {
+    return (
+      <div className="flex h-[calc(100vh-var(--header-height))] items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
 
   const promptProps = getPromptProps();
   const isPromptOpen = dialog.type === 'release:create' || dialog.type === 'release:rename';
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-[calc(100vh-var(--header-height))] flex-col">
       <header className="flex items-center gap-4 border-b px-4 py-3">
         <Link href="/">
           <Button variant="ghost" size="icon">

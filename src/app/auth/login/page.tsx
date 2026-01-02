@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Auth forms have inherent complexity from multiple modes, validation, and error states
 function AuthForm() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
