@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { domainRuntime } from '@/domains/runtime';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { createReleaseSchema, reorderReleasesSchema, validateRequest } from '@/lib/validations';
 
 export async function PUT(request: Request) {
-  const auth = await requireAuth();
+  const auth = await domainRuntime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const validation = await validateRequest(request, reorderReleasesSchema);
@@ -24,7 +24,7 @@ export async function PUT(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAuth();
+  const auth = await domainRuntime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const validation = await validateRequest(request, createReleaseSchema);
