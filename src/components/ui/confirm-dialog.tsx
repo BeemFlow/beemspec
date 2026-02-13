@@ -20,11 +20,12 @@ interface ConfirmDialogProps {
   title: string;
   description?: string;
   confirmLabel?: string;
+  confirmingLabel?: string;
   cancelLabel?: string;
   variant?: 'default' | 'destructive';
   /** If provided, user must type this exact text to enable confirm button */
   confirmText?: string;
-  onConfirm: () => void;
+  onConfirm: () => Promise<void> | void;
 }
 
 export function ConfirmDialog({
@@ -33,22 +34,31 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel = 'Confirm',
+  confirmingLabel = 'Confirming...',
   cancelLabel = 'Cancel',
   variant = 'default',
   confirmText,
   onConfirm,
 }: ConfirmDialogProps) {
   const [inputValue, setInputValue] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isConfirmEnabled = !confirmText || inputValue === confirmText;
+  const isConfirmEnabled = (!confirmText || inputValue === confirmText) && !isSubmitting;
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (!isConfirmEnabled) return;
-    onConfirm();
-    onOpenChange(false);
+
+    try {
+      setIsSubmitting(true);
+      await onConfirm();
+      onOpenChange(false);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function handleOpenChange(nextOpen: boolean) {
+    if (isSubmitting) return;
     if (!nextOpen) setInputValue('');
     onOpenChange(nextOpen);
   }
@@ -70,18 +80,19 @@ export function ConfirmDialog({
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder={confirmText}
+              disabled={isSubmitting}
               autoComplete="off"
             />
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
+          <AlertDialogCancel disabled={isSubmitting}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
             disabled={!isConfirmEnabled}
             className={variant === 'destructive' ? 'bg-destructive text-white hover:bg-destructive/90' : ''}
           >
-            {confirmLabel}
+            {isSubmitting ? confirmingLabel : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

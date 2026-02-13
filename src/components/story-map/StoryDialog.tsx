@@ -17,8 +17,8 @@ interface Props {
   story: Story | null;
   releases: Release[];
   defaultReleaseId?: string | null;
-  onSave: (story: Partial<Story>) => void;
-  onDelete?: () => void;
+  onSave: (story: Partial<Story>) => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
 }
 
 const NO_RELEASE = '__none__';
@@ -32,6 +32,7 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
   const [technicalGuidelines, setTechnicalGuidelines] = useState('');
   const [status, setStatus] = useState<StoryStatus>('backlog');
   const [releaseId, setReleaseId] = useState<string>(NO_RELEASE);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: open is intentionally included to reset form when dialog opens
   useEffect(() => {
@@ -57,22 +58,40 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
     }
   }, [story, open, defaultReleaseId]);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    onSave({
-      title,
-      requirements,
-      acceptance_criteria: acceptanceCriteria,
-      figma_link: figmaLink || null,
-      edge_cases: edgeCases || null,
-      technical_guidelines: technicalGuidelines || null,
-      status,
-      release_id: releaseId === NO_RELEASE ? null : releaseId,
-    });
+    if (isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      await onSave({
+        title,
+        requirements,
+        acceptance_criteria: acceptanceCriteria,
+        figma_link: figmaLink || null,
+        edge_cases: edgeCases || null,
+        technical_guidelines: technicalGuidelines || null,
+        status,
+        release_id: releaseId === NO_RELEASE ? null : releaseId,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!onDelete || isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      await onDelete();
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !isSubmitting && onOpenChange(nextOpen)}>
       <DialogContent
         className="max-w-2xl max-h-[90vh] overflow-y-auto"
         onOpenAutoFocus={(e) => story && e.preventDefault()}
@@ -88,6 +107,7 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="OAuth login with Google"
+              disabled={isSubmitting}
               required
             />
           </div>
@@ -100,6 +120,7 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
               onChange={(e) => setRequirements(e.target.value)}
               placeholder="As a user, I want to sign in with my Google account so that..."
               rows={3}
+              disabled={isSubmitting}
               required
             />
           </div>
@@ -112,6 +133,7 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
               onChange={(e) => setAcceptanceCriteria(e.target.value)}
               placeholder="- [ ] Google OAuth button on login page&#10;- [ ] Successful auth creates/links user account"
               rows={3}
+              disabled={isSubmitting}
               required
             />
           </div>
@@ -123,6 +145,7 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
               value={figmaLink}
               onChange={(e) => setFigmaLink(e.target.value)}
               placeholder="https://figma.com/file/..."
+              disabled={isSubmitting}
             />
           </div>
 
@@ -134,6 +157,7 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
               onChange={(e) => setEdgeCases(e.target.value)}
               placeholder="- User cancels OAuth flow&#10;- Email already exists with password auth"
               rows={2}
+              disabled={isSubmitting}
             />
           </div>
 
@@ -145,13 +169,14 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
               onChange={(e) => setTechnicalGuidelines(e.target.value)}
               placeholder="Use NextAuth.js with Google provider. Follow existing auth patterns..."
               rows={2}
+              disabled={isSubmitting}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as StoryStatus)}>
+              <Select value={status} onValueChange={(v) => setStatus(v as StoryStatus)} disabled={isSubmitting}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -167,7 +192,7 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
 
             <div className="space-y-2">
               <Label>Release</Label>
-              <Select value={releaseId} onValueChange={setReleaseId}>
+              <Select value={releaseId} onValueChange={setReleaseId} disabled={isSubmitting}>
                 <SelectTrigger>
                   <SelectValue placeholder="No release" />
                 </SelectTrigger>
@@ -186,16 +211,19 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
           <div className="flex justify-between pt-4">
             {onDelete && (
               <DeleteButton
-                onDelete={onDelete}
+                onDelete={handleDelete}
                 confirmTitle="Delete story?"
                 confirmDescription="This story will be permanently deleted."
+                loading={isSubmitting}
               />
             )}
             <div className="ml-auto flex gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit">Save Story</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving Story...' : 'Save Story'}
+              </Button>
             </div>
           </div>
         </form>

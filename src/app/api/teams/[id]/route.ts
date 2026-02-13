@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
+import { requireAuthWithUuidParams } from '@/lib/route-guards';
 import { createClient } from '@/lib/supabase/server';
-import { invalidIdResponse, isValidUuid, updateTeamSchema, validateRequest } from '@/lib/validations';
+import { updateTeamSchema, validateRequest } from '@/lib/validations';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth();
-  if (!auth.success) return auth.response;
+  const guard = await requireAuthWithUuidParams(params, ['id']);
+  if (!guard.success) return guard.response;
 
-  const { id } = await params;
-  if (!isValidUuid(id)) return invalidIdResponse();
+  const { id } = guard.params;
 
   const validation = await validateRequest(request, updateTeamSchema);
   if (!validation.success) return validation.response;
@@ -32,11 +31,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth();
-  if (!auth.success) return auth.response;
+  const guard = await requireAuthWithUuidParams(params, ['id']);
+  if (!guard.success) return guard.response;
 
-  const { id } = await params;
-  if (!isValidUuid(id)) return invalidIdResponse();
+  const { id } = guard.params;
 
   const supabase = await createClient();
 

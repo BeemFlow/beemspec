@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface DeleteButtonProps {
-  onDelete: () => void;
+  onDelete: () => Promise<void> | void;
   /** If provided, shows confirmation dialog before deleting */
   confirmTitle?: string;
   confirmDescription?: string;
@@ -43,8 +43,8 @@ export function DeleteButton({
     }
   }
 
-  function handleConfirm() {
-    onDelete();
+  async function handleConfirm() {
+    await onDelete();
     setShowConfirm(false);
   }
 

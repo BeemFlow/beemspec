@@ -1,17 +1,16 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
+import { requireAuthWithUuidParams } from '@/lib/route-guards';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
-import { invalidIdResponse, inviteEmailSchema, isValidUuid, validateRequest } from '@/lib/validations';
+import { inviteEmailSchema, validateRequest } from '@/lib/validations';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth();
-  if (!auth.success) return auth.response;
+  const guard = await requireAuthWithUuidParams(params, ['id']);
+  if (!guard.success) return guard.response;
 
-  const { id } = await params;
-  if (!isValidUuid(id)) return invalidIdResponse();
+  const { id } = guard.params;
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -29,11 +28,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth();
-  if (!auth.success) return auth.response;
+  const guard = await requireAuthWithUuidParams(params, ['id']);
+  if (!guard.success) return guard.response;
 
-  const { id: teamId } = await params;
-  if (!isValidUuid(teamId)) return invalidIdResponse();
+  const { id: teamId } = guard.params;
 
   const validation = await validateRequest(request, inviteEmailSchema);
   if (!validation.success) return validation.response;
@@ -63,7 +61,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // Create invite record
   const { data: invite, error: inviteError } = await supabase
     .from('team_invites')
-    .insert({ team_id: teamId, email, invited_by: auth.user.id })
+    .insert({ team_id: teamId, email, invited_by: guard.user.id })
     .select()
     .single();
 

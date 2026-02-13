@@ -2,7 +2,7 @@
 
 import { Map as MapIcon, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useTeam } from '@/lib/contexts/team-context';
+import { errorMessage } from '@/lib/errors';
+import { fetchJson } from '@/lib/http';
 import type { StoryMap } from '@/types';
 
 export default function Dashboard() {
@@ -20,45 +22,57 @@ export default function Dashboard() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
-  useEffect(() => {
+  const loadStoryMaps = useCallback(async () => {
     if (!currentTeam) return;
 
-    setLoading(true);
-    fetch(`/api/story-maps?team_id=${currentTeam.id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) {
-          setError(data.error);
-        } else {
-          setStoryMaps(data);
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
+    try {
+      setLoading(true);
+      setError(null);
+      const maps = await fetchJson<StoryMap[]>(
+        `/api/story-maps?team_id=${currentTeam.id}`,
+        undefined,
+        'Failed to load story maps',
+      );
+      setStoryMaps(maps);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   }, [currentTeam]);
+
+  useEffect(() => {
+    loadStoryMaps();
+  }, [loadStoryMaps]);
 
   async function createStoryMap(e: React.FormEvent) {
     e.preventDefault();
-    if (!currentTeam) return;
+    if (!currentTeam || isCreating) return;
 
-    const res = await fetch('/api/story-maps', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ team_id: currentTeam.id, name, description }),
-    });
-    const data = await res.json();
-    if (data.error) {
-      setError(data.error);
-      return;
+    try {
+      setIsCreating(true);
+      const map = await fetchJson<StoryMap>(
+        '/api/story-maps',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ team_id: currentTeam.id, name, description }),
+        },
+        'Failed to create story map',
+      );
+
+      setStoryMaps([map, ...storyMaps]);
+      setName('');
+      setDescription('');
+      setOpen(false);
+      setError(null);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setIsCreating(false);
     }
-    setStoryMaps([data, ...storyMaps]);
-    setName('');
-    setDescription('');
-    setOpen(false);
   }
 
   const showEmpty = !loading && currentTeam && storyMaps.length === 0;
@@ -100,8 +114,8 @@ export default function Dashboard() {
                     placeholder="A brief description..."
                   />
                 </div>
-                <Button type="submit" className="w-full">
-                  Create
+                <Button type="submit" className="w-full" disabled={isCreating || !name.trim()}>
+                  {isCreating ? 'Creating...' : 'Create'}
                 </Button>
               </form>
             </DialogContent>
@@ -116,19 +130,7 @@ export default function Dashboard() {
               size="sm"
               className="mt-4"
               onClick={() => {
-                setError(null);
-                setLoading(true);
-                fetch(`/api/story-maps?team_id=${currentTeam?.id}`)
-                  .then((r) => r.json())
-                  .then((data) => {
-                    if (data.error) setError(data.error);
-                    else setStoryMaps(data);
-                    setLoading(false);
-                  })
-                  .catch((err) => {
-                    setError(err.message);
-                    setLoading(false);
-                  });
+                loadStoryMaps();
               }}
             >
               Retry

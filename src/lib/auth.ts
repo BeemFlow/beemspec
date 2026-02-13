@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-export type AuthResult =
-  | { success: true; user: { id: string; email: string } }
-  | { success: false; response: NextResponse };
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+}
+
+export type AuthResult = { success: true; user: AuthenticatedUser } | { success: false; response: NextResponse };
 
 /** Verify authentication in API routes (server-only) */
 export async function requireAuth(): Promise<AuthResult> {

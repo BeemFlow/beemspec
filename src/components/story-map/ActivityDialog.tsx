@@ -12,12 +12,13 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   activity: Activity | null;
-  onSave: (data: { name: string }) => void;
-  onDelete?: () => void;
+  onSave: (data: { name: string }) => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
 }
 
 export function ActivityDialog({ open, onOpenChange, activity, onSave, onDelete }: Props) {
   const [name, setName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: open is intentionally included to reset form when dialog opens
   useEffect(() => {
@@ -28,15 +29,31 @@ export function ActivityDialog({ open, onOpenChange, activity, onSave, onDelete 
     }
   }, [activity, open]);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (name.trim()) {
-      onSave({ name: name.trim() });
+    if (!name.trim() || isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      await onSave({ name: name.trim() });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!onDelete || isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      await onDelete();
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !isSubmitting && onOpenChange(nextOpen)}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{activity ? 'Edit Activity' : 'New Activity'}</DialogTitle>
@@ -49,6 +66,7 @@ export function ActivityDialog({ open, onOpenChange, activity, onSave, onDelete 
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="User Registration"
+              disabled={isSubmitting}
               required
             />
           </div>
@@ -56,17 +74,18 @@ export function ActivityDialog({ open, onOpenChange, activity, onSave, onDelete 
           <div className="flex justify-between pt-4">
             {onDelete && (
               <DeleteButton
-                onDelete={onDelete}
+                onDelete={handleDelete}
                 confirmTitle="Delete activity?"
                 confirmDescription="All tasks and stories in this activity will be permanently deleted."
+                loading={isSubmitting}
               />
             )}
             <div className="ml-auto flex gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!name.trim()}>
-                Save
+              <Button type="submit" disabled={!name.trim() || isSubmitting}>
+                {isSubmitting ? 'Saving...' : 'Save'}
               </Button>
             </div>
           </div>

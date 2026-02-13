@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { errorMessage } from '@/lib/errors';
+import { fetchJson } from '@/lib/http';
 import type { TeamInvite, TeamMember, TeamWithRole } from '@/types';
 
 type InviteStatus =
@@ -25,6 +27,7 @@ interface TeamSettingsDialogProps {
   onTeamUpdated: () => Promise<void>;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This dialog coordinates multiple independent async team management flows in one place.
 export function TeamSettingsDialog({ open, onOpenChange, team, onTeamUpdated }: TeamSettingsDialogProps) {
   const [name, setName] = useState('');
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -35,31 +38,37 @@ export function TeamSettingsDialog({ open, onOpenChange, team, onTeamUpdated }: 
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isOwner = team?.role === 'owner';
 
   const loadData = useCallback(async () => {
     if (!team) return;
-    setLoading(true);
 
-    const [membersRes, invitesRes] = await Promise.all([
-      fetch(`/api/teams/${team.id}/members`),
-      isOwner ? fetch(`/api/teams/${team.id}/invites`) : Promise.resolve(null),
-    ]);
+    try {
+      setLoading(true);
+      setError(null);
 
-    if (membersRes.ok) {
-      setMembers(await membersRes.json());
+      const [membersData, invitesData] = await Promise.all([
+        fetchJson<TeamMember[]>(`/api/teams/${team.id}/members`, undefined, 'Failed to fetch team members'),
+        isOwner
+          ? fetchJson<TeamInvite[]>(`/api/teams/${team.id}/invites`, undefined, 'Failed to fetch invites')
+          : Promise.resolve([]),
+      ]);
+
+      setMembers(membersData);
+      setInvites(invitesData);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
     }
-    if (invitesRes?.ok) {
-      setInvites(await invitesRes.json());
-    }
-
-    setLoading(false);
   }, [team, isOwner]);
 
   useEffect(() => {
     if (open && team) {
       setName(team.name);
+      setError(null);
       setInviteStatus({ type: 'idle' });
       loadData();
     }
@@ -69,14 +78,20 @@ export function TeamSettingsDialog({ open, onOpenChange, team, onTeamUpdated }: 
     e.preventDefault();
     if (!team || !name.trim() || name === team.name) return;
 
-    const res = await fetch(`/api/teams/${team.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim() }),
-    });
-
-    if (res.ok) {
+    try {
+      setError(null);
+      await fetchJson(
+        `/api/teams/${team.id}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim() }),
+        },
+        'Failed to rename team',
+      );
       await onTeamUpdated();
+    } catch (err) {
+      setError(errorMessage(err));
     }
   }
 
@@ -85,15 +100,17 @@ export function TeamSettingsDialog({ open, onOpenChange, team, onTeamUpdated }: 
     if (!team || !inviteEmail.trim()) return;
 
     setInviteStatus({ type: 'loading' });
-    const res = await fetch(`/api/teams/${team.id}/invites`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: inviteEmail.trim() }),
-    });
+    try {
+      const data = await fetchJson<{ status: 'added' | 'invited' }>(
+        `/api/teams/${team.id}/invites`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: inviteEmail.trim() }),
+        },
+        'Failed to invite user',
+      );
 
-    const data = await res.json();
-
-    if (res.ok) {
       setInviteEmail('');
       await loadData();
       setInviteStatus({
@@ -101,50 +118,73 @@ export function TeamSettingsDialog({ open, onOpenChange, team, onTeamUpdated }: 
         message: data.status === 'added' ? 'User added to team' : 'Invitation sent',
       });
       setTimeout(() => setInviteStatus({ type: 'idle' }), 3000);
-    } else {
-      setInviteStatus({ type: 'error', message: data.error || 'Failed to invite' });
+    } catch (err) {
+      setInviteStatus({ type: 'error', message: errorMessage(err) });
     }
   }
 
   async function handleRemoveMember(userId: string) {
     if (!team) return;
 
-    setRemovingId(userId);
-    const res = await fetch(`/api/teams/${team.id}/members/${userId}`, {
-      method: 'DELETE',
-    });
-
-    if (res.ok) {
+    try {
+      setRemovingId(userId);
+      setError(null);
+      await fetchJson(
+        `/api/teams/${team.id}/members/${userId}`,
+        {
+          method: 'DELETE',
+        },
+        'Failed to remove member',
+      );
       await loadData();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setRemovingId(null);
     }
-    setRemovingId(null);
   }
 
   async function handleCancelInvite(inviteId: string) {
     if (!team) return;
 
-    setCancelingId(inviteId);
-    const res = await fetch(`/api/teams/${team.id}/invites/${inviteId}`, {
-      method: 'DELETE',
-    });
-
-    if (res.ok) {
+    try {
+      setCancelingId(inviteId);
+      setError(null);
+      await fetchJson(
+        `/api/teams/${team.id}/invites/${inviteId}`,
+        {
+          method: 'DELETE',
+        },
+        'Failed to cancel invite',
+      );
       await loadData();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setCancelingId(null);
     }
-    setCancelingId(null);
   }
 
   async function handleDeleteTeam() {
     if (!team) return;
 
-    setDeleting(true);
-    const res = await fetch(`/api/teams/${team.id}`, { method: 'DELETE' });
-
-    if (res.ok) {
+    try {
+      setDeleting(true);
+      setError(null);
+      await fetchJson(
+        `/api/teams/${team.id}`,
+        {
+          method: 'DELETE',
+        },
+        'Failed to delete team',
+      );
       onOpenChange(false);
       await onTeamUpdated();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setDeleting(false);
     }
-    setDeleting(false);
   }
 
   if (!team) return null;
@@ -157,6 +197,11 @@ export function TeamSettingsDialog({ open, onOpenChange, team, onTeamUpdated }: 
         </DialogHeader>
 
         <Tabs defaultValue="general" className="mt-2">
+          {error && (
+            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          )}
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="members">Members</TabsTrigger>

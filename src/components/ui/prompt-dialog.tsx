@@ -13,7 +13,9 @@ interface PromptDialogProps {
   label?: string;
   placeholder?: string;
   defaultValue?: string;
-  onSubmit: (value: string) => void;
+  onSubmit: (value: string) => Promise<void> | void;
+  submitLabel?: string;
+  submittingLabel?: string;
 }
 
 export function PromptDialog({
@@ -24,8 +26,11 @@ export function PromptDialog({
   placeholder,
   defaultValue = '',
   onSubmit,
+  submitLabel = 'Save',
+  submittingLabel = 'Saving...',
 }: PromptDialogProps) {
   const [value, setValue] = useState(defaultValue);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -33,16 +38,21 @@ export function PromptDialog({
     }
   }, [open, defaultValue]);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (value.trim()) {
-      onSubmit(value.trim());
+    if (!value.trim() || isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      await onSubmit(value.trim());
       onOpenChange(false);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !isSubmitting && onOpenChange(nextOpen)}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -55,15 +65,16 @@ export function PromptDialog({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder={placeholder}
+              disabled={isSubmitting}
               autoFocus
             />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!value.trim()}>
-              Save
+            <Button type="submit" disabled={!value.trim() || isSubmitting}>
+              {isSubmitting ? submittingLabel : submitLabel}
             </Button>
           </DialogFooter>
         </form>

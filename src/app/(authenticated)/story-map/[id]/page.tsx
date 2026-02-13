@@ -12,17 +12,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { PromptDialog } from '@/components/ui/prompt-dialog';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { errorMessage } from '@/lib/errors';
+import { fetchJson } from '@/lib/http';
 import type { Activity, Story, StoryMapFull, Task } from '@/types';
-
-/** Extract error message from failed fetch response */
-async function extractError(res: Response, fallback: string): Promise<string> {
-  try {
-    const body = await res.json();
-    return body.error || fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 /**
  * Dialog state machine - discriminated union ensuring only one dialog can be open
@@ -51,17 +42,21 @@ const CLOSED: DialogState = { type: 'closed' };
 export default function StoryMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [storyMap, setStoryMap] = useState<StoryMapFull | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [uiError, setUiError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogState>(CLOSED);
+
+  async function request(input: RequestInfo | URL, init: RequestInit | undefined, fallback: string) {
+    await fetchJson(input, init, fallback);
+  }
 
   const loadStoryMap = useCallback(async () => {
     try {
-      const res = await fetch(`/api/story-maps/${id}`);
-      if (!res.ok) throw new Error(await extractError(res, 'Failed to load story map'));
-      setStoryMap(await res.json());
-      setError(null);
+      const map = await fetchJson<StoryMapFull>(`/api/story-maps/${id}`, undefined, 'Failed to load story map');
+      setStoryMap(map);
+      setLoadError(null);
     } catch (err) {
-      setError(errorMessage(err));
+      setLoadError(errorMessage(err));
     }
   }, [id]);
 
@@ -83,40 +78,45 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   async function handleSaveStory(storyData: Partial<Story>) {
     try {
       if (dialog.type === 'story:edit') {
-        const res = await fetch(`/api/stories/${dialog.story.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(storyData),
-        });
-        if (!res.ok) throw new Error(await extractError(res, 'Failed to save story'));
+        await request(
+          `/api/stories/${dialog.story.id}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(storyData),
+          },
+          'Failed to save story',
+        );
       } else if (dialog.type === 'story:create') {
-        const res = await fetch('/api/stories', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...storyData,
-            task_id: dialog.taskId,
-            release_id: dialog.releaseId,
-          }),
-        });
-        if (!res.ok) throw new Error(await extractError(res, 'Failed to create story'));
+        await request(
+          '/api/stories',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...storyData,
+              task_id: dialog.taskId,
+              release_id: dialog.releaseId,
+            }),
+          },
+          'Failed to create story',
+        );
       }
       closeDialog();
       loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err));
+      setUiError(errorMessage(err));
     }
   }
 
   async function handleDeleteStory() {
     if (dialog.type !== 'story:edit') return;
     try {
-      const res = await fetch(`/api/stories/${dialog.story.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete story'));
+      await request(`/api/stories/${dialog.story.id}`, { method: 'DELETE' }, 'Failed to delete story');
       closeDialog();
       loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err));
+      setUiError(errorMessage(err));
     }
   }
 
@@ -132,36 +132,41 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   async function handleSaveActivity(data: { name: string }) {
     try {
       if (dialog.type === 'activity:edit') {
-        const res = await fetch(`/api/activities/${dialog.activity.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        if (!res.ok) throw new Error(await extractError(res, 'Failed to update activity'));
+        await request(
+          `/api/activities/${dialog.activity.id}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          },
+          'Failed to update activity',
+        );
       } else if (dialog.type === 'activity:create') {
-        const res = await fetch('/api/activities', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ story_map_id: id, name: data.name }),
-        });
-        if (!res.ok) throw new Error(await extractError(res, 'Failed to create activity'));
+        await request(
+          '/api/activities',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ story_map_id: id, name: data.name }),
+          },
+          'Failed to create activity',
+        );
       }
       closeDialog();
       loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err));
+      setUiError(errorMessage(err));
     }
   }
 
   async function handleDeleteActivity() {
     if (dialog.type !== 'activity:edit') return;
     try {
-      const res = await fetch(`/api/activities/${dialog.activity.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete activity'));
+      await request(`/api/activities/${dialog.activity.id}`, { method: 'DELETE' }, 'Failed to delete activity');
       closeDialog();
       loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err));
+      setUiError(errorMessage(err));
     }
   }
 
@@ -177,36 +182,41 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   async function handleSaveTask(data: { name: string }) {
     try {
       if (dialog.type === 'task:edit') {
-        const res = await fetch(`/api/tasks/${dialog.task.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        if (!res.ok) throw new Error(await extractError(res, 'Failed to update task'));
+        await request(
+          `/api/tasks/${dialog.task.id}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          },
+          'Failed to update task',
+        );
       } else if (dialog.type === 'task:create') {
-        const res = await fetch('/api/tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity_id: dialog.activityId, name: data.name }),
-        });
-        if (!res.ok) throw new Error(await extractError(res, 'Failed to create task'));
+        await request(
+          '/api/tasks',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ activity_id: dialog.activityId, name: data.name }),
+          },
+          'Failed to create task',
+        );
       }
       closeDialog();
       loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err));
+      setUiError(errorMessage(err));
     }
   }
 
   async function handleDeleteTask() {
     if (dialog.type !== 'task:edit') return;
     try {
-      const res = await fetch(`/api/tasks/${dialog.task.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete task'));
+      await request(`/api/tasks/${dialog.task.id}`, { method: 'DELETE' }, 'Failed to delete task');
       closeDialog();
       loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err));
+      setUiError(errorMessage(err));
     }
   }
 
@@ -227,12 +237,15 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     try {
       switch (dialog.type) {
         case 'release:create': {
-          const res = await fetch('/api/releases', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ story_map_id: id, name: value }),
-          });
-          if (!res.ok) throw new Error(await extractError(res, 'Failed to create release'));
+          await request(
+            '/api/releases',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ story_map_id: id, name: value }),
+            },
+            'Failed to create release',
+          );
           break;
         }
         case 'release:rename': {
@@ -240,12 +253,15 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
             closeDialog();
             return;
           }
-          const res = await fetch(`/api/releases/${dialog.releaseId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: value }),
-          });
-          if (!res.ok) throw new Error(await extractError(res, 'Failed to rename release'));
+          await request(
+            `/api/releases/${dialog.releaseId}`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: value }),
+            },
+            'Failed to rename release',
+          );
           break;
         }
         default:
@@ -254,11 +270,10 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
       closeDialog();
       loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err));
+      setUiError(errorMessage(err));
     }
   }
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Release reordering requires checking bounds and swapping - inherently branchy
   async function handleMoveRelease(releaseId: string, direction: 'up' | 'down') {
     if (!storyMap) return;
     const sortedReleases = [...storyMap.releases].sort((a, b) => a.sort_order - b.sort_order);
@@ -272,27 +287,29 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     [newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]];
 
     try {
-      const res = await fetch('/api/releases', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ story_map_id: id, order: newOrder }),
-      });
-      if (!res.ok) throw new Error(await extractError(res, 'Failed to reorder releases'));
+      await request(
+        '/api/releases',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ story_map_id: id, order: newOrder }),
+        },
+        'Failed to reorder releases',
+      );
       loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err));
+      setUiError(errorMessage(err));
     }
   }
 
   async function handleConfirmDelete() {
     if (dialog.type !== 'release:delete') return;
     try {
-      const res = await fetch(`/api/releases/${dialog.releaseId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(await extractError(res, 'Failed to delete release'));
+      await request(`/api/releases/${dialog.releaseId}`, { method: 'DELETE' }, 'Failed to delete release');
       closeDialog();
       loadStoryMap();
     } catch (err) {
-      setError(errorMessage(err));
+      setUiError(errorMessage(err));
     }
   }
 
@@ -313,11 +330,11 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   }
 
   // Render states
-  if (error) {
+  if (loadError) {
     return (
       <div className="flex h-[calc(100vh-var(--header-height))] items-center justify-center">
         <div className="text-center">
-          <p className="text-destructive mb-4">{error}</p>
+          <p className="text-destructive mb-4">{loadError}</p>
           <Button variant="outline" onClick={loadStoryMap}>
             Retry
           </Button>
@@ -339,14 +356,23 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
 
   return (
     <div className="flex h-[calc(100vh-var(--header-height))] flex-col">
-      <header className="flex items-center gap-4 border-b px-4 py-3">
+      <header className="flex items-center gap-2 border-b px-2 py-2 sm:gap-4 sm:px-4 sm:py-3">
         <Link href="/">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <h1 className="text-xl font-semibold">{storyMap.name}</h1>
+        <h1 className="truncate text-base font-semibold sm:text-xl">{storyMap.name}</h1>
       </header>
+
+      {uiError && (
+        <div className="mx-4 mt-3 flex items-center justify-between rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <span>{uiError}</span>
+          <Button size="sm" variant="ghost" onClick={() => setUiError(null)}>
+            Dismiss
+          </Button>
+        </div>
+      )}
 
       <ScrollArea className="flex-1">
         <div className="p-4">
@@ -363,6 +389,7 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
             onMoveRelease={handleMoveRelease}
             onDeleteRelease={handleDeleteRelease}
             onRefresh={loadStoryMap}
+            onError={setUiError}
           />
         </div>
         <ScrollBar orientation="horizontal" />
