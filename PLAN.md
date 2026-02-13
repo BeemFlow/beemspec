@@ -40,6 +40,7 @@ BeemSpec is the planning source of truth (`what` + `why`), Linear is execution c
 - Notifications: defer all push/desktop/telegram notifications until after core orchestration is stable.
 - Sequencing: finish and polish story-map product surface before starting Linear/OpenCode integration build.
 - DB scope now: no non-story-map schema migrations until story-map hardening exit criteria are met.
+- Personas: defer from active Story Map UI flow for now; revisit after dogfooding feedback confirms need.
 
 ## Delivery Strategy (Story-Map First)
 

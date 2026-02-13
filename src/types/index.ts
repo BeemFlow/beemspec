@@ -107,7 +107,6 @@ export interface ReleaseWithStories extends Release {
 }
 
 export interface StoryMapFull extends StoryMap {
-  personas: Persona[];
   activities: ActivityWithTasks[];
   releases: Release[];
 }

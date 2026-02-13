@@ -14,7 +14,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
   const supabase = await createClient();
 
-  const [mapResult, activitiesResult, releasesResult, personasResult] = await Promise.all([
+  const [mapResult, activitiesResult, releasesResult] = await Promise.all([
     supabase.from('story_maps').select('*').eq('id', id).single(),
     supabase
       .from('activities')
@@ -24,7 +24,6 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       .order('sort_order', { referencedTable: 'tasks' })
       .order('sort_order', { referencedTable: 'tasks.stories' }),
     supabase.from('releases').select('*').eq('story_map_id', id).order('sort_order'),
-    supabase.from('personas').select('*').eq('story_map_id', id).order('sort_order'),
   ]);
 
   // Check main map first
@@ -42,15 +41,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   if (releasesResult.error) {
     return serverErrorResponse('Failed to load releases', releasesResult.error);
   }
-  if (personasResult.error) {
-    return serverErrorResponse('Failed to load personas', personasResult.error);
-  }
-
   const fullMap: StoryMapFull = {
     ...mapResult.data,
     activities: activitiesResult.data,
     releases: releasesResult.data,
-    personas: personasResult.data,
   };
 
   return NextResponse.json(fullMap);

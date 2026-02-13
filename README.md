@@ -8,6 +8,7 @@ BeemSpec is a story-mapping and release-planning tool. It is currently focused o
 - Team-based collaboration with authentication, team switching, and member invites.
 - Drag-and-drop map interactions for reordering and moving work across the board.
 - Story detail capture for requirements, acceptance criteria, design links, edge cases, and technical notes.
+- Personas are intentionally deferred from the active UI flow until post-hardening product validation.
 
 ## Product direction
 
