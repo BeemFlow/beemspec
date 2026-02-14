@@ -144,7 +144,6 @@ Exit criteria:
 
 - Add integration settings (per team/story map):
   - Linear workspace/team/project IDs
-  - status mapping
   - optional assignee/label defaults
 - Extend schema with mapping tables:
   - `story_linear_links` (story_id <-> linear_issue_id)
@@ -153,7 +152,7 @@ Exit criteria:
   - create/update Linear issue from story changes
 - Implement inbound sync:
   - Linear webhook endpoint for status/title updates back to stories
-- Add idempotency and conflict strategy (BeemSpec fields authoritative vs mirrored fields).
+- Add idempotency and conflict strategy (latest-write-wins using object update timestamps).
 
 Exit criteria:
 - Bi-directional story<->issue sync works for create/update/status.

@@ -45,6 +45,11 @@ Manual reconciliation endpoint:
 - `POST /api/integrations/linear/reconcile`
 - body: `{ "story_id": "<uuid>" }`
 
+Batch reconciliation endpoint (for lightweight periodic drift correction):
+
+- `POST /api/integrations/linear/reconcile/batch`
+- body: `{ "limit": 25, "older_than_minutes": 30 }` (both optional)
+
 Inbound webhook sync requires a webhook signing secret:
 
 - `BEEMSPEC_LINEAR_WEBHOOK_SECRET` (preferred)

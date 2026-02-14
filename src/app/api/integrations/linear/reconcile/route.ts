@@ -62,6 +62,35 @@ async function reconcileLocalToRemote(
   return NextResponse.json({ success: true, direction: 'local_to_remote', story_id: story.id });
 }
 
+export async function reconcileStoryById(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  linearIssueSync: NonNullable<typeof domainRuntime.storyMap.linearIssueSync>;
+  storyId: string;
+}): Promise<NextResponse> {
+  const { data: story, error: storyError } = await input.supabase
+    .from('stories')
+    .select('*')
+    .eq('id', input.storyId)
+    .single();
+  if (storyError) {
+    if (storyError.code === DbErrorCode.NOT_FOUND) return notFoundResponse('Story');
+    return serverErrorResponse('Failed to load story', storyError);
+  }
+
+  const link = await getStoryLinearLink(input.supabase, story.id);
+  if (!link) return ignored('story is not linked to Linear');
+
+  const remote = await input.linearIssueSync.getIssueById(link.linearIssueId);
+  if (!remote) return ignored('linked Linear issue was not found');
+
+  const localUpdatedAt = (story.updated_at as string | null) ?? null;
+  if (shouldApplyRemoteUpdate(remote.updatedAt, localUpdatedAt)) {
+    return reconcileRemoteToLocal(input.supabase, story, remote);
+  }
+
+  return reconcileLocalToRemote(input.supabase, input.linearIssueSync, story, link);
+}
+
 export async function POST(request: Request) {
   const auth = await domainRuntime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
@@ -75,26 +104,9 @@ export async function POST(request: Request) {
   if (!validation.success) return validation.response;
 
   const supabase = await createClient();
-  const { data: story, error: storyError } = await supabase
-    .from('stories')
-    .select('*')
-    .eq('id', validation.data.story_id)
-    .single();
-  if (storyError) {
-    if (storyError.code === DbErrorCode.NOT_FOUND) return notFoundResponse('Story');
-    return serverErrorResponse('Failed to load story', storyError);
-  }
-
-  const link = await getStoryLinearLink(supabase, story.id);
-  if (!link) return ignored('story is not linked to Linear');
-
-  const remote = await linearIssueSync.getIssueById(link.linearIssueId);
-  if (!remote) return ignored('linked Linear issue was not found');
-
-  const localUpdatedAt = (story.updated_at as string | null) ?? null;
-  if (shouldApplyRemoteUpdate(remote.updatedAt, localUpdatedAt)) {
-    return reconcileRemoteToLocal(supabase, story, remote);
-  }
-
-  return reconcileLocalToRemote(supabase, linearIssueSync, story, link);
+  return reconcileStoryById({
+    supabase,
+    linearIssueSync,
+    storyId: validation.data.story_id,
+  });
 }

@@ -52,6 +52,11 @@ Completed so far:
 - Manual reconciliation endpoint added for forced convergence on demand:
   - `POST /api/integrations/linear/reconcile`
   - `src/app/api/integrations/linear/reconcile/route.ts`
+- Batch reconciliation endpoint added for periodic drift correction:
+  - `POST /api/integrations/linear/reconcile/batch`
+  - `src/app/api/integrations/linear/reconcile/batch/route.ts`
+- Shared reconciliation logic extracted to avoid route-level duplication:
+  - `src/integrations/linear/reconcile.ts`
 - Story update route now syncs outbound too:
   - uses existing link to `updateIssue` when present
   - creates issue + link if a link does not exist
@@ -65,6 +70,8 @@ Tests added/updated:
 - `src/integrations/linear/webhook-verifier.test.ts`
 - `src/app/api/integrations/linear/webhook/route.test.ts`
 - `src/app/api/integrations/linear/reconcile/route.test.ts`
+- `src/app/api/integrations/linear/reconcile/batch/route.test.ts`
+- `src/integrations/linear/reconcile.test.ts`
 - `src/app/api/story-map-routes.test.ts`
 
 ## Notes
@@ -74,6 +81,6 @@ Tests added/updated:
 
 ## Next Steps (Ordered)
 
-1. Add explicit near-simultaneous race tests that exercise both directions (webhook-first and local-first) with deterministic LWW outcomes.
-2. Add periodic/background reconciliation runner (manual endpoint already shipped) for automatic drift correction.
+1. Wire `reconcile/batch` into a scheduled trigger (cron on main machine) and track run metrics.
+2. Add small operations view/API filter for failed webhook receipts and repeated reconcile failures.
 3. Expand bidirectional parser/serializer coverage tests for full story field parity edge cases.
