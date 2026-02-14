@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
+import { domainRuntime } from '@/domains/runtime';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
-import { requireAuthWithUuidParams } from '@/lib/route-guards';
 import { createClient } from '@/lib/supabase/server';
+import { invalidIdResponse, isValidUuid } from '@/lib/validations';
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string; inviteId: string }> }) {
-  const guard = await requireAuthWithUuidParams(params, ['id', 'inviteId']);
-  if (!guard.success) return guard.response;
+  const auth = await domainRuntime.teams.auth.requireAuth();
+  if (!auth.success) return auth.response;
 
-  const { id: teamId, inviteId } = guard.params;
+  const { id: teamId, inviteId } = await params;
+  if (!isValidUuid(teamId) || !isValidUuid(inviteId)) return invalidIdResponse();
 
   const supabase = await createClient();
   const { error } = await supabase.from('team_invites').delete().eq('id', inviteId).eq('team_id', teamId);

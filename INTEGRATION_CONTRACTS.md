@@ -8,11 +8,19 @@ This document captures the minimum official integration contract for BeemSpec Ph
 - OpenCode: plugin packaging, hooks, event lifecycle handling, custom tools.
 - Rule: if behavior is not documented in official sources below, treat it as unsupported until verified.
 
+## SDK-First Policy
+
+- Prefer official SDKs for integration implementations when available and stable.
+- Allow direct HTTP only when an SDK does not exist, lacks required functionality, or has blocking stability issues.
+- Record any SDK bypass decision in an ADR or this contract doc with rationale.
+
 ## Canonical Sources
 
 ### Linear
 
 - GraphQL API: https://linear.app/developers/graphql
+- TypeScript SDK: https://linear.app/developers/sdk
+- SDK source: https://github.com/linear/linear/tree/master/packages/sdk
 - Webhooks: https://linear.app/developers/webhooks
 - OAuth/auth: https://linear.app/developers/oauth-2-0-authentication
 - Rate limits: https://linear.app/developers/rate-limiting
@@ -22,6 +30,7 @@ This document captures the minimum official integration contract for BeemSpec Ph
 
 ### OpenCode
 
+- SDK overview: https://opencode.ai/docs/sdk/
 - Plugins: https://opencode.ai/docs/plugins/
 - Custom tools: https://opencode.ai/docs/custom-tools/
 - Config: https://opencode.ai/docs/config/
@@ -35,15 +44,22 @@ This document captures the minimum official integration contract for BeemSpec Ph
 - GraphQL endpoint: `https://api.linear.app/graphql`.
 - OAuth authorize endpoint: `https://linear.app/oauth/authorize`.
 - OAuth token endpoint: `https://api.linear.app/oauth/token`.
+- Local runtime config for Phase 3 slice 1: `LINEAR_API_KEY` (fallback `BEEMSPEC_LINEAR_API_KEY`).
+- Default outbound target config for story-triggered sync:
+  - `BEEMSPEC_LINEAR_DEFAULT_TEAM_ID` (required)
+  - `BEEMSPEC_LINEAR_DEFAULT_PROJECT_ID` (optional)
+  - `BEEMSPEC_LINEAR_DEFAULT_STATE_ID` (optional)
 - Auth headers:
   - OAuth bearer: `Authorization: Bearer <ACCESS_TOKEN>`
   - Personal key: `Authorization: <API_KEY>`
 
 ### Operations to support first
 
-- Read basics: `viewer`, `teams`, `issue`.
-- Outbound sync writes: `issueCreate`, `issueUpdate`.
-- Use schema-defined field names only (`id`, `title`, `description`, `teamId`, `stateId`, etc.).
+- Use official SDK methods first:
+  - `issue(id)`
+  - `createIssue(input)`
+  - `updateIssue(id, input)`
+- Keep mapping aligned with provider-documented model fields (`id`, `identifier`, `title`, `description`, `stateId`, `updatedAt`).
 
 ### Error model
 

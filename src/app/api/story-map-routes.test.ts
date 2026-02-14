@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { domainRuntime } from '@/domains/runtime';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { DELETE as deleteActivityById, PUT as putActivityById } from './activities/[id]/route';
@@ -71,6 +72,10 @@ describe('story map API routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user' } } as never);
+    domainRuntime.storyMap.linearIssueSync = null;
+    delete process.env.BEEMSPEC_LINEAR_DEFAULT_TEAM_ID;
+    delete process.env.BEEMSPEC_LINEAR_DEFAULT_PROJECT_ID;
+    delete process.env.BEEMSPEC_LINEAR_DEFAULT_STATE_ID;
   });
 
   describe('reorder routes', () => {
@@ -237,6 +242,62 @@ describe('story map API routes', () => {
         status: 'backlog',
       });
       await expect(response.json()).resolves.toMatchObject({ id: VALID_ID, title: 'Login' });
+    });
+
+    it('syncs new story to Linear when configured and includes sync result', async () => {
+      process.env.BEEMSPEC_LINEAR_DEFAULT_TEAM_ID = 'team_1';
+
+      const { client } = createInsertClient({
+        id: VALID_ID,
+        title: 'Login',
+        requirements: 'As a user...',
+        acceptance_criteria: '- [ ] Can log in',
+        edge_cases: null,
+        technical_guidelines: null,
+        figma_link: null,
+        status: 'backlog',
+      });
+      vi.mocked(createClient).mockResolvedValue(client as never);
+
+      const createIssue = vi.fn().mockResolvedValue({
+        id: 'lin_issue_1',
+        identifier: 'ENG-101',
+        title: 'Login',
+        description: 'mapped',
+        stateId: null,
+        updatedAt: '2026-02-13T10:00:00.000Z',
+      });
+
+      domainRuntime.storyMap.linearIssueSync = {
+        getIssueById: vi.fn(),
+        createIssue,
+        updateIssue: vi.fn(),
+      };
+
+      const response = await postStories(
+        jsonRequest({
+          task_id: VALID_ID,
+          title: 'Login',
+          requirements: 'As a user...',
+          acceptance_criteria: '- [ ] Can log in',
+        }),
+      );
+
+      expect(createIssue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Login',
+          teamId: 'team_1',
+        }),
+      );
+
+      await expect(response.json()).resolves.toMatchObject({
+        id: VALID_ID,
+        title: 'Login',
+        linear_issue: {
+          id: 'lin_issue_1',
+          identifier: 'ENG-101',
+        },
+      });
     });
   });
 

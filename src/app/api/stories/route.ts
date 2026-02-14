@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { domainRuntime } from '@/domains/runtime';
+import { syncNewStoryToLinear } from '@/integrations/linear/story-sync';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { createStorySchema, reorderStoriesSchema, validateRequest } from '@/lib/validations';
@@ -51,5 +52,16 @@ export async function POST(request: Request) {
   if (error) {
     return serverErrorResponse('Failed to create story', error);
   }
-  return NextResponse.json(data);
+
+  try {
+    const linearIssue = await syncNewStoryToLinear(data, domainRuntime.storyMap.linearIssueSync);
+    if (!linearIssue) return NextResponse.json(data);
+
+    return NextResponse.json({
+      ...data,
+      linear_issue: linearIssue,
+    });
+  } catch {
+    return NextResponse.json(data);
+  }
 }

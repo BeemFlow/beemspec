@@ -30,6 +30,7 @@ BeemSpec is the planning source of truth (`what` + `why`), Linear is execution c
 - Keep BeemSpec as product-planning source of truth.
 - Keep Linear as execution layer; avoid duplicating sprint/issue workflow in BeemSpec.
 - Keep OpenCode-native responsibilities in OpenCode; use thin glue code/plugin.
+- Prefer official provider SDKs over hand-rolled HTTP clients when the SDK is stable and covers required operations.
 - Preserve existing Next.js + Supabase foundation.
 - Ship in vertical slices with observable outcomes, not broad scaffolding.
 
@@ -130,6 +131,15 @@ Exit criteria:
 Exit criteria:
 - Repo structure and architecture docs are integration-ready without introducing non-story-map DB changes.
 
+### Phase 2 Exit Checklist
+
+- [x] Domain boundaries established for `story-map`, `teams`, and `auth`.
+- [x] Integration contracts and stubs added for Linear and OpenCode (no live external calls).
+- [x] Orchestration contract and stub added for release runner (no DB/job migrations yet).
+- [x] ADRs added for source-of-truth, runtime topology, and idempotency/retry design.
+- [x] Story-map and team API routes use domain runtime auth entrypoint consistently.
+- [x] No non-story-map schema migrations added in this phase.
+
 ## Phase 3 - Linear Sync Foundation (4-6 days)
 
 - Add integration settings (per team/story map):
@@ -147,6 +157,15 @@ Exit criteria:
 
 Exit criteria:
 - Bi-directional story<->issue sync works for create/update/status.
+
+### Phase 3 Slice 1 Definition of Done (Outbound Only)
+
+- Outbound adapter uses the official Linear TypeScript SDK (`@linear/sdk`) for create/update/read issue operations.
+- Adapter stays behind `BEEMSPEC_ENABLE_LINEAR`; disabled mode performs no external calls.
+- Idempotent retry behavior is implemented in-process per ADR 0003 (bounded retries, backoff, safe re-entry).
+- Contract tests cover SDK call shape, retry behavior, and field mapping using provider-documented model fields only.
+- No webhook write-back or inbound sync changes in this slice.
+- No new DB schema migrations required for this slice.
 
 ## Phase 4 - Build Release Orchestrator in BeemSpec (4-6 days)
 

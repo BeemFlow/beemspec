@@ -1,16 +1,4 @@
-import type {
-  LinearIssueSnapshot,
-  LinearIssueSyncPort,
-  LinearIssueUpsertInput,
-  LinearWebhookEvent,
-  LinearWebhookIngestPort,
-} from '@/integrations/linear/contracts';
-
-class LinearNotEnabledError extends Error {
-  constructor() {
-    super('Invalid Linear webhook request');
-  }
-}
+import type { LinearWebhookEvent, LinearWebhookIngestPort } from '@/integrations/linear/contracts';
 
 function getString(value: unknown, key: string): string {
   if (typeof value !== 'string' || value.length === 0) {
@@ -50,22 +38,6 @@ export function parseLinearWebhookEvent(rawBody: string, headers: Headers): Line
   };
 }
 
-export function createLinearIssueSyncStub(enabled: boolean): LinearIssueSyncPort | null {
-  if (!enabled) return null;
-
-  return {
-    async getIssueById(_issueId: string): Promise<LinearIssueSnapshot | null> {
-      throw new Error('Linear issue sync not implemented yet');
-    },
-    async createIssue(_input: LinearIssueUpsertInput): Promise<LinearIssueSnapshot> {
-      throw new Error('Linear issue sync not implemented yet');
-    },
-    async updateIssue(_issueId: string, _input: Partial<LinearIssueUpsertInput>): Promise<LinearIssueSnapshot> {
-      throw new Error('Linear issue sync not implemented yet');
-    },
-  };
-}
-
 export function createLinearWebhookIngestStub(enabled: boolean): LinearWebhookIngestPort | null {
   if (!enabled) return null;
 
@@ -73,7 +45,7 @@ export function createLinearWebhookIngestStub(enabled: boolean): LinearWebhookIn
     parseAndValidate(input: { rawBody: string; headers: Headers }): LinearWebhookEvent {
       const signature = input.headers.get('Linear-Signature');
       if (!signature) {
-        throw new LinearNotEnabledError();
+        throw new Error('Invalid Linear webhook request');
       }
       return parseLinearWebhookEvent(input.rawBody, input.headers);
     },
