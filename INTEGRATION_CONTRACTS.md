@@ -47,10 +47,7 @@ This document captures the minimum official integration contract for BeemSpec Ph
 - Local runtime config for Phase 3 slice 1: `LINEAR_API_KEY` (fallback `BEEMSPEC_LINEAR_API_KEY`).
 - Webhook signing config: `BEEMSPEC_LINEAR_WEBHOOK_SECRET` (fallback `LINEAR_WEBHOOK_SECRET`).
 - Outbound target config source: team-scoped `integration_settings` row (`linear_team_id`, `linear_project_id`, `linear_state_id`).
-- Inbound policy config source: team-scoped `integration_settings` row:
-  - `linear_allow_title_writeback`
-  - `linear_allow_status_writeback`
-  - `linear_status_mapping` (state-name -> story-status)
+- Inbound conflict policy: code-defined latest-write-wins using provider/object update timestamps.
 - Auth headers:
   - OAuth bearer: `Authorization: Bearer <ACCESS_TOKEN>`
   - Personal key: `Authorization: <API_KEY>`
@@ -76,6 +73,8 @@ This document captures the minimum official integration contract for BeemSpec Ph
 - Validate timestamp fields (`webhookTimestamp`) against an allowed drift window.
 - Handle retry and idempotency using delivery identifiers such as `Linear-Delivery` and/or webhook object ids.
 - Persist delivery idempotency receipts with a unique key to prevent double-apply on retries.
+- Resolve field conflicts with code-defined latest-write-wins using object update timestamps (`issue.updatedAt` vs local `updated_at`).
+- Provide a manual reconciliation path to converge drift when webhook/outbound delivery is missed.
 - Key documented headers include:
   - `Linear-Delivery`
   - `Linear-Event`

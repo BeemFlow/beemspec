@@ -33,8 +33,6 @@ describe('team linear integration settings route', () => {
         team_id: TEAM_ID,
         linear_team_id: 'team_linear_1',
         linear_project_id: 'project_linear_1',
-        linear_allow_title_writeback: false,
-        linear_allow_status_writeback: true,
       },
       error: null,
     });
@@ -61,9 +59,6 @@ describe('team linear integration settings route', () => {
         linear_team_id: 'team_linear_1',
         linear_project_id: null,
         linear_state_id: null,
-        linear_status_mapping: null,
-        linear_allow_title_writeback: false,
-        linear_allow_status_writeback: true,
       },
       error: null,
     });
@@ -84,9 +79,6 @@ describe('team linear integration settings route', () => {
         linear_team_id: 'team_linear_1',
         linear_project_id: undefined,
         linear_state_id: undefined,
-        linear_status_mapping: undefined,
-        linear_allow_title_writeback: undefined,
-        linear_allow_status_writeback: undefined,
       },
       { onConflict: 'team_id' },
     );

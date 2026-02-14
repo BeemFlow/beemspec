@@ -17,9 +17,56 @@ export interface LinearStorySyncTarget {
   stateId?: string;
 }
 
+export type StoryStatus = 'backlog' | 'ready' | 'in_progress' | 'review' | 'done';
+
 function section(title: string, body: string | null): string | null {
   if (!body) return null;
   return `## ${title}\n${body}`;
+}
+
+function normalizeStatusCandidate(value: string): string {
+  return value.trim().toLowerCase().replaceAll(/\s+/g, '_');
+}
+
+export function mapLinearStatusToStoryStatus(value: string | null): StoryStatus | null {
+  if (!value) return null;
+  const normalized = normalizeStatusCandidate(value);
+
+  if (['backlog', 'todo'].includes(normalized)) return 'backlog';
+  if (['ready', 'planned'].includes(normalized)) return 'ready';
+  if (['in_progress', 'started', 'inprogress'].includes(normalized)) return 'in_progress';
+  if (['review', 'in_review'].includes(normalized)) return 'review';
+  if (['done', 'complete', 'completed', 'canceled', 'cancelled'].includes(normalized)) return 'done';
+  return null;
+}
+
+function sectionBody(description: string, title: string): string | null {
+  const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`## ${escapedTitle}\\n([\\s\\S]*?)(?=\\n\\n## |$)`);
+  const match = description.match(pattern);
+  if (!match) return null;
+  const body = match[1].trim();
+  return body.length > 0 ? body : null;
+}
+
+export function parseLinearDescriptionToStoryFields(description: string | null): Partial<StoryForLinearSync> {
+  if (!description) return {};
+
+  const requirements = sectionBody(description, 'Requirements');
+  const acceptanceCriteria = sectionBody(description, 'Acceptance Criteria');
+  const figmaLink = sectionBody(description, 'Figma');
+  const edgeCases = sectionBody(description, 'Edge Cases');
+  const technicalGuidelines = sectionBody(description, 'Technical Guidelines');
+  const statusSection = sectionBody(description, 'Status');
+
+  return {
+    requirements: requirements ?? undefined,
+    acceptance_criteria: acceptanceCriteria ?? undefined,
+    figma_link: figmaLink ?? undefined,
+    edge_cases: edgeCases ?? undefined,
+    technical_guidelines: technicalGuidelines ?? undefined,
+    status: mapLinearStatusToStoryStatus(statusSection) ?? undefined,
+  };
 }
 
 function buildDescription(story: StoryForLinearSync): string {

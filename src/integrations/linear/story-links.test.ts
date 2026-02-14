@@ -49,6 +49,8 @@ describe('story linear links', () => {
       storyId: 'story_1',
       linearIssueId: 'lin_1',
       linearIssueIdentifier: 'ENG-101',
+      lastLocalUpdatedAt: null,
+      lastLinearUpdatedAt: null,
     });
   });
 
@@ -71,6 +73,8 @@ describe('story linear links', () => {
       storyId: 'story_2',
       linearIssueId: 'lin_2',
       linearIssueIdentifier: 'ENG-102',
+      lastLocalUpdatedAt: null,
+      lastLinearUpdatedAt: null,
     });
   });
 });

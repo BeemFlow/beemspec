@@ -17,8 +17,7 @@ function createWebhookAdminClient(
   options: {
     existingLink?: { story_id: string; linear_issue_id: string; linear_issue_identifier: string | null } | null;
     duplicateReceipt?: boolean;
-    allowTitleWriteback?: boolean;
-    statusMapping?: Record<string, 'backlog' | 'ready' | 'in_progress' | 'review' | 'done'>;
+    localStoryUpdatedAt?: string;
   } = {},
 ) {
   const receiptInsert = vi.fn().mockResolvedValue(
@@ -34,6 +33,8 @@ function createWebhookAdminClient(
       story_id: 'story_1',
       linear_issue_id: 'lin_1',
       linear_issue_identifier: 'ENG-101',
+      last_local_updated_at: null,
+      last_linear_updated_at: null,
     },
     error: null,
   });
@@ -45,40 +46,26 @@ function createWebhookAdminClient(
       story_id: 'story_1',
       linear_issue_id: 'lin_1',
       linear_issue_identifier: 'ENG-101',
+      last_local_updated_at: '2026-02-14T11:00:00.000Z',
+      last_linear_updated_at: '2026-02-14T11:00:00.000Z',
     },
     error: null,
   });
   const linkUpsertSelect = vi.fn().mockReturnValue({ single: linkUpsertSingle });
   const linkUpsert = vi.fn().mockReturnValue({ select: linkUpsertSelect });
 
+  const storySelectSingle = vi.fn().mockResolvedValue({
+    data: {
+      id: 'story_1',
+      updated_at: options.localStoryUpdatedAt ?? '2026-02-14T10:00:00.000Z',
+    },
+    error: null,
+  });
+  const storySelectEq = vi.fn().mockReturnValue({ single: storySelectSingle });
+  const storySelect = vi.fn().mockReturnValue({ eq: storySelectEq });
+
   const storyEq = vi.fn().mockResolvedValue({ error: null });
   const storyUpdate = vi.fn().mockReturnValue({ eq: storyEq });
-
-  const storyTeamSingle = vi.fn().mockResolvedValue({
-    data: {
-      tasks: {
-        activities: {
-          story_maps: {
-            team_id: 'team_1',
-          },
-        },
-      },
-    },
-    error: null,
-  });
-  const storyTeamEq = vi.fn().mockReturnValue({ single: storyTeamSingle });
-  const storySelect = vi.fn().mockReturnValue({ eq: storyTeamEq });
-
-  const settingsMaybeSingle = vi.fn().mockResolvedValue({
-    data: {
-      linear_status_mapping: options.statusMapping ?? null,
-      linear_allow_title_writeback: options.allowTitleWriteback ?? false,
-      linear_allow_status_writeback: true,
-    },
-    error: null,
-  });
-  const settingsEq = vi.fn().mockReturnValue({ maybeSingle: settingsMaybeSingle });
-  const settingsSelect = vi.fn().mockReturnValue({ eq: settingsEq });
 
   const from = vi.fn((table: string) => {
     if (table === 'integration_webhook_receipts') {
@@ -94,11 +81,6 @@ function createWebhookAdminClient(
       return {
         select: storySelect,
         update: storyUpdate,
-      };
-    }
-    if (table === 'integration_settings') {
-      return {
-        select: settingsSelect,
       };
     }
     return {};
@@ -129,10 +111,7 @@ describe('linear webhook route', () => {
       type: 'Issue',
       createdAt,
       webhookTimestamp: createdAt,
-      data: {
-        id: 'lin_1',
-        title: 'Updated',
-      },
+      data: { id: 'lin_1', title: 'Updated' },
     });
 
     const response = await POST(
@@ -151,7 +130,7 @@ describe('linear webhook route', () => {
   });
 
   it('applies supported issue writeback and records receipt', async () => {
-    const admin = createWebhookAdminClient({ allowTitleWriteback: true });
+    const admin = createWebhookAdminClient();
     vi.mocked(createAdminClient).mockReturnValue(admin.client as never);
 
     const createdAt = new Date().toISOString();
@@ -164,7 +143,10 @@ describe('linear webhook route', () => {
         id: 'lin_1',
         identifier: 'ENG-101',
         title: 'Story title updated from Linear',
+        description:
+          '## Requirements\nUpdated req\n\n## Acceptance Criteria\n- [ ] Updated AC\n\n## Status\nIn Progress',
         state: { name: 'In Progress' },
+        updatedAt: '2026-02-14T11:00:00.000Z',
       },
     });
 
@@ -183,6 +165,8 @@ describe('linear webhook route', () => {
     expect(admin.storyUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Story title updated from Linear',
+        requirements: 'Updated req',
+        acceptance_criteria: '- [ ] Updated AC',
         status: 'in_progress',
       }),
     );
@@ -223,8 +207,8 @@ describe('linear webhook route', () => {
     await expect(response.json()).resolves.toMatchObject({ success: true, duplicate: true });
   });
 
-  it('uses configured status mapping for writeback', async () => {
-    const admin = createWebhookAdminClient({ statusMapping: { started: 'in_progress' } });
+  it('ignores stale remote updates when local is newer', async () => {
+    const admin = createWebhookAdminClient({ localStoryUpdatedAt: '2026-02-14T12:00:00.000Z' });
     vi.mocked(createAdminClient).mockReturnValue(admin.client as never);
 
     const createdAt = new Date().toISOString();
@@ -235,31 +219,30 @@ describe('linear webhook route', () => {
       webhookTimestamp: createdAt,
       data: {
         id: 'lin_1',
-        state: { name: 'Started' },
+        title: 'Older remote title',
+        updatedAt: '2026-02-14T11:00:00.000Z',
       },
     });
 
-    await POST(
+    const response = await POST(
       new Request('http://localhost/api/integrations/linear/webhook', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Linear-Signature': sign(rawBody, 'webhook_secret'),
-          'Linear-Delivery': 'delivery_mapping',
+          'Linear-Delivery': 'delivery_stale_remote',
         },
         body: rawBody,
       }),
     );
 
-    expect(admin.storyUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: 'in_progress',
-      }),
-    );
+    expect(admin.storyUpdate).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true, ignored: true });
   });
 
-  it('uses state id mapping when provided', async () => {
-    const admin = createWebhookAdminClient({ statusMapping: { state_started_1: 'review' } });
+  it('ignores remote updates when timestamps are equal', async () => {
+    const admin = createWebhookAdminClient({ localStoryUpdatedAt: '2026-02-14T11:00:00.000Z' });
     vi.mocked(createAdminClient).mockReturnValue(admin.client as never);
 
     const createdAt = new Date().toISOString();
@@ -270,65 +253,25 @@ describe('linear webhook route', () => {
       webhookTimestamp: createdAt,
       data: {
         id: 'lin_1',
-        state: { id: 'state_started_1', name: 'Started' },
+        title: 'Equal timestamp title',
+        updatedAt: '2026-02-14T11:00:00.000Z',
       },
     });
 
-    await POST(
+    const response = await POST(
       new Request('http://localhost/api/integrations/linear/webhook', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Linear-Signature': sign(rawBody, 'webhook_secret'),
-          'Linear-Delivery': 'delivery_state_id_mapping',
+          'Linear-Delivery': 'delivery_equal_timestamp',
         },
         body: rawBody,
       }),
     );
 
-    expect(admin.storyUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: 'review',
-      }),
-    );
-  });
-
-  it('does not write back title by default policy', async () => {
-    const admin = createWebhookAdminClient();
-    vi.mocked(createAdminClient).mockReturnValue(admin.client as never);
-
-    const createdAt = new Date().toISOString();
-    const rawBody = JSON.stringify({
-      action: 'update',
-      type: 'Issue',
-      createdAt,
-      webhookTimestamp: createdAt,
-      data: {
-        id: 'lin_1',
-        title: 'Should not apply by default',
-        state: { name: 'Ready' },
-      },
-    });
-
-    await POST(
-      new Request('http://localhost/api/integrations/linear/webhook', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Linear-Signature': sign(rawBody, 'webhook_secret'),
-          'Linear-Delivery': 'delivery_title_policy',
-        },
-        body: rawBody,
-      }),
-    );
-
-    expect(admin.storyUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: 'ready',
-      }),
-    );
-    expect(admin.storyUpdate).toHaveBeenCalledWith(
-      expect.not.objectContaining({ title: 'Should not apply by default' }),
-    );
+    expect(admin.storyUpdate).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true, ignored: true });
   });
 });

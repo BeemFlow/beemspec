@@ -48,10 +48,10 @@ Completed so far:
   - `src/app/api/integrations/linear/webhook/route.ts`
   - `src/integrations/linear/webhook-verifier.ts`
   - `supabase/migrations/003_story_linear_links.sql`
-- Inbound conflict policy implemented with practical defaults:
-  - title write-back disabled by default
-  - status write-back enabled by default
-  - team-configurable state mapping via `integration_settings.linear_status_mapping` (state name or state ID)
+- Inbound conflict policy now uses code-defined latest-write-wins (newer update timestamp wins across BeemSpec/Linear).
+- Manual reconciliation endpoint added for forced convergence on demand:
+  - `POST /api/integrations/linear/reconcile`
+  - `src/app/api/integrations/linear/reconcile/route.ts`
 - Story update route now syncs outbound too:
   - uses existing link to `updateIssue` when present
   - creates issue + link if a link does not exist
@@ -64,6 +64,7 @@ Tests added/updated:
 - `src/app/api/teams/[id]/integrations/linear/route.test.ts`
 - `src/integrations/linear/webhook-verifier.test.ts`
 - `src/app/api/integrations/linear/webhook/route.test.ts`
+- `src/app/api/integrations/linear/reconcile/route.test.ts`
 - `src/app/api/story-map-routes.test.ts`
 
 ## Notes
@@ -73,6 +74,6 @@ Tests added/updated:
 
 ## Next Steps (Ordered)
 
-1. Add explicit per-field source-of-truth tests for outbound vs inbound behavior (title/status) across update races.
-2. Add UI surface in team settings page for webhook policy fields (`linear_allow_title_writeback`, status mapping JSON/editor).
-3. Add optional mapping by Linear state ID (not just state name) for teams with duplicate state names.
+1. Add explicit near-simultaneous race tests that exercise both directions (webhook-first and local-first) with deterministic LWW outcomes.
+2. Add periodic/background reconciliation runner (manual endpoint already shipped) for automatic drift correction.
+3. Expand bidirectional parser/serializer coverage tests for full story field parity edge cases.

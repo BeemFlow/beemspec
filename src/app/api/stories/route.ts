@@ -69,6 +69,8 @@ export async function POST(request: Request) {
         storyId: data.id,
         linearIssueId: linearIssue.id,
         linearIssueIdentifier: linearIssue.identifier,
+        lastLocalUpdatedAt: data.updated_at ?? null,
+        lastLinearUpdatedAt: linearIssue.updatedAt,
       });
     } catch (linkError) {
       // biome-ignore lint/suspicious/noConsole: best-effort link persistence

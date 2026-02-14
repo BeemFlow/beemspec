@@ -74,6 +74,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         storyId: data.id,
         linearIssueId: linearIssue.id,
         linearIssueIdentifier: linearIssue.identifier,
+        lastLocalUpdatedAt: data.updated_at ?? null,
+        lastLinearUpdatedAt: linearIssue.updatedAt,
       });
     } catch (linkError) {
       // biome-ignore lint/suspicious/noConsole: best-effort link persistence

@@ -38,11 +38,12 @@ Current management API for team settings:
 - `GET /api/teams/:id/integrations/linear`
 - `PUT /api/teams/:id/integrations/linear`
 
-Inbound webhook write-back policy is team-configurable via `integration_settings`:
+Inbound sync uses a code-defined latest-write-wins policy (newer `updated_at` wins) to keep both systems convergent.
 
-- `linear_allow_title_writeback` (default `false`)
-- `linear_allow_status_writeback` (default `true`)
-- `linear_status_mapping` (optional JSON mapping from Linear state name or state ID to BeemSpec story status)
+Manual reconciliation endpoint:
+
+- `POST /api/integrations/linear/reconcile`
+- body: `{ "story_id": "<uuid>" }`
 
 Inbound webhook sync requires a webhook signing secret:
 

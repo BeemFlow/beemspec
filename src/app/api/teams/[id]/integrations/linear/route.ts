@@ -26,9 +26,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('integration_settings')
-    .select(
-      'team_id, linear_workspace_id, linear_team_id, linear_project_id, linear_state_id, linear_status_mapping, linear_allow_title_writeback, linear_allow_status_writeback, updated_at',
-    )
+    .select('team_id, linear_workspace_id, linear_team_id, linear_project_id, linear_state_id, updated_at')
     .eq('team_id', teamId)
     .maybeSingle();
 
@@ -55,18 +53,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     linear_team_id: normalizeText(validation.data.linear_team_id),
     linear_project_id: normalizeText(validation.data.linear_project_id),
     linear_state_id: normalizeText(validation.data.linear_state_id),
-    linear_status_mapping: validation.data.linear_status_mapping,
-    linear_allow_title_writeback: validation.data.linear_allow_title_writeback,
-    linear_allow_status_writeback: validation.data.linear_allow_status_writeback,
   };
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('integration_settings')
     .upsert(payload, { onConflict: 'team_id' })
-    .select(
-      'team_id, linear_workspace_id, linear_team_id, linear_project_id, linear_state_id, linear_status_mapping, linear_allow_title_writeback, linear_allow_status_writeback, updated_at',
-    )
+    .select('team_id, linear_workspace_id, linear_team_id, linear_project_id, linear_state_id, updated_at')
     .single();
 
   if (error) {

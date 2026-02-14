@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mapStoryToLinearIssueInput, syncNewStoryToLinear, syncStoryToLinear } from './story-sync';
+import {
+  mapLinearStatusToStoryStatus,
+  mapStoryToLinearIssueInput,
+  parseLinearDescriptionToStoryFields,
+  syncNewStoryToLinear,
+  syncStoryToLinear,
+} from './story-sync';
 
 const story = {
   id: 'story_1',
@@ -83,5 +89,32 @@ describe('linear story sync mapping', () => {
       }),
     );
     expect(updateIssue).toHaveBeenCalledWith('lin_1', expect.not.objectContaining({ teamId: 'team_1' }));
+  });
+
+  it('parses mirrored story fields from linear description', () => {
+    const parsed = parseLinearDescriptionToStoryFields(
+      [
+        '## Requirements',
+        'As a user...',
+        '',
+        '## Acceptance Criteria',
+        '- [ ] Works',
+        '',
+        '## Status',
+        'In Progress',
+      ].join('\n'),
+    );
+
+    expect(parsed).toMatchObject({
+      requirements: 'As a user...',
+      acceptance_criteria: '- [ ] Works',
+      status: 'in_progress',
+    });
+  });
+
+  it('normalizes linear status names into story status', () => {
+    expect(mapLinearStatusToStoryStatus('In Progress')).toBe('in_progress');
+    expect(mapLinearStatusToStoryStatus('completed')).toBe('done');
+    expect(mapLinearStatusToStoryStatus('unknown')).toBeNull();
   });
 });

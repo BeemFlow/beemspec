@@ -7,6 +7,8 @@ CREATE TABLE story_linear_links (
   story_id UUID NOT NULL UNIQUE REFERENCES stories(id) ON DELETE CASCADE,
   linear_issue_id TEXT NOT NULL UNIQUE,
   linear_issue_identifier TEXT,
+  last_local_updated_at TIMESTAMPTZ,
+  last_linear_updated_at TIMESTAMPTZ,
   sync_state TEXT NOT NULL DEFAULT 'synced' CHECK (sync_state IN ('synced', 'error')),
   sync_error TEXT,
   last_synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -83,9 +85,6 @@ CREATE TABLE integration_settings (
   linear_team_id TEXT,
   linear_project_id TEXT,
   linear_state_id TEXT,
-  linear_status_mapping JSONB,
-  linear_allow_title_writeback BOOLEAN NOT NULL DEFAULT false,
-  linear_allow_status_writeback BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

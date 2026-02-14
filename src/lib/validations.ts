@@ -226,17 +226,19 @@ export const updateLinearIntegrationSettingsSchema = z
     linear_team_id: nullableString.optional(),
     linear_project_id: nullableString.optional(),
     linear_state_id: nullableString.optional(),
-    linear_status_mapping: z.record(z.string(), storyStatus).nullable().optional(),
-    linear_allow_title_writeback: z.boolean().optional(),
-    linear_allow_status_writeback: z.boolean().optional(),
   })
   .refine(atLeastOneField, atLeastOneFieldMessage);
+
+export const linearReconcileStorySchema = z.object({
+  story_id: uuid,
+});
 
 // Type Exports
 export type CreateTeam = z.infer<typeof createTeamSchema>;
 export type UpdateTeam = z.infer<typeof updateTeamSchema>;
 export type InviteEmail = z.infer<typeof inviteEmailSchema>;
 export type UpdateLinearIntegrationSettings = z.infer<typeof updateLinearIntegrationSettingsSchema>;
+export type LinearReconcileStoryRequest = z.infer<typeof linearReconcileStorySchema>;
 
 export type CreateStoryMap = z.infer<typeof createStoryMapSchema>;
 export type UpdateStoryMap = z.infer<typeof updateStoryMapSchema>;
