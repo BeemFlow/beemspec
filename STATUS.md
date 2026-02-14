@@ -1,31 +1,22 @@
 # STATUS.md
 
-Last updated: 2026-02-13
+Last updated: 2026-02-14
 
 ## Snapshot
 
-- Current milestone focus: Phase 3 slice 1 started (Linear outbound sync foundation).
-- Current code health: `test`, `lint`, and `build` all passing on latest changes.
-- Integration posture: contract-first, feature-flagged runtime with Linear outbound adapter implemented behind flag.
+- Current milestone focus: Phase 3 execution (outbound foundation, DB-backed settings, and inbound webhook foundation in place).
+- Current code health: `npm test`, `npm run lint`, and `npm run build` passing on latest changes.
+- Integration posture: contract-first, feature-flagged runtime, official Linear SDK adapter, and story-link persistence scaffolded.
 
 ## Plan Progress
 
 ### Phase 1 - Story Map Hardening
 
-Status: Complete for technical exit; signoff artifact recorded.
+Status: Complete.
 
-Completed:
+Artifacts:
 
-- Story map UX hardening and error/loading improvements.
-- Core route and behavior tests for story map and team flows.
-- Personas explicitly deferred from active UI flow.
-- README and planning docs aligned to current scope.
-
-Closure artifacts:
-
-- Bug bash record added: `docs/phase1-bug-bash-2026-02-13.md`.
-- Explicit no-open P1/P2 statement captured in bug bash record.
-- Phase 1 signoff note captured as "technical exit complete, ready for team confirmation".
+- `docs/phase1-bug-bash-2026-02-13.md`
 
 ### Phase 2 - Repo Architecture Alignment
 
@@ -33,81 +24,55 @@ Status: Complete.
 
 Completed:
 
-- Integration contract document: `INTEGRATION_CONTRACTS.md`.
-- ADRs added for source-of-truth, local runtime topology, idempotency/retry policy.
-- Interface boundaries added:
-  - `src/integrations/linear/contracts.ts`
-  - `src/integrations/opencode/contracts.ts`
-  - `src/orchestration/release-runner/contracts.ts`
-- Domain runtime boundaries added:
-  - `src/domains/auth/index.ts`
-  - `src/domains/story-map/index.ts`
-  - `src/domains/teams/index.ts`
-  - `src/domains/runtime.ts`
-- Domain runtime auth entrypoint adopted across story-map API routes.
-- Feature-flagged stubs added and covered by contract-shape tests.
+- Domain runtime boundaries and auth entrypoints are in place.
+- Integration contracts/stubs are in place for Linear/OpenCode/release-runner.
+- ADR set added for source-of-truth, runtime topology, and retry/idempotency policy.
 
-Closure artifacts:
-
-- Added and completed Phase 2 exit checklist in `PLAN.md`.
-- Team nested route family now uses domain runtime auth entrypoint consistently.
-
-### Phase 3+ - Not started
-
-- No integration DB migrations or inbound sync/orchestration behavior implemented yet.
-
-### Phase 3 - Slice 1 (Outbound Foundation)
+### Phase 3 - Linear Sync Foundation
 
 Status: In progress.
 
-Completed:
+Completed so far:
 
-- Added a feature-flagged Linear issue sync adapter behind `BEEMSPEC_ENABLE_LINEAR`.
-- Re-architected adapter to use official Linear SDK (`@linear/sdk`) for outbound/lookup surface:
-  - `createIssue(input)`
-  - `updateIssue(id, input)`
-  - `issue(id)`
-- Added retry handling for SDK retryable failures (`RatelimitedLinearError`, `NetworkLinearError`, HTTP 429/5xx).
-- Added contract tests for SDK call shape, retry behavior, and missing API key handling.
-- Wired first story-triggered outbound sync call site on story create route.
-- Added canonical story -> Linear mapping module (`src/integrations/linear/story-sync.ts`).
-- Removed unused legacy helpers (`src/lib/route-guards.ts`, `src/lib/http.ts`) and their orphaned tests.
+- Official SDK-backed Linear issue adapter (`@linear/sdk`) for `issue`, `createIssue`, and `updateIssue`.
+- Feature-flagged runtime wiring behind `BEEMSPEC_ENABLE_LINEAR`.
+- Retry behavior for retryable Linear failures (rate-limit/network/5xx class).
+- Story create route outbound sync call site with canonical story->Linear field mapping.
+- Consolidated integration foundation migration: `supabase/migrations/003_story_linear_links.sql` (story links + team settings + webhook receipts).
+- New story-link helper module: `src/integrations/linear/story-links.ts`.
+- New settings resolver module with DB-backed target resolution: `src/integrations/linear/settings.ts`.
+- Team settings API added for in-app management:
+  - `GET /api/teams/:id/integrations/linear`
+  - `PUT /api/teams/:id/integrations/linear`
+- Inbound Linear webhook route added with signature verification and idempotent receipt persistence:
+  - `src/app/api/integrations/linear/webhook/route.ts`
+  - `src/integrations/linear/webhook-verifier.ts`
+  - `supabase/migrations/003_story_linear_links.sql`
+- Inbound conflict policy implemented with practical defaults:
+  - title write-back disabled by default
+  - status write-back enabled by default
+  - team-configurable state mapping via `integration_settings.linear_status_mapping` (state name or state ID)
+- Story update route now syncs outbound too:
+  - uses existing link to `updateIssue` when present
+  - creates issue + link if a link does not exist
 
-Still needed:
+Tests added/updated:
 
-- Extend outbound sync beyond story creation once mapping links (`story_linear_links`) are available.
+- `src/integrations/linear/story-sync.test.ts`
+- `src/integrations/linear/story-links.test.ts`
+- `src/integrations/linear/settings.test.ts`
+- `src/app/api/teams/[id]/integrations/linear/route.test.ts`
+- `src/integrations/linear/webhook-verifier.test.ts`
+- `src/app/api/integrations/linear/webhook/route.test.ts`
+- `src/app/api/story-map-routes.test.ts`
 
-## Complexity Audit
+## Notes
 
-Audit goal: keep Phase 2 practical and avoid accidental overengineering.
-
-Findings:
-
-- Good: boundaries are thin and readable; no heavy DI framework or speculative generic layers.
-- Good: feature flags keep runtime behavior explicit and safe.
-- Good: stubs are minimal and test-backed.
-- Remaining risk to watch: keep new integration code on contract boundaries and avoid leaking provider-specific payloads into route handlers.
-
-## Integration SDK Audit
-
-- Linear: official SDK available and now adopted in runtime (`@linear/sdk`).
-- OpenCode: official plugin SDK/tooling already part of architecture (`@opencode-ai/plugin` surface in contract docs).
-- Release runner: internal BeemSpec orchestration boundary; no external provider SDK required.
-
-Action taken:
-
-- Simplified Linear webhook stub by removing an unnecessary custom error class and using direct error construction.
-- Removed auth-entrypoint split in team nested routes by migrating to `domainRuntime.teams.auth.requireAuth()`.
-
-Keep-as-is decision:
-
-- Keep current domain runtime + contracts + stub structure. It adds limited indirection with clear payoff for upcoming integration work.
+- `src/lib/http.ts` is still active and retained.
+- Removed legacy route-guard helper remains removed (`src/lib/route-guards.ts`).
 
 ## Next Steps (Ordered)
 
-1. Start Phase 3 slice 1 (Linear outbound sync only, no webhook write-back yet):
-   - implement adapter using official Linear SDK operations
-   - keep all calls behind `BEEMSPEC_ENABLE_LINEAR`
-   - add contract tests using documented SDK model fields only
-2. Implement idempotent retry behavior for outbound sync from ADR 0003 (in-process design, no durable job table yet).
-3. Wire a first story-driven call site to outbound Linear adapter with explicit field mapping policy.
+1. Add explicit per-field source-of-truth tests for outbound vs inbound behavior (title/status) across update races.
+2. Add UI surface in team settings page for webhook policy fields (`linear_allow_title_writeback`, status mapping JSON/editor).
+3. Add optional mapping by Linear state ID (not just state name) for teams with duplicate state names.

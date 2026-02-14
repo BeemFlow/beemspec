@@ -45,10 +45,12 @@ This document captures the minimum official integration contract for BeemSpec Ph
 - OAuth authorize endpoint: `https://linear.app/oauth/authorize`.
 - OAuth token endpoint: `https://api.linear.app/oauth/token`.
 - Local runtime config for Phase 3 slice 1: `LINEAR_API_KEY` (fallback `BEEMSPEC_LINEAR_API_KEY`).
-- Default outbound target config for story-triggered sync:
-  - `BEEMSPEC_LINEAR_DEFAULT_TEAM_ID` (required)
-  - `BEEMSPEC_LINEAR_DEFAULT_PROJECT_ID` (optional)
-  - `BEEMSPEC_LINEAR_DEFAULT_STATE_ID` (optional)
+- Webhook signing config: `BEEMSPEC_LINEAR_WEBHOOK_SECRET` (fallback `LINEAR_WEBHOOK_SECRET`).
+- Outbound target config source: team-scoped `integration_settings` row (`linear_team_id`, `linear_project_id`, `linear_state_id`).
+- Inbound policy config source: team-scoped `integration_settings` row:
+  - `linear_allow_title_writeback`
+  - `linear_allow_status_writeback`
+  - `linear_status_mapping` (state-name -> story-status)
 - Auth headers:
   - OAuth bearer: `Authorization: Bearer <ACCESS_TOKEN>`
   - Personal key: `Authorization: <API_KEY>`
@@ -73,6 +75,7 @@ This document captures the minimum official integration contract for BeemSpec Ph
 - Verify `Linear-Signature` using HMAC-SHA256 over the raw request body.
 - Validate timestamp fields (`webhookTimestamp`) against an allowed drift window.
 - Handle retry and idempotency using delivery identifiers such as `Linear-Delivery` and/or webhook object ids.
+- Persist delivery idempotency receipts with a unique key to prevent double-apply on retries.
 - Key documented headers include:
   - `Linear-Delivery`
   - `Linear-Event`

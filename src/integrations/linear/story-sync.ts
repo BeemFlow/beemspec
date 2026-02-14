@@ -17,12 +17,6 @@ export interface LinearStorySyncTarget {
   stateId?: string;
 }
 
-function normalize(value: string | undefined): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
 function section(title: string, body: string | null): string | null {
   if (!body) return null;
   return `## ${title}\n${body}`;
@@ -42,17 +36,6 @@ function buildDescription(story: StoryForLinearSync): string {
   return parts.join('\n\n');
 }
 
-export function getLinearStorySyncTargetFromEnv(): LinearStorySyncTarget | null {
-  const teamId = normalize(process.env.BEEMSPEC_LINEAR_DEFAULT_TEAM_ID);
-  if (!teamId) return null;
-
-  return {
-    teamId,
-    projectId: normalize(process.env.BEEMSPEC_LINEAR_DEFAULT_PROJECT_ID) ?? undefined,
-    stateId: normalize(process.env.BEEMSPEC_LINEAR_DEFAULT_STATE_ID) ?? undefined,
-  };
-}
-
 export function mapStoryToLinearIssueInput(
   story: StoryForLinearSync,
   target: LinearStorySyncTarget,
@@ -69,11 +52,26 @@ export function mapStoryToLinearIssueInput(
 export async function syncNewStoryToLinear(
   story: StoryForLinearSync,
   linearIssueSync: LinearIssueSyncPort | null,
+  target: LinearStorySyncTarget | null,
+): Promise<LinearIssueSnapshot | null> {
+  return syncStoryToLinear(story, linearIssueSync, null, target);
+}
+
+export async function syncStoryToLinear(
+  story: StoryForLinearSync,
+  linearIssueSync: LinearIssueSyncPort | null,
+  linearIssueId: string | null,
+  target: LinearStorySyncTarget | null,
 ): Promise<LinearIssueSnapshot | null> {
   if (!linearIssueSync) return null;
 
-  const target = getLinearStorySyncTargetFromEnv();
   if (!target) return null;
 
-  return linearIssueSync.createIssue(mapStoryToLinearIssueInput(story, target));
+  const input = mapStoryToLinearIssueInput(story, target);
+  if (!linearIssueId) {
+    return linearIssueSync.createIssue(input);
+  }
+
+  const { teamId: _teamId, ...updateInput } = input;
+  return linearIssueSync.updateIssue(linearIssueId, updateInput);
 }

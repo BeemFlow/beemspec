@@ -220,10 +220,23 @@ export const inviteEmailSchema = z.object({
   email: z.string().email('Invalid email address'),
 });
 
+export const updateLinearIntegrationSettingsSchema = z
+  .object({
+    linear_workspace_id: nullableString.optional(),
+    linear_team_id: nullableString.optional(),
+    linear_project_id: nullableString.optional(),
+    linear_state_id: nullableString.optional(),
+    linear_status_mapping: z.record(z.string(), storyStatus).nullable().optional(),
+    linear_allow_title_writeback: z.boolean().optional(),
+    linear_allow_status_writeback: z.boolean().optional(),
+  })
+  .refine(atLeastOneField, atLeastOneFieldMessage);
+
 // Type Exports
 export type CreateTeam = z.infer<typeof createTeamSchema>;
 export type UpdateTeam = z.infer<typeof updateTeamSchema>;
 export type InviteEmail = z.infer<typeof inviteEmailSchema>;
+export type UpdateLinearIntegrationSettings = z.infer<typeof updateLinearIntegrationSettingsSchema>;
 
 export type CreateStoryMap = z.infer<typeof createStoryMapSchema>;
 export type UpdateStoryMap = z.infer<typeof updateStoryMapSchema>;

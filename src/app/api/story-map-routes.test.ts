@@ -29,11 +29,58 @@ function jsonRequest(body: unknown): Request {
   });
 }
 
-function createInsertClient(returnData: unknown) {
+function createInsertClient(returnData: unknown, options: { includeLinearSettings?: boolean } = {}) {
   const single = vi.fn().mockResolvedValue({ data: returnData, error: null });
   const select = vi.fn().mockReturnValue({ single });
   const insert = vi.fn().mockReturnValue({ select });
-  const from = vi.fn().mockReturnValue({ insert });
+
+  const taskSingle = vi.fn().mockResolvedValue({
+    data: {
+      activities: {
+        story_maps: {
+          team_id: 'team_db_1',
+        },
+      },
+    },
+    error: null,
+  });
+  const taskEq = vi.fn().mockReturnValue({ single: taskSingle });
+  const taskSelect = vi.fn().mockReturnValue({ eq: taskEq });
+
+  const settingsMaybeSingle = vi.fn().mockResolvedValue({
+    data: {
+      linear_team_id: 'team_1',
+      linear_project_id: null,
+      linear_state_id: null,
+    },
+    error: null,
+  });
+  const settingsEq = vi.fn().mockReturnValue({ maybeSingle: settingsMaybeSingle });
+  const settingsSelect = vi.fn().mockReturnValue({ eq: settingsEq });
+
+  const linkSingle = vi.fn().mockResolvedValue({
+    data: {
+      story_id: (returnData as { id?: string }).id ?? VALID_ID,
+      linear_issue_id: 'lin_issue_1',
+      linear_issue_identifier: 'ENG-101',
+    },
+    error: null,
+  });
+  const linkSelect = vi.fn().mockReturnValue({ single: linkSingle });
+  const linkUpsert = vi.fn().mockReturnValue({ select: linkSelect });
+
+  const from = vi.fn((table: string) => {
+    if (options.includeLinearSettings && table === 'tasks') {
+      return { select: taskSelect };
+    }
+    if (options.includeLinearSettings && table === 'integration_settings') {
+      return { select: settingsSelect };
+    }
+    if (table === 'story_linear_links') {
+      return { upsert: linkUpsert };
+    }
+    return { insert };
+  });
 
   return {
     client: { from },
@@ -68,14 +115,93 @@ function createDeleteClient(returnData: unknown) {
   };
 }
 
+function createStoryUpdateWithLinkClient(
+  storyData: Record<string, unknown>,
+  existingLinearIssueId: string | null = null,
+) {
+  const storySingle = vi.fn().mockResolvedValue({ data: storyData, error: null });
+  const storySelect = vi.fn().mockReturnValue({ single: storySingle });
+  const storyEq = vi.fn().mockReturnValue({ select: storySelect });
+  const update = vi.fn().mockReturnValue({ eq: storyEq });
+
+  const teamSingle = vi.fn().mockResolvedValue({
+    data: {
+      tasks: {
+        activities: {
+          story_maps: {
+            team_id: 'team_db_1',
+          },
+        },
+      },
+    },
+    error: null,
+  });
+  const teamEq = vi.fn().mockReturnValue({ single: teamSingle });
+  const teamSelect = vi.fn().mockReturnValue({ eq: teamEq });
+
+  const settingsMaybeSingle = vi.fn().mockResolvedValue({
+    data: {
+      linear_team_id: 'team_1',
+      linear_project_id: null,
+      linear_state_id: null,
+    },
+    error: null,
+  });
+  const settingsEq = vi.fn().mockReturnValue({ maybeSingle: settingsMaybeSingle });
+  const settingsSelect = vi.fn().mockReturnValue({ eq: settingsEq });
+
+  const linkMaybeSingle = vi.fn().mockResolvedValue({
+    data: existingLinearIssueId
+      ? {
+          story_id: storyData.id,
+          linear_issue_id: existingLinearIssueId,
+          linear_issue_identifier: 'ENG-101',
+        }
+      : null,
+    error: null,
+  });
+  const linkEq = vi.fn().mockReturnValue({ maybeSingle: linkMaybeSingle });
+  const linkSelect = vi.fn().mockReturnValue({ eq: linkEq });
+
+  const linkSingle = vi.fn().mockResolvedValue({
+    data: {
+      story_id: storyData.id,
+      linear_issue_id: existingLinearIssueId ?? 'lin_issue_2',
+      linear_issue_identifier: 'ENG-102',
+    },
+    error: null,
+  });
+  const linkUpsertSelect = vi.fn().mockReturnValue({ single: linkSingle });
+  const linkUpsert = vi.fn().mockReturnValue({ select: linkUpsertSelect });
+
+  const from = vi.fn((table: string) => {
+    if (table === 'stories') {
+      return { update, select: teamSelect };
+    }
+    if (table === 'integration_settings') {
+      return { select: settingsSelect };
+    }
+    if (table === 'story_linear_links') {
+      return {
+        select: linkSelect,
+        upsert: linkUpsert,
+      };
+    }
+    return {};
+  });
+
+  return {
+    client: { from },
+    update,
+    linkUpsert,
+  };
+}
+
 describe('story map API routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user' } } as never);
     domainRuntime.storyMap.linearIssueSync = null;
-    delete process.env.BEEMSPEC_LINEAR_DEFAULT_TEAM_ID;
-    delete process.env.BEEMSPEC_LINEAR_DEFAULT_PROJECT_ID;
-    delete process.env.BEEMSPEC_LINEAR_DEFAULT_STATE_ID;
   });
 
   describe('reorder routes', () => {
@@ -245,18 +371,19 @@ describe('story map API routes', () => {
     });
 
     it('syncs new story to Linear when configured and includes sync result', async () => {
-      process.env.BEEMSPEC_LINEAR_DEFAULT_TEAM_ID = 'team_1';
-
-      const { client } = createInsertClient({
-        id: VALID_ID,
-        title: 'Login',
-        requirements: 'As a user...',
-        acceptance_criteria: '- [ ] Can log in',
-        edge_cases: null,
-        technical_guidelines: null,
-        figma_link: null,
-        status: 'backlog',
-      });
+      const { client } = createInsertClient(
+        {
+          id: VALID_ID,
+          title: 'Login',
+          requirements: 'As a user...',
+          acceptance_criteria: '- [ ] Can log in',
+          edge_cases: null,
+          technical_guidelines: null,
+          figma_link: null,
+          status: 'backlog',
+        },
+        { includeLinearSettings: true },
+      );
       vi.mocked(createClient).mockResolvedValue(client as never);
 
       const createIssue = vi.fn().mockResolvedValue({
@@ -353,6 +480,57 @@ describe('story map API routes', () => {
         }),
       );
       await expect(response.json()).resolves.toMatchObject({ id: VALID_ID, title: 'Story edited' });
+    });
+
+    it('syncs updated story to linked Linear issue', async () => {
+      const story = {
+        id: VALID_ID,
+        title: 'Story edited',
+        requirements: 'As a user...',
+        acceptance_criteria: '- [ ] Can update',
+        edge_cases: null,
+        technical_guidelines: null,
+        figma_link: null,
+        status: 'ready',
+      };
+
+      const { client, linkUpsert } = createStoryUpdateWithLinkClient(story, 'lin_issue_1');
+      vi.mocked(createClient).mockResolvedValue(client as never);
+
+      const updateIssue = vi.fn().mockResolvedValue({
+        id: 'lin_issue_1',
+        identifier: 'ENG-101',
+        title: 'Story edited',
+        description: 'mapped',
+        stateId: null,
+        updatedAt: '2026-02-13T10:00:00.000Z',
+      });
+
+      domainRuntime.storyMap.linearIssueSync = {
+        getIssueById: vi.fn(),
+        createIssue: vi.fn(),
+        updateIssue,
+      };
+
+      const response = await putStoryById(jsonRequest({ title: 'Story edited', status: 'ready' }), {
+        params: Promise.resolve({ id: VALID_ID }),
+      });
+
+      expect(updateIssue).toHaveBeenCalledWith(
+        'lin_issue_1',
+        expect.objectContaining({
+          title: 'Story edited',
+        }),
+      );
+      expect(linkUpsert).toHaveBeenCalledTimes(1);
+
+      await expect(response.json()).resolves.toMatchObject({
+        id: VALID_ID,
+        linear_issue: {
+          id: 'lin_issue_1',
+          identifier: 'ENG-101',
+        },
+      });
     });
 
     it('deletes activity by id', async () => {

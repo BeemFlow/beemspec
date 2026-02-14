@@ -26,15 +26,31 @@ Near-term focus is hardening and polishing the Story Map experience for daily do
 - `BEEMSPEC_ENABLE_OPENCODE`: enables OpenCode plugin/runtime ports.
 - `BEEMSPEC_ENABLE_RELEASE_RUNNER`: enables release-runner orchestration port.
 
-Linear outbound sync (Phase 3 slice 1) also requires an API key:
+Linear outbound sync requires an API key:
 
 - `LINEAR_API_KEY` (preferred)
 - `BEEMSPEC_LINEAR_API_KEY` (fallback)
 
-Story-triggered outbound sync uses default target settings:
+Story-triggered outbound sync target is loaded from team integration settings (`integration_settings` table).
 
-- `BEEMSPEC_LINEAR_DEFAULT_TEAM_ID` (required for auto-create on story create)
-- `BEEMSPEC_LINEAR_DEFAULT_PROJECT_ID` (optional)
-- `BEEMSPEC_LINEAR_DEFAULT_STATE_ID` (optional)
+Current management API for team settings:
 
-Implementation note: Linear integration uses the official SDK (`@linear/sdk`) for issue read/create/update operations.
+- `GET /api/teams/:id/integrations/linear`
+- `PUT /api/teams/:id/integrations/linear`
+
+Inbound webhook write-back policy is team-configurable via `integration_settings`:
+
+- `linear_allow_title_writeback` (default `false`)
+- `linear_allow_status_writeback` (default `true`)
+- `linear_status_mapping` (optional JSON mapping from Linear state name or state ID to BeemSpec story status)
+
+Inbound webhook sync requires a webhook signing secret:
+
+- `BEEMSPEC_LINEAR_WEBHOOK_SECRET` (preferred)
+- `LINEAR_WEBHOOK_SECRET` (fallback)
+
+Webhook endpoint:
+
+- `POST /api/integrations/linear/webhook`
+
+Implementation note: Linear outbound integration uses the official SDK (`@linear/sdk`) for issue read/create/update operations.

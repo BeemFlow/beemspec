@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { domainRuntime } from '@/domains/runtime';
+import { getLinearStorySyncTargetForTask } from '@/integrations/linear/settings';
+import { upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { syncNewStoryToLinear } from '@/integrations/linear/story-sync';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -53,15 +55,33 @@ export async function POST(request: Request) {
     return serverErrorResponse('Failed to create story', error);
   }
 
+  if (!domainRuntime.storyMap.linearIssueSync) {
+    return NextResponse.json(data);
+  }
+
   try {
-    const linearIssue = await syncNewStoryToLinear(data, domainRuntime.storyMap.linearIssueSync);
+    const target = await getLinearStorySyncTargetForTask(supabase, data.task_id);
+    const linearIssue = await syncNewStoryToLinear(data, domainRuntime.storyMap.linearIssueSync, target);
     if (!linearIssue) return NextResponse.json(data);
+
+    try {
+      await upsertStoryLinearLink(supabase, {
+        storyId: data.id,
+        linearIssueId: linearIssue.id,
+        linearIssueIdentifier: linearIssue.identifier,
+      });
+    } catch (linkError) {
+      // biome-ignore lint/suspicious/noConsole: best-effort link persistence
+      console.error('Failed to persist story-linear link after story create sync', linkError);
+    }
 
     return NextResponse.json({
       ...data,
       linear_issue: linearIssue,
     });
-  } catch {
+  } catch (syncError) {
+    // biome-ignore lint/suspicious/noConsole: best-effort outbound sync
+    console.error('Failed to sync new story to Linear', syncError);
     return NextResponse.json(data);
   }
 }
