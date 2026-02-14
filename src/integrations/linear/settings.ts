@@ -49,6 +49,17 @@ interface IntegrationSettingsTable {
   };
 }
 
+interface StoryMapsTable {
+  select(columns: string): {
+    eq(
+      column: string,
+      value: string,
+    ): {
+      single(): Promise<{ data: { team_id: string } | null; error: unknown }>;
+    };
+  };
+}
+
 function normalize(value: string | null | undefined): string | null {
   if (!value) return null;
   const trimmed = value.trim();
@@ -77,6 +88,23 @@ async function getSettingsForTeamId(supabase: SupabaseLike, teamId: string): Pro
 
   if (error) throw error;
   return toLinearTarget(data);
+}
+
+export async function getLinearStorySyncTargetForStoryMap(
+  supabase: SupabaseLike,
+  storyMapId: string,
+): Promise<LinearStorySyncTarget | null> {
+  try {
+    const storyMapsTable = supabase.from('story_maps') as StoryMapsTable;
+    const { data, error } = await storyMapsTable.select('team_id').eq('id', storyMapId).single();
+    if (error) throw error;
+
+    const teamId = data?.team_id;
+    if (!teamId) return null;
+    return getSettingsForTeamId(supabase, teamId);
+  } catch {
+    return null;
+  }
 }
 
 export async function getLinearStorySyncTargetForTask(

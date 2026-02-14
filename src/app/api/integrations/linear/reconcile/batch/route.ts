@@ -8,9 +8,19 @@ function isSuccessResponseStatus(status: number): boolean {
   return status >= 200 && status < 300;
 }
 
+function isAuthorizedByCronToken(request: Request): boolean {
+  const token = process.env.BEEMSPEC_RECONCILE_CRON_TOKEN;
+  if (!token) return false;
+
+  const authHeader = request.headers.get('authorization') ?? '';
+  return authHeader === `Bearer ${token}`;
+}
+
 export async function POST(request: Request) {
-  const auth = await domainRuntime.storyMap.auth.requireAuth();
-  if (!auth.success) return auth.response;
+  if (!isAuthorizedByCronToken(request)) {
+    const auth = await domainRuntime.storyMap.auth.requireAuth();
+    if (!auth.success) return auth.response;
+  }
 
   const linearIssueSync = domainRuntime.storyMap.linearIssueSync;
   if (!linearIssueSync) {

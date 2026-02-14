@@ -4,7 +4,7 @@ Last updated: 2026-02-14
 
 ## Snapshot
 
-- Current milestone focus: Phase 3 execution (outbound foundation, DB-backed settings, and inbound webhook foundation in place).
+- Current milestone focus: Phase 3 hardening complete and Phase 4 foundation started.
 - Current code health: `npm test`, `npm run lint`, and `npm run build` passing on latest changes.
 - Integration posture: contract-first, feature-flagged runtime, official Linear SDK adapter, and story-link persistence scaffolded.
 
@@ -30,7 +30,7 @@ Completed:
 
 ### Phase 3 - Linear Sync Foundation
 
-Status: In progress.
+Status: Functionally complete; hardening in progress.
 
 Completed so far:
 
@@ -57,6 +57,11 @@ Completed so far:
   - `src/app/api/integrations/linear/reconcile/batch/route.ts`
 - Shared reconciliation logic extracted to avoid route-level duplication:
   - `src/integrations/linear/reconcile.ts`
+- Ops visibility endpoints added:
+  - `GET /api/integrations/linear/ops/failed-webhooks`
+  - `GET /api/integrations/linear/ops/reconcile-failures`
+- Cron-friendly auth added for batch reconciliation (`BEEMSPEC_RECONCILE_CRON_TOKEN`) and helper script added:
+  - `scripts/reconcile-linear-batch.sh`
 - Story update route now syncs outbound too:
   - uses existing link to `updateIssue` when present
   - creates issue + link if a link does not exist
@@ -72,7 +77,26 @@ Tests added/updated:
 - `src/app/api/integrations/linear/reconcile/route.test.ts`
 - `src/app/api/integrations/linear/reconcile/batch/route.test.ts`
 - `src/integrations/linear/reconcile.test.ts`
+- `src/app/api/integrations/linear/ops/failed-webhooks/route.test.ts`
+- `src/app/api/integrations/linear/ops/reconcile-failures/route.test.ts`
 - `src/app/api/story-map-routes.test.ts`
+
+### Phase 4 - Build Release Orchestrator
+
+Status: Started (foundation slice).
+
+Completed so far:
+
+- Added release run schema foundation migration:
+  - `supabase/migrations/004_release_runs.sql`
+- Added release build API route:
+  - `POST /api/releases/:id/build`
+  - `src/app/api/releases/[id]/build/route.ts`
+- Route creates run + run items, syncs release stories to Linear, and finalizes run with deterministic status counts.
+
+Tests added:
+
+- `src/app/api/releases/[id]/build/route.test.ts`
 
 ## Notes
 
@@ -81,6 +105,6 @@ Tests added/updated:
 
 ## Next Steps (Ordered)
 
-1. Wire `reconcile/batch` into a scheduled trigger (cron on main machine) and track run metrics.
-2. Add small operations view/API filter for failed webhook receipts and repeated reconcile failures.
-3. Expand bidirectional parser/serializer coverage tests for full story field parity edge cases.
+1. Add `GET /api/releases/:id/build` (or run-history endpoint) for release run visibility in UI.
+2. Add release-run retry semantics (resume failed items without duplicating successful ones).
+3. Hook scheduled cron on main machine to `scripts/reconcile-linear-batch.sh` and monitor error rates.

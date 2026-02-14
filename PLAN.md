@@ -153,6 +153,9 @@ Exit criteria:
 - Implement inbound sync:
   - Linear webhook endpoint for status/title updates back to stories
 - Add idempotency and conflict strategy (latest-write-wins using object update timestamps).
+- Add reconciliation paths:
+  - manual per-story reconcile endpoint
+  - batch reconcile endpoint suitable for cron on main machine
 
 Exit criteria:
 - Bi-directional story<->issue sync works for create/update/status.

@@ -75,6 +75,8 @@ This document captures the minimum official integration contract for BeemSpec Ph
 - Persist delivery idempotency receipts with a unique key to prevent double-apply on retries.
 - Resolve field conflicts with code-defined latest-write-wins using object update timestamps (`issue.updatedAt` vs local `updated_at`).
 - Provide a manual reconciliation path to converge drift when webhook/outbound delivery is missed.
+- Provide a batch reconciliation path for periodic drift correction on the main machine runtime.
+- Optional machine trigger auth for batch reconcile via `BEEMSPEC_RECONCILE_CRON_TOKEN` bearer token.
 - Key documented headers include:
   - `Linear-Delivery`
   - `Linear-Event`

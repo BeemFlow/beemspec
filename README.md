@@ -15,7 +15,7 @@ BeemSpec is a story-mapping and release-planning tool. It is currently focused o
 BeemSpec is being built as the planning source of truth.
 
 - BeemSpec: planning context (`what` and `why`).
-- Linear: execution coordination (`when` and `who`) - planned, not yet implemented.
+- Linear: execution coordination (`when` and `who`) - story sync foundation implemented.
 - OpenCode: implementation runtime - planned, not yet implemented.
 
 Near-term focus is hardening and polishing the Story Map experience for daily dogfooding before building integrations.
@@ -49,6 +49,20 @@ Batch reconciliation endpoint (for lightweight periodic drift correction):
 
 - `POST /api/integrations/linear/reconcile/batch`
 - body: `{ "limit": 25, "older_than_minutes": 30 }` (both optional)
+
+Ops visibility endpoints:
+
+- `GET /api/integrations/linear/ops/failed-webhooks?limit=50`
+- `GET /api/integrations/linear/ops/reconcile-failures?limit=50`
+
+Batch reconciliation supports machine-trigger auth token:
+
+- `BEEMSPEC_RECONCILE_CRON_TOKEN`
+- call with `Authorization: Bearer <token>`
+
+Helper script for local cron:
+
+- `scripts/reconcile-linear-batch.sh`
 
 Inbound webhook sync requires a webhook signing secret:
 

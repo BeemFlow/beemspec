@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getLinearStorySyncTargetForStory, getLinearStorySyncTargetForTask } from './settings';
+import {
+  getLinearStorySyncTargetForStory,
+  getLinearStorySyncTargetForStoryMap,
+  getLinearStorySyncTargetForTask,
+} from './settings';
 
 describe('linear settings target resolution', () => {
   it('resolves target from integration_settings for task', async () => {
@@ -47,5 +51,39 @@ describe('linear settings target resolution', () => {
     const target = await getLinearStorySyncTargetForStory({ from }, 'story_1');
 
     expect(target).toBeNull();
+  });
+
+  it('resolves target for story map id', async () => {
+    const storyMapSingle = vi.fn().mockResolvedValue({
+      data: { team_id: 'team_db_1' },
+      error: null,
+    });
+    const storyMapEq = vi.fn().mockReturnValue({ single: storyMapSingle });
+    const storyMapSelect = vi.fn().mockReturnValue({ eq: storyMapEq });
+
+    const settingsMaybeSingle = vi.fn().mockResolvedValue({
+      data: {
+        linear_team_id: 'linear_team_db',
+        linear_project_id: null,
+        linear_state_id: null,
+      },
+      error: null,
+    });
+    const settingsEq = vi.fn().mockReturnValue({ maybeSingle: settingsMaybeSingle });
+    const settingsSelect = vi.fn().mockReturnValue({ eq: settingsEq });
+
+    const from = vi.fn((table: string) => {
+      if (table === 'story_maps') return { select: storyMapSelect };
+      if (table === 'integration_settings') return { select: settingsSelect };
+      return {};
+    });
+
+    const target = await getLinearStorySyncTargetForStoryMap({ from }, 'story_map_1');
+
+    expect(target).toEqual({
+      teamId: 'linear_team_db',
+      projectId: undefined,
+      stateId: undefined,
+    });
   });
 });

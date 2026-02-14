@@ -30,6 +30,7 @@ function jsonRequest(body: unknown): Request {
 describe('linear batch reconcile route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.BEEMSPEC_RECONCILE_CRON_TOKEN;
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
     domainRuntime.storyMap.linearIssueSync = {
       getIssueById: vi.fn(),
@@ -62,5 +63,33 @@ describe('linear batch reconcile route', () => {
       succeeded: 1,
       failed: 1,
     });
+  });
+
+  it('allows cron token authorization without user session', async () => {
+    process.env.BEEMSPEC_RECONCILE_CRON_TOKEN = 'cron_secret';
+    vi.mocked(requireAuth).mockResolvedValue({
+      success: false,
+      response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+    } as never);
+
+    const limit = vi.fn().mockResolvedValue({ data: [], error: null });
+    const order = vi.fn().mockReturnValue({ limit });
+    const lt = vi.fn().mockReturnValue({ order });
+    const select = vi.fn().mockReturnValue({ lt });
+    const from = vi.fn().mockReturnValue({ select });
+    vi.mocked(createClient).mockResolvedValue({ from } as never);
+
+    const request = new Request('http://localhost/api/integrations/linear/reconcile/batch', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer cron_secret',
+      },
+      body: JSON.stringify({ limit: 5 }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true, considered: 0 });
   });
 });
