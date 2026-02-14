@@ -92,11 +92,18 @@ Completed so far:
 - Added release build API route:
   - `POST /api/releases/:id/build`
   - `src/app/api/releases/[id]/build/route.ts`
+- Added release run visibility/read endpoints:
+  - `GET /api/releases/:id/runs`
+  - `GET /api/release-runs/:id`
+- Added release run retry endpoint for failed items:
+  - `POST /api/release-runs/:id/retry`
 - Route creates run + run items, syncs release stories to Linear, and finalizes run with deterministic status counts.
 
 Tests added:
 
 - `src/app/api/releases/[id]/build/route.test.ts`
+- `src/app/api/releases/[id]/runs/route.test.ts`
+- `src/app/api/release-runs/[id]/retry/route.test.ts`
 
 ## Notes
 
@@ -105,6 +112,6 @@ Tests added:
 
 ## Next Steps (Ordered)
 
-1. Add `GET /api/releases/:id/build` (or run-history endpoint) for release run visibility in UI.
-2. Add release-run retry semantics (resume failed items without duplicating successful ones).
+1. Add release-run list view in UI using `GET /api/releases/:id/runs` and drill-in with `GET /api/release-runs/:id`.
+2. Add item-level retry metadata (`retry_count`, `last_retry_at`) if observed failures need deeper diagnostics.
 3. Hook scheduled cron on main machine to `scripts/reconcile-linear-batch.sh` and monitor error rates.

@@ -63,6 +63,14 @@ Batch reconciliation supports machine-trigger auth token:
 Helper script for local cron:
 
 - `scripts/reconcile-linear-batch.sh`
+- detailed setup: `docs/reconcile-cron.md`
+
+Release build orchestration foundation:
+
+- `POST /api/releases/:id/build`
+- `GET /api/releases/:id/runs`
+- `GET /api/release-runs/:id`
+- `POST /api/release-runs/:id/retry`
 
 Inbound webhook sync requires a webhook signing secret:
 
