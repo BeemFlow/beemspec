@@ -65,6 +65,8 @@ This will:
 - store run + item results
 - fail items that are not yet synced to Linear
 
+Story create/update with Linear enabled will enqueue a story sync job automatically.
+
 ## 6) Build one story
 
 In run detail, use **Build story** on an item.

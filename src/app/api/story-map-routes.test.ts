@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { enqueueStoryLinearSyncJob, loadStoryWithStoryMap } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 import { DELETE as deleteActivityById, PUT as putActivityById } from './activities/[id]/route';
 import { POST as postActivities, PUT as putActivities } from './activities/route';
@@ -17,6 +18,11 @@ vi.mock('@/lib/auth', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
+}));
+
+vi.mock('@/orchestration/release-build', () => ({
+  enqueueStoryLinearSyncJob: vi.fn(),
+  loadStoryWithStoryMap: vi.fn(),
 }));
 
 const VALID_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
@@ -201,6 +207,11 @@ describe('story map API routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user' } } as never);
+    vi.mocked(loadStoryWithStoryMap).mockResolvedValue({
+      ok: true,
+      data: { story: { id: VALID_ID }, storyMapId: 'map_1' },
+    } as never);
+    vi.mocked(enqueueStoryLinearSyncJob).mockResolvedValue({ data: { id: 'job_1' }, error: null } as never);
     runtime.storyMap.linearIssueSync = null;
   });
 
@@ -370,34 +381,21 @@ describe('story map API routes', () => {
       await expect(response.json()).resolves.toMatchObject({ id: VALID_ID, title: 'Login' });
     });
 
-    it('syncs new story to Linear when configured and includes sync result', async () => {
-      const { client } = createInsertClient(
-        {
-          id: VALID_ID,
-          title: 'Login',
-          requirements: 'As a user...',
-          acceptance_criteria: '- [ ] Can log in',
-          edge_cases: null,
-          technical_guidelines: null,
-          figma_link: null,
-          status: 'backlog',
-        },
-        { includeLinearSettings: true },
-      );
-      vi.mocked(createClient).mockResolvedValue(client as never);
-
-      const createIssue = vi.fn().mockResolvedValue({
-        id: 'lin_issue_1',
-        identifier: 'ENG-101',
+    it('enqueues Linear sync for new story when configured', async () => {
+      const { client } = createInsertClient({
+        id: VALID_ID,
         title: 'Login',
-        description: 'mapped',
-        stateId: null,
-        updatedAt: '2026-02-13T10:00:00.000Z',
+        requirements: 'As a user...',
+        acceptance_criteria: '- [ ] Can log in',
+        edge_cases: null,
+        technical_guidelines: null,
+        figma_link: null,
+        status: 'backlog',
       });
-
+      vi.mocked(createClient).mockResolvedValue(client as never);
       runtime.storyMap.linearIssueSync = {
         getIssueById: vi.fn(),
-        createIssue,
+        createIssue: vi.fn(),
         updateIssue: vi.fn(),
       };
 
@@ -410,19 +408,20 @@ describe('story map API routes', () => {
         }),
       );
 
-      expect(createIssue).toHaveBeenCalledWith(
+      expect(enqueueStoryLinearSyncJob).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
-          title: 'Login',
-          teamId: 'team_1',
+          storyId: VALID_ID,
+          storyMapId: 'map_1',
         }),
       );
 
       await expect(response.json()).resolves.toMatchObject({
         id: VALID_ID,
         title: 'Login',
-        linear_issue: {
-          id: 'lin_issue_1',
-          identifier: 'ENG-101',
+        linear_sync: {
+          status: 'queued',
+          job_id: 'job_1',
         },
       });
     });
@@ -482,7 +481,7 @@ describe('story map API routes', () => {
       await expect(response.json()).resolves.toMatchObject({ id: VALID_ID, title: 'Story edited' });
     });
 
-    it('syncs updated story to linked Linear issue', async () => {
+    it('enqueues Linear sync for updated story when configured', async () => {
       const story = {
         id: VALID_ID,
         title: 'Story edited',
@@ -494,41 +493,32 @@ describe('story map API routes', () => {
         status: 'ready',
       };
 
-      const { client, linkUpsert } = createStoryUpdateWithLinkClient(story, 'lin_issue_1');
+      const { client } = createStoryUpdateWithLinkClient(story, 'lin_issue_1');
       vi.mocked(createClient).mockResolvedValue(client as never);
-
-      const updateIssue = vi.fn().mockResolvedValue({
-        id: 'lin_issue_1',
-        identifier: 'ENG-101',
-        title: 'Story edited',
-        description: 'mapped',
-        stateId: null,
-        updatedAt: '2026-02-13T10:00:00.000Z',
-      });
 
       runtime.storyMap.linearIssueSync = {
         getIssueById: vi.fn(),
         createIssue: vi.fn(),
-        updateIssue,
+        updateIssue: vi.fn(),
       };
 
       const response = await putStoryById(jsonRequest({ title: 'Story edited', status: 'ready' }), {
         params: Promise.resolve({ id: VALID_ID }),
       });
 
-      expect(updateIssue).toHaveBeenCalledWith(
-        'lin_issue_1',
+      expect(enqueueStoryLinearSyncJob).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
-          title: 'Story edited',
+          storyId: VALID_ID,
+          storyMapId: 'map_1',
         }),
       );
-      expect(linkUpsert).toHaveBeenCalledTimes(1);
 
       await expect(response.json()).resolves.toMatchObject({
         id: VALID_ID,
-        linear_issue: {
-          id: 'lin_issue_1',
-          identifier: 'ENG-101',
+        linear_sync: {
+          status: 'queued',
+          job_id: 'job_1',
         },
       });
     });

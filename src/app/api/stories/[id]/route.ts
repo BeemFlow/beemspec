@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getLinearStorySyncTargetForStory } from '@/integrations/linear/settings';
-import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import { syncStoryToLinear } from '@/integrations/linear/story-sync';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, pickDefined, updateStorySchema, validateRequest } from '@/lib/validations';
+import { enqueueStoryLinearSyncJob, loadStoryWithStoryMap } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -56,39 +54,22 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   try {
-    const target = await getLinearStorySyncTargetForStory(supabase, data.id);
-    const existingLink = await getStoryLinearLink(supabase, data.id);
-    const linearIssue = await syncStoryToLinear(
-      data,
-      runtime.storyMap.linearIssueSync,
-      existingLink?.linearIssueId ?? null,
-      target,
-    );
+    const context = await loadStoryWithStoryMap(supabase, data.id);
+    if (!context.ok) return NextResponse.json(data);
 
-    if (!linearIssue) {
-      return NextResponse.json(data);
-    }
-
-    try {
-      await upsertStoryLinearLink(supabase, {
-        storyId: data.id,
-        linearIssueId: linearIssue.id,
-        linearIssueIdentifier: linearIssue.identifier,
-        lastLocalUpdatedAt: data.updated_at ?? null,
-        lastLinearUpdatedAt: linearIssue.updatedAt,
-      });
-    } catch (linkError) {
-      // biome-ignore lint/suspicious/noConsole: best-effort link persistence
-      console.error('Failed to persist story-linear link after story update sync', linkError);
-    }
+    const { data: job } = await enqueueStoryLinearSyncJob(supabase, {
+      storyMapId: context.data.storyMapId,
+      storyId: data.id,
+    });
+    if (!job) return NextResponse.json(data);
 
     return NextResponse.json({
       ...data,
-      linear_issue: linearIssue,
+      linear_sync: { status: 'queued', job_id: job.id },
     });
-  } catch (syncError) {
-    // biome-ignore lint/suspicious/noConsole: best-effort outbound sync
-    console.error('Failed to sync updated story to Linear', syncError);
+  } catch (queueError) {
+    // biome-ignore lint/suspicious/noConsole: best-effort outbound sync enqueue
+    console.error('Failed to enqueue story sync to Linear', queueError);
     return NextResponse.json(data);
   }
 }

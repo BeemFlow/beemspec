@@ -11,7 +11,7 @@
 1. User clicks **Build Release**.
 2. BeemSpec creates `release_runs` row and enqueues `orchestration_jobs` row.
 3. For each story:
-   - syncs to Linear (`story_linear_links` upsert)
+   - reads existing `story_linear_links` mapping
    - creates OpenCode session via `@opencode-ai/sdk`
    - writes `release_run_items` with issue + session links
 4. BeemSpec finalizes run status and counts.
@@ -34,9 +34,19 @@ If processing is interrupted, queued jobs can be resumed via dispatch endpoint.
 ## Recovery/operations flow
 
 - Retry failed items: `POST /api/release-runs/:id/retry`
-- Manual per-story sync: `POST /api/stories/:id/sync-linear`
+- Manual per-story sync: `POST /api/stories/:id/sync-linear` (enqueue)
 - Mark blocked: `POST /api/opencode/blocked`
 - Batch reconcile (optional machine token): `POST /api/integrations/linear/reconcile/batch`
+
+Queue dispatch notes:
+
+- Dispatch claims one queued job at a time in created-order, then executes it.
+- Failed jobs are re-queued with exponential backoff until `max_attempts`, then marked `failed`.
+
+## Authoring sync behavior
+
+- Story create/update with Linear enabled enqueues a `story_linear_sync` job.
+- Story build/rebuild never performs inline Linear sync; it requires an existing link.
 
 ## Data tables involved
 

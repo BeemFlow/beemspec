@@ -29,6 +29,7 @@ export interface OrchestrationJobRow {
 export interface OrchestrationJobDispatchResult {
   claimed: boolean;
   completed?: boolean;
+  requeued?: boolean;
   error?: string;
 }
 
@@ -36,5 +37,6 @@ export interface OrchestrationJobSummary {
   considered: number;
   claimed: number;
   completed: number;
+  requeued: number;
   failed: number;
 }

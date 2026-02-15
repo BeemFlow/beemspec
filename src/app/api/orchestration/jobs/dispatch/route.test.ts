@@ -21,6 +21,7 @@ describe('orchestration dispatch route', () => {
       considered: 2,
       claimed: 2,
       completed: 2,
+      requeued: 0,
       failed: 0,
     });
 
@@ -38,6 +39,7 @@ describe('orchestration dispatch route', () => {
       considered: 1,
       claimed: 1,
       completed: 1,
+      requeued: 0,
       failed: 0,
     });
 

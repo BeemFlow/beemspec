@@ -8,7 +8,7 @@
 
 ## Main folders
 
-- `src/orchestration/release-build`: release build execution pipeline (queue, run processor, story sync, run records).
+- `src/orchestration/release-build`: release build execution pipeline (queue, run processor, linear sync processor, run records).
 - `src/integrations/linear`: Linear API + webhook ingest + sync/reconcile helpers.
 - `src/integrations/opencode`: OpenCode session runtime adapter.
 - `src/app/api`: HTTP boundaries only.
@@ -31,4 +31,4 @@ Short version: **run = business record**, **job = worker record**.
 3. `src/app/api/releases/[id]/build/route.ts`
 4. `src/orchestration/release-build/job-queue.ts`
 5. `src/orchestration/release-build/run-processor.ts`
-6. `src/orchestration/release-build/story-sync.ts`
+6. `src/orchestration/release-build/linear-sync-processor.ts`

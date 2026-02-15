@@ -12,6 +12,7 @@ import type {
 } from '@/orchestration/release-build/types';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
+const BASE_RETRY_DELAY_MS = 5000;
 
 export async function enqueueStoryBuildJob(
   supabase: Supabase,
@@ -64,11 +65,27 @@ export async function enqueueStoryLinearSyncJob(
 }
 
 async function claimJobById(supabase: Supabase, jobId: string): Promise<OrchestrationJobRow | null> {
-  const { data, error } = await supabase
+  const { data: queuedJob, error: queuedJobError } = await supabase
     .from('orchestration_jobs')
-    .update({ status: 'running', started_at: new Date().toISOString(), attempts: 1 })
+    .select('id, kind, status, attempts, max_attempts, payload')
     .eq('id', jobId)
     .eq('status', 'queued')
+    .maybeSingle();
+
+  if (queuedJobError || !queuedJob) return null;
+
+  const nextAttempts = (queuedJob.attempts as number) + 1;
+  const { data, error } = await supabase
+    .from('orchestration_jobs')
+    .update({
+      status: 'running',
+      started_at: new Date().toISOString(),
+      attempts: nextAttempts,
+      last_error: null,
+    })
+    .eq('id', jobId)
+    .eq('status', 'queued')
+    .eq('attempts', queuedJob.attempts as number)
     .select('id, kind, status, attempts, max_attempts, payload')
     .maybeSingle();
 
@@ -88,6 +105,38 @@ async function markJobResult(
       last_error: input.lastError ?? null,
     })
     .eq('id', input.jobId);
+}
+
+function getRetryDelayMs(attempts: number): number {
+  return BASE_RETRY_DELAY_MS * 2 ** Math.max(0, attempts - 1);
+}
+
+async function markJobFailureOrRequeue(
+  supabase: Supabase,
+  input: { jobId: string; attempts: number; maxAttempts: number; lastError: string },
+): Promise<'failed' | 'requeued'> {
+  if (input.attempts >= input.maxAttempts) {
+    await markJobResult(supabase, {
+      jobId: input.jobId,
+      status: 'failed',
+      lastError: input.lastError,
+    });
+    return 'failed';
+  }
+
+  const availableAt = new Date(Date.now() + getRetryDelayMs(input.attempts)).toISOString();
+  await supabase
+    .from('orchestration_jobs')
+    .update({
+      status: 'queued',
+      available_at: availableAt,
+      started_at: null,
+      finished_at: null,
+      last_error: input.lastError,
+    })
+    .eq('id', input.jobId);
+
+  return 'requeued';
 }
 
 export async function dispatchOrchestrationJobById(
@@ -123,8 +172,18 @@ export async function dispatchOrchestrationJobById(
     return { claimed: true as const, completed: true as const };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Orchestration job failed';
-    await markJobResult(supabase, { jobId: job.id, status: 'failed', lastError: message });
-    return { claimed: true as const, completed: false as const, error: message };
+    const outcome = await markJobFailureOrRequeue(supabase, {
+      jobId: job.id,
+      attempts: job.attempts,
+      maxAttempts: job.max_attempts,
+      lastError: message,
+    });
+    return {
+      claimed: true as const,
+      completed: false as const,
+      requeued: outcome === 'requeued',
+      error: message,
+    };
   }
 }
 
@@ -136,32 +195,38 @@ export async function dispatchQueuedOrchestrationJobs(
     openCodeSessions: OpenCodeSessions | null;
   },
 ): Promise<OrchestrationJobSummary> {
-  const { data: jobs, error } = await supabase
-    .from('orchestration_jobs')
-    .select('id')
-    .eq('status', 'queued')
-    .lte('available_at', new Date().toISOString())
-    .order('created_at', { ascending: true })
-    .limit(input.limit);
-
-  if (error) throw error;
-
-  const jobIds = (jobs ?? []).map((j) => j.id as string).filter(Boolean);
   let claimed = 0;
   let completed = 0;
+  let requeued = 0;
   let failed = 0;
+  let considered = 0;
 
-  for (const jobId of jobIds) {
+  while (considered < input.limit) {
+    const { data: nextJob, error } = await supabase
+      .from('orchestration_jobs')
+      .select('id')
+      .eq('status', 'queued')
+      .lte('available_at', new Date().toISOString())
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!nextJob?.id) break;
+
+    considered += 1;
     const result = await dispatchOrchestrationJobById(supabase, {
-      jobId,
+      jobId: nextJob.id as string,
       linearIssueSync: input.linearIssueSync,
       openCodeSessions: input.openCodeSessions,
     });
+
     if (!result.claimed) continue;
     claimed += 1;
     if (result.completed) completed += 1;
+    else if (result.requeued) requeued += 1;
     else failed += 1;
   }
 
-  return { considered: jobIds.length, claimed, completed, failed };
+  return { considered, claimed, completed, requeued, failed };
 }
