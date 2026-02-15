@@ -22,9 +22,8 @@ Near-term focus is hardening and polishing the Story Map experience for daily do
 
 ## Integration feature flags
 
-- `BEEMSPEC_ENABLE_LINEAR`: enables Linear integration ports.
-- `BEEMSPEC_ENABLE_OPENCODE`: enables OpenCode plugin/runtime ports.
-- `BEEMSPEC_ENABLE_RELEASE_RUNNER`: enables release-runner orchestration port.
+- `BEEMSPEC_ENABLE_LINEAR`: enables Linear integration.
+- `BEEMSPEC_ENABLE_OPENCODE`: enables OpenCode plugin/runtime integration.
 
 Linear outbound sync requires an API key:
 
@@ -60,10 +59,9 @@ Batch reconciliation supports machine-trigger auth token:
 - `BEEMSPEC_RECONCILE_CRON_TOKEN`
 - call with `Authorization: Bearer <token>`
 
-Helper script for local cron:
+Cron setup guide:
 
-- `scripts/reconcile-linear-batch.sh`
-- detailed setup: `docs/reconcile-cron.md`
+- `docs/reconcile-cron.md`
 
 Release build orchestration foundation:
 
@@ -75,6 +73,11 @@ Release build orchestration foundation:
 - `POST /api/stories/:id/build` (single-story build)
 - `POST /api/stories/:id/sync-linear` (manual per-story Linear sync)
 - `POST /api/orchestration/jobs/dispatch` (durable queue worker dispatch)
+
+Terminology:
+
+- `release_runs` = user-visible build attempts and outcomes
+- `orchestration_jobs` = internal durable worker queue records that execute those runs
 
 Story map UI now includes a Release Runs panel for:
 
@@ -112,6 +115,7 @@ Quick docs:
 - Setup + usage: `docs/setup-and-usage.md`
 - System flow: `docs/system-flow.md`
 - OpenCode runtime rollout: `docs/opencode-runtime-rollout.md`
+- Codebase map: `docs/codebase-map.md`
 
 Inbound webhook sync requires a webhook signing secret:
 

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { domainRuntime } from '@/domains/runtime';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import {
@@ -8,6 +7,7 @@ import {
   updateLinearIntegrationSettingsSchema,
   validateRequest,
 } from '@/lib/validations';
+import { runtime } from '@/runtime';
 
 function normalizeText(value: string | null | undefined): string | null | undefined {
   if (value === undefined) return undefined;
@@ -17,7 +17,7 @@ function normalizeText(value: string | null | undefined): string | null | undefi
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await domainRuntime.teams.auth.requireAuth();
+  const auth = await runtime.teams.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const { id: teamId } = await params;
@@ -38,7 +38,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await domainRuntime.teams.auth.requireAuth();
+  const auth = await runtime.teams.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const { id: teamId } = await params;

@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
-import { domainRuntime } from '@/domains/runtime';
-import type { LinearWebhookEvent } from '@/integrations/linear/contracts';
 import {
   buildStoryPatchFromLinearIssue,
   hasMutableStoryFields,
   shouldApplyRemoteUpdate,
 } from '@/integrations/linear/reconcile';
 import { getStoryLinearLinkByLinearIssueId, upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import { createLinearWebhookVerifier } from '@/integrations/linear/webhook-verifier';
+import type { LinearWebhookEvent } from '@/integrations/linear/types';
+import { createLinearWebhookSignatureVerifier } from '@/integrations/linear/webhook-verifier';
 import { serverErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { runtime } from '@/runtime';
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object') return null;
@@ -89,7 +89,7 @@ function isSupportedIssueEvent(event: LinearWebhookEvent): boolean {
 }
 
 function parseAndVerifyEvent(request: Request, rawBody: string): LinearWebhookEvent | null {
-  const ingest = domainRuntime.storyMap.linearWebhookIngest;
+  const ingest = runtime.storyMap.linearWebhookIngest;
   if (!ingest) return null;
 
   let event: LinearWebhookEvent;
@@ -99,7 +99,7 @@ function parseAndVerifyEvent(request: Request, rawBody: string): LinearWebhookEv
     return null;
   }
 
-  const verifier = createLinearWebhookVerifier();
+  const verifier = createLinearWebhookSignatureVerifier();
   if (!verifier) {
     throw new Error('Linear webhook secret is not configured');
   }
@@ -179,7 +179,7 @@ async function processIssueEvent(
 }
 
 export async function POST(request: Request) {
-  if (!domainRuntime.storyMap.linearWebhookIngest) {
+  if (!runtime.storyMap.linearWebhookIngest) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 

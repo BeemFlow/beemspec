@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { reconcileStoryById } from '@/app/api/integrations/linear/reconcile/route';
-import { domainRuntime } from '@/domains/runtime';
 import { createClient } from '@/lib/supabase/server';
 import { linearReconcileBatchSchema, validateRequest } from '@/lib/validations';
+import { runtime } from '@/runtime';
 
 function isSuccessResponseStatus(status: number): boolean {
   return status >= 200 && status < 300;
@@ -18,11 +18,11 @@ function isAuthorizedByCronToken(request: Request): boolean {
 
 export async function POST(request: Request) {
   if (!isAuthorizedByCronToken(request)) {
-    const auth = await domainRuntime.storyMap.auth.requireAuth();
+    const auth = await runtime.storyMap.auth.requireAuth();
     if (!auth.success) return auth.response;
   }
 
-  const linearIssueSync = domainRuntime.storyMap.linearIssueSync;
+  const linearIssueSync = runtime.storyMap.linearIssueSync;
   if (!linearIssueSync) {
     return NextResponse.json({ error: 'Linear integration is not enabled' }, { status: 503 });
   }

@@ -6,7 +6,7 @@ CREATE TABLE orchestration_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   story_map_id UUID NOT NULL REFERENCES story_maps(id) ON DELETE CASCADE,
   release_run_id UUID REFERENCES release_runs(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('release_build')),
+  kind TEXT NOT NULL CHECK (kind IN ('story_build', 'story_linear_sync')),
   status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'failed')),
   payload JSONB NOT NULL DEFAULT '{}'::jsonb,
   attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),

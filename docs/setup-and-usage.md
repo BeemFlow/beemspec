@@ -61,9 +61,9 @@ In Story Map page:
 
 This will:
 
-- sync each story to Linear
 - create one OpenCode session per story
 - store run + item results
+- fail items that are not yet synced to Linear
 
 ## 6) Build one story
 
@@ -77,8 +77,8 @@ API equivalent:
 
 From run detail:
 
-- **Retry failed**: retries failed run items
-- **Re-sync**: manually sync a story to Linear
+- **Retry failed**: enqueues retry for failed run items
+- **Re-sync**: enqueues story sync to Linear
 - **Mark blocked**: mark latest story run item blocked with a reason
 
 APIs:
@@ -102,7 +102,7 @@ Tool-backed endpoints used by plugin:
 
 ## 9) Durable queue dispatch
 
-Release builds are enqueued as orchestration jobs and also dispatched inline on trigger.
+Build and Linear sync actions are enqueued as orchestration jobs.
 
 You can dispatch queued jobs manually with:
 

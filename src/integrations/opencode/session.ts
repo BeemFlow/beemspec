@@ -1,9 +1,9 @@
 import { createOpencodeClient } from '@opencode-ai/sdk';
 import type {
   OpenCodeSessionCreateInput,
-  OpenCodeSessionPort,
   OpenCodeSessionSnapshot,
-} from '@/integrations/opencode/contracts';
+  OpenCodeSessions,
+} from '@/integrations/opencode/types';
 
 type OpenCodeClient = ReturnType<typeof createOpencodeClient>;
 
@@ -83,7 +83,7 @@ function getClient(): OpenCodeClient {
   return cachedClient;
 }
 
-export function createOpenCodeSessionPort(enabled: boolean): OpenCodeSessionPort | null {
+export function createOpenCodeSessions(enabled: boolean): OpenCodeSessions | null {
   if (!enabled) return null;
 
   return {

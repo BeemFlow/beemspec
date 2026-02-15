@@ -18,6 +18,12 @@
 
 If processing is interrupted, queued jobs can be resumed via dispatch endpoint.
 
+### Run vs job
+
+- `release_runs` is the user-visible record of a build attempt.
+- `orchestration_jobs` is the worker queue envelope that executes that run durably.
+- One run usually maps to one release-build job, but they are intentionally separate concerns.
+
 ## Single-story flow
 
 1. User clicks **Build story**.

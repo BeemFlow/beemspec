@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { domainRuntime } from '@/domains/runtime';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
+import { runtime } from '@/runtime';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await domainRuntime.storyMap.auth.requireAuth();
+  const auth = await runtime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const { id: runId } = await params;

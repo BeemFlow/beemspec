@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import type { LinearWebhookVerifier } from '@/integrations/linear/contracts';
+import type { LinearWebhookSignatureVerifier } from '@/integrations/linear/types';
 
 const DEFAULT_MAX_DRIFT_MS = 5 * 60 * 1000;
 
@@ -33,9 +33,9 @@ function isMatchingSignature(expectedHex: string, candidateHex: string): boolean
   return timingSafeEqual(expected, candidate);
 }
 
-export function createLinearWebhookVerifier(
+export function createLinearWebhookSignatureVerifier(
   options: { secret?: string; maxTimestampDriftMs?: number; now?: () => number } = {},
-): LinearWebhookVerifier | null {
+): LinearWebhookSignatureVerifier | null {
   const secret = (
     options.secret ??
     process.env.BEEMSPEC_LINEAR_WEBHOOK_SECRET ??

@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { createLinearWebhookVerifier } from './webhook-verifier';
+import { createLinearWebhookSignatureVerifier } from './webhook-verifier';
 
 describe('linear webhook verifier', () => {
   it('verifies matching signature and recent timestamp', () => {
@@ -8,7 +8,7 @@ describe('linear webhook verifier', () => {
     const body = JSON.stringify({ hello: 'world' });
     const signature = createHmac('sha256', 'secret_123').update(body).digest('hex');
 
-    const verifier = createLinearWebhookVerifier({
+    const verifier = createLinearWebhookSignatureVerifier({
       secret: 'secret_123',
       now: () => nowMs,
     });
@@ -17,7 +17,7 @@ describe('linear webhook verifier', () => {
   });
 
   it('rejects stale timestamp or invalid signature', () => {
-    const verifier = createLinearWebhookVerifier({
+    const verifier = createLinearWebhookSignatureVerifier({
       secret: 'secret_123',
       now: () => Date.parse('2026-02-14T12:00:00.000Z'),
       maxTimestampDriftMs: 60_000,

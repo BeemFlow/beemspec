@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { domainRuntime } from '@/domains/runtime';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { runtime } from '@/runtime';
 import { DELETE as deleteActivityById, PUT as putActivityById } from './activities/[id]/route';
 import { POST as postActivities, PUT as putActivities } from './activities/route';
 import { DELETE as deleteReleaseById, PUT as putReleaseById } from './releases/[id]/route';
@@ -201,7 +201,7 @@ describe('story map API routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user' } } as never);
-    domainRuntime.storyMap.linearIssueSync = null;
+    runtime.storyMap.linearIssueSync = null;
   });
 
   describe('reorder routes', () => {
@@ -395,7 +395,7 @@ describe('story map API routes', () => {
         updatedAt: '2026-02-13T10:00:00.000Z',
       });
 
-      domainRuntime.storyMap.linearIssueSync = {
+      runtime.storyMap.linearIssueSync = {
         getIssueById: vi.fn(),
         createIssue,
         updateIssue: vi.fn(),
@@ -506,7 +506,7 @@ describe('story map API routes', () => {
         updatedAt: '2026-02-13T10:00:00.000Z',
       });
 
-      domainRuntime.storyMap.linearIssueSync = {
+      runtime.storyMap.linearIssueSync = {
         getIssueById: vi.fn(),
         createIssue: vi.fn(),
         updateIssue,

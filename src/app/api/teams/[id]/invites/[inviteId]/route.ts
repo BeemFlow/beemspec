@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { domainRuntime } from '@/domains/runtime';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
+import { runtime } from '@/runtime';
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string; inviteId: string }> }) {
-  const auth = await domainRuntime.teams.auth.requireAuth();
+  const auth = await runtime.teams.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const { id: teamId, inviteId } = await params;

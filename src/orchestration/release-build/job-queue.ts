@@ -1,31 +1,25 @@
-import type { LinearIssueSyncPort } from '@/integrations/linear/contracts';
-import type { OpenCodeSessionPort } from '@/integrations/opencode/contracts';
+import type { LinearIssueSync } from '@/integrations/linear/types';
+import type { OpenCodeSessions } from '@/integrations/opencode/types';
 import type { createClient } from '@/lib/supabase/server';
-import { processReleaseRunById } from '@/orchestration/release-runner/processor';
+import { processStoryLinearSyncById } from '@/orchestration/release-build/linear-sync-processor';
+import { processReleaseRunById } from '@/orchestration/release-build/run-processor';
+import type {
+  OrchestrationJobDispatchResult,
+  OrchestrationJobRow,
+  OrchestrationJobSummary,
+  StoryBuildJobPayload,
+  StoryLinearSyncJobPayload,
+} from '@/orchestration/release-build/types';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-interface ReleaseBuildJobPayload {
-  release_id: string;
-  release_run_id: string;
-  story_map_id: string;
-}
-
-interface OrchestrationJobRow {
-  id: string;
-  kind: 'release_build';
-  status: 'queued' | 'running' | 'completed' | 'failed';
-  attempts: number;
-  max_attempts: number;
-  payload: ReleaseBuildJobPayload;
-}
-
-export async function enqueueReleaseBuildJob(
+export async function enqueueStoryBuildJob(
   supabase: Supabase,
   input: {
     storyMapId: string;
     releaseRunId: string;
     releaseId: string;
+    storyIds: string[];
   },
 ) {
   return supabase
@@ -33,12 +27,35 @@ export async function enqueueReleaseBuildJob(
     .insert({
       story_map_id: input.storyMapId,
       release_run_id: input.releaseRunId,
-      kind: 'release_build',
+      kind: 'story_build',
       status: 'queued',
       payload: {
         release_id: input.releaseId,
         release_run_id: input.releaseRunId,
         story_map_id: input.storyMapId,
+        story_ids: input.storyIds,
+      },
+      available_at: new Date().toISOString(),
+    })
+    .select('id, status')
+    .single();
+}
+
+export async function enqueueStoryLinearSyncJob(
+  supabase: Supabase,
+  input: {
+    storyMapId: string;
+    storyId: string;
+  },
+) {
+  return supabase
+    .from('orchestration_jobs')
+    .insert({
+      story_map_id: input.storyMapId,
+      kind: 'story_linear_sync',
+      status: 'queued',
+      payload: {
+        story_id: input.storyId,
       },
       available_at: new Date().toISOString(),
     })
@@ -73,26 +90,34 @@ async function markJobResult(
     .eq('id', input.jobId);
 }
 
-export async function dispatchReleaseBuildJobById(
+export async function dispatchOrchestrationJobById(
   supabase: Supabase,
   input: {
     jobId: string;
-    linearIssueSync: LinearIssueSyncPort;
-    openCodeSessions: OpenCodeSessionPort | null;
+    linearIssueSync: LinearIssueSync | null;
+    openCodeSessions: OpenCodeSessions | null;
   },
-) {
+): Promise<OrchestrationJobDispatchResult> {
   const job = await claimJobById(supabase, input.jobId);
   if (!job) return { claimed: false as const };
 
   try {
-    const payload = job.payload;
-    await processReleaseRunById(supabase, {
-      runId: payload.release_run_id,
-      releaseId: payload.release_id,
-      storyMapId: payload.story_map_id,
-      linearIssueSync: input.linearIssueSync,
-      openCodeSessions: input.openCodeSessions,
-    });
+    if (job.kind === 'story_build') {
+      const payload = job.payload as StoryBuildJobPayload;
+      await processReleaseRunById(supabase, {
+        runId: payload.release_run_id,
+        releaseId: payload.release_id,
+        storyIds: payload.story_ids,
+        openCodeSessions: input.openCodeSessions,
+      });
+    } else {
+      if (!input.linearIssueSync) throw new Error('Linear integration is not enabled');
+      const payload = job.payload as StoryLinearSyncJobPayload;
+      await processStoryLinearSyncById(supabase, {
+        storyId: payload.story_id,
+        linearIssueSync: input.linearIssueSync,
+      });
+    }
 
     await markJobResult(supabase, { jobId: job.id, status: 'completed' });
     return { claimed: true as const, completed: true as const };
@@ -103,18 +128,17 @@ export async function dispatchReleaseBuildJobById(
   }
 }
 
-export async function dispatchQueuedReleaseBuildJobs(
+export async function dispatchQueuedOrchestrationJobs(
   supabase: Supabase,
   input: {
     limit: number;
-    linearIssueSync: LinearIssueSyncPort;
-    openCodeSessions: OpenCodeSessionPort | null;
+    linearIssueSync: LinearIssueSync | null;
+    openCodeSessions: OpenCodeSessions | null;
   },
-) {
+): Promise<OrchestrationJobSummary> {
   const { data: jobs, error } = await supabase
     .from('orchestration_jobs')
     .select('id')
-    .eq('kind', 'release_build')
     .eq('status', 'queued')
     .lte('available_at', new Date().toISOString())
     .order('created_at', { ascending: true })
@@ -128,7 +152,7 @@ export async function dispatchQueuedReleaseBuildJobs(
   let failed = 0;
 
   for (const jobId of jobIds) {
-    const result = await dispatchReleaseBuildJobById(supabase, {
+    const result = await dispatchOrchestrationJobById(supabase, {
       jobId,
       linearIssueSync: input.linearIssueSync,
       openCodeSessions: input.openCodeSessions,

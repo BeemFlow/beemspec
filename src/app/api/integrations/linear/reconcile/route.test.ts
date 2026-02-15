@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { domainRuntime } from '@/domains/runtime';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { runtime } from '@/runtime';
 import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({
@@ -124,7 +124,7 @@ describe('linear reconcile route', () => {
     const { client, storyUpdate } = createReconcileClient('2026-02-14T10:00:00.000Z');
     vi.mocked(createClient).mockResolvedValue(client as never);
 
-    domainRuntime.storyMap.linearIssueSync = {
+    runtime.storyMap.linearIssueSync = {
       getIssueById: vi.fn().mockResolvedValue({
         id: 'lin_1',
         identifier: 'ENG-1',
@@ -164,7 +164,7 @@ describe('linear reconcile route', () => {
       updatedAt: '2026-02-14T12:00:00.000Z',
     });
 
-    domainRuntime.storyMap.linearIssueSync = {
+    runtime.storyMap.linearIssueSync = {
       getIssueById: vi.fn().mockResolvedValue({
         id: 'lin_1',
         identifier: 'ENG-1',
@@ -196,7 +196,7 @@ describe('linear reconcile route', () => {
       updatedAt: '2026-02-14T11:00:00.000Z',
     });
 
-    domainRuntime.storyMap.linearIssueSync = {
+    runtime.storyMap.linearIssueSync = {
       getIssueById: vi.fn().mockResolvedValue({
         id: 'lin_1',
         identifier: 'ENG-1',

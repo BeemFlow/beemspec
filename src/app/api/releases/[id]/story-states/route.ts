@@ -1,16 +1,17 @@
 import { NextResponse } from 'next/server';
-import { domainRuntime } from '@/domains/runtime';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
+import type { ReleaseRunItemStatus, ReleaseRunStatus } from '@/orchestration/release-build';
+import { runtime } from '@/runtime';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 interface StoryStateRow {
   story_id: string;
   run_id: string;
-  run_status: string;
-  item_status: string;
+  run_status: ReleaseRunStatus | 'unknown';
+  item_status: ReleaseRunItemStatus;
   item_error: string | null;
   linear_issue_id: string | null;
   opencode_session_id: string | null;
@@ -46,11 +47,15 @@ function latestByStory(items: Array<Record<string, unknown>>): Map<string, Story
     if (!storyId || map.has(storyId)) continue;
 
     const run = item.run as { id?: string; status?: string } | null;
+    const runStatus = run?.status;
     map.set(storyId, {
       story_id: storyId,
       run_id: run?.id ?? '',
-      run_status: run?.status ?? 'unknown',
-      item_status: item.status as string,
+      run_status:
+        runStatus === 'queued' || runStatus === 'running' || runStatus === 'completed' || runStatus === 'failed'
+          ? runStatus
+          : 'unknown',
+      item_status: item.status as ReleaseRunItemStatus,
       item_error: (item.error as string | null) ?? null,
       linear_issue_id: (item.linear_issue_id as string | null) ?? null,
       opencode_session_id: (item.opencode_session_id as string | null) ?? null,
@@ -65,7 +70,7 @@ function latestByStory(items: Array<Record<string, unknown>>): Map<string, Story
 }
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await domainRuntime.storyMap.auth.requireAuth();
+  const auth = await runtime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const { id: releaseId } = await params;

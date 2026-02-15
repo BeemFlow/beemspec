@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { domainRuntime } from '@/domains/runtime';
 import { getLinearStorySyncTargetForTask } from '@/integrations/linear/settings';
 import { upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { syncNewStoryToLinear } from '@/integrations/linear/story-sync';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { createStorySchema, reorderStoriesSchema, validateRequest } from '@/lib/validations';
+import { runtime } from '@/runtime';
 
 export async function PUT(request: Request) {
-  const auth = await domainRuntime.storyMap.auth.requireAuth();
+  const auth = await runtime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const validation = await validateRequest(request, reorderStoriesSchema);
@@ -28,7 +28,7 @@ export async function PUT(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await domainRuntime.storyMap.auth.requireAuth();
+  const auth = await runtime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const validation = await validateRequest(request, createStorySchema);
@@ -55,13 +55,13 @@ export async function POST(request: Request) {
     return serverErrorResponse('Failed to create story', error);
   }
 
-  if (!domainRuntime.storyMap.linearIssueSync) {
+  if (!runtime.storyMap.linearIssueSync) {
     return NextResponse.json(data);
   }
 
   try {
     const target = await getLinearStorySyncTargetForTask(supabase, data.task_id);
-    const linearIssue = await syncNewStoryToLinear(data, domainRuntime.storyMap.linearIssueSync, target);
+    const linearIssue = await syncNewStoryToLinear(data, runtime.storyMap.linearIssueSync, target);
     if (!linearIssue) return NextResponse.json(data);
 
     try {

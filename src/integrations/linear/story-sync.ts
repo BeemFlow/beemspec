@@ -1,4 +1,4 @@
-import type { LinearIssueSnapshot, LinearIssueSyncPort, LinearIssueUpsertInput } from '@/integrations/linear/contracts';
+import type { LinearIssueSnapshot, LinearIssueSync, LinearIssueUpsertInput } from '@/integrations/linear/types';
 
 export interface StoryForLinearSync {
   id: string;
@@ -98,7 +98,7 @@ export function mapStoryToLinearIssueInput(
 
 export async function syncNewStoryToLinear(
   story: StoryForLinearSync,
-  linearIssueSync: LinearIssueSyncPort | null,
+  linearIssueSync: LinearIssueSync | null,
   target: LinearStorySyncTarget | null,
 ): Promise<LinearIssueSnapshot | null> {
   return syncStoryToLinear(story, linearIssueSync, null, target);
@@ -106,7 +106,7 @@ export async function syncNewStoryToLinear(
 
 export async function syncStoryToLinear(
   story: StoryForLinearSync,
-  linearIssueSync: LinearIssueSyncPort | null,
+  linearIssueSync: LinearIssueSync | null,
   linearIssueId: string | null,
   target: LinearStorySyncTarget | null,
 ): Promise<LinearIssueSnapshot | null> {

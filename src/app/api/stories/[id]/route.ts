@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { domainRuntime } from '@/domains/runtime';
 import { getLinearStorySyncTargetForStory } from '@/integrations/linear/settings';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { syncStoryToLinear } from '@/integrations/linear/story-sync';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, pickDefined, updateStorySchema, validateRequest } from '@/lib/validations';
+import { runtime } from '@/runtime';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await domainRuntime.storyMap.auth.requireAuth();
+  const auth = await runtime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const { id } = await params;
@@ -27,7 +27,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await domainRuntime.storyMap.auth.requireAuth();
+  const auth = await runtime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const { id } = await params;
@@ -51,7 +51,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return serverErrorResponse('Failed to update story', error);
   }
 
-  if (!domainRuntime.storyMap.linearIssueSync) {
+  if (!runtime.storyMap.linearIssueSync) {
     return NextResponse.json(data);
   }
 
@@ -60,7 +60,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const existingLink = await getStoryLinearLink(supabase, data.id);
     const linearIssue = await syncStoryToLinear(
       data,
-      domainRuntime.storyMap.linearIssueSync,
+      runtime.storyMap.linearIssueSync,
       existingLink?.linearIssueId ?? null,
       target,
     );
@@ -94,7 +94,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await domainRuntime.storyMap.auth.requireAuth();
+  const auth = await runtime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const { id } = await params;

@@ -1,13 +1,13 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { domainRuntime } from '@/domains/runtime';
 import { serverErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, inviteEmailSchema, isValidUuid, validateRequest } from '@/lib/validations';
+import { runtime } from '@/runtime';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await domainRuntime.teams.auth.requireAuth();
+  const auth = await runtime.teams.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const { id } = await params;
@@ -29,7 +29,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await domainRuntime.teams.auth.requireAuth();
+  const auth = await runtime.teams.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const { id: teamId } = await params;

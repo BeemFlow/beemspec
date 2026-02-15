@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { domainRuntime } from '@/domains/runtime';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { createTeamSchema, validateRequest } from '@/lib/validations';
+import { runtime } from '@/runtime';
 import type { TeamWithRole } from '@/types';
 
 export async function GET() {
-  const auth = await domainRuntime.teams.auth.requireAuth();
+  const auth = await runtime.teams.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const supabase = await createClient();
@@ -32,7 +32,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await domainRuntime.teams.auth.requireAuth();
+  const auth = await runtime.teams.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const validation = await validateRequest(request, createTeamSchema);

@@ -1,4 +1,4 @@
-import type { LinearWebhookEvent, LinearWebhookIngestPort } from '@/integrations/linear/contracts';
+import type { LinearWebhookEvent, LinearWebhookIngest } from '@/integrations/linear/types';
 
 function getString(value: unknown, key: string): string {
   if (typeof value !== 'string' || value.length === 0) {
@@ -38,7 +38,7 @@ export function parseLinearWebhookEvent(rawBody: string, headers: Headers): Line
   };
 }
 
-export function createLinearWebhookIngestStub(enabled: boolean): LinearWebhookIngestPort | null {
+export function createLinearWebhookIngest(enabled: boolean): LinearWebhookIngest | null {
   if (!enabled) return null;
 
   return {

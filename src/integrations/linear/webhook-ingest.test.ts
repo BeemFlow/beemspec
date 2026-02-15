@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createLinearWebhookIngestStub, parseLinearWebhookEvent } from './stub';
+import { createLinearWebhookIngest, parseLinearWebhookEvent } from './webhook-ingest';
 
-describe('linear integration stub contracts', () => {
+describe('linear webhook ingest contracts', () => {
   it('parses documented webhook shape into contract event', () => {
     const headers = new Headers({
       'Linear-Delivery': 'delivery-123',
@@ -28,7 +28,7 @@ describe('linear integration stub contracts', () => {
   });
 
   it('requires signature header for ingest validation', () => {
-    const ingest = createLinearWebhookIngestStub(true);
+    const ingest = createLinearWebhookIngest(true);
     expect(ingest).not.toBeNull();
 
     expect(() =>

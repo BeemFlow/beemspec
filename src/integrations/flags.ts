@@ -6,5 +6,4 @@ function parseFlag(value: string | undefined): boolean {
 export const integrationFlags = {
   linear: parseFlag(process.env.BEEMSPEC_ENABLE_LINEAR),
   opencode: parseFlag(process.env.BEEMSPEC_ENABLE_OPENCODE),
-  releaseRunner: parseFlag(process.env.BEEMSPEC_ENABLE_RELEASE_RUNNER),
 };

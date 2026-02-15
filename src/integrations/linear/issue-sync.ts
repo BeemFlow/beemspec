@@ -6,7 +6,7 @@ import {
   NetworkLinearError,
   RatelimitedLinearError,
 } from '@linear/sdk';
-import type { LinearIssueSnapshot, LinearIssueSyncPort, LinearIssueUpsertInput } from '@/integrations/linear/contracts';
+import type { LinearIssueSnapshot, LinearIssueSync, LinearIssueUpsertInput } from '@/integrations/linear/types';
 
 const DEFAULT_MAX_RETRIES = 2;
 const BASE_BACKOFF_MS = 250;
@@ -88,10 +88,7 @@ function getIssueFromPayload(payload: IssuePayload, operation: string): Promise<
   return payload.issue;
 }
 
-export function createLinearIssueSyncPort(
-  enabled: boolean,
-  options: LinearIssueSyncOptions = {},
-): LinearIssueSyncPort | null {
+export function createLinearIssueSync(enabled: boolean, options: LinearIssueSyncOptions = {}): LinearIssueSync | null {
   if (!enabled) return null;
 
   const apiKey = options.apiKey ?? getConfiguredApiKey() ?? '';

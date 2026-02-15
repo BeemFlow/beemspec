@@ -1,8 +1,8 @@
 import { createHmac } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { domainRuntime } from '@/domains/runtime';
-import { parseLinearWebhookEvent } from '@/integrations/linear/stub';
+import { parseLinearWebhookEvent } from '@/integrations/linear/webhook-ingest';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { runtime } from '@/runtime';
 import { POST } from './route';
 
 vi.mock('@/lib/supabase/admin', () => ({
@@ -97,7 +97,7 @@ describe('linear webhook route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.BEEMSPEC_LINEAR_WEBHOOK_SECRET = 'webhook_secret';
-    domainRuntime.storyMap.linearWebhookIngest = {
+    runtime.storyMap.linearWebhookIngest = {
       parseAndValidate: ({ rawBody, headers }) => parseLinearWebhookEvent(rawBody, headers),
     };
   });

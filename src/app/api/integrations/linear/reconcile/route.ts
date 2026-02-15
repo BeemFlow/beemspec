@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { domainRuntime } from '@/domains/runtime';
 import { buildStoryPatchFromLinearIssue, shouldApplyRemoteUpdate } from '@/integrations/linear/reconcile';
 import { getLinearStorySyncTargetForStory } from '@/integrations/linear/settings';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
@@ -7,6 +6,7 @@ import { syncStoryToLinear } from '@/integrations/linear/story-sync';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { linearReconcileStorySchema, validateRequest } from '@/lib/validations';
+import { runtime } from '@/runtime';
 
 function ignored(reason: string): NextResponse {
   return NextResponse.json({ success: true, ignored: true, reason });
@@ -41,7 +41,7 @@ async function reconcileRemoteToLocal(
 
 async function reconcileLocalToRemote(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  linearIssueSync: NonNullable<typeof domainRuntime.storyMap.linearIssueSync>,
+  linearIssueSync: NonNullable<typeof runtime.storyMap.linearIssueSync>,
   story: Record<string, unknown>,
   link: { linearIssueId: string },
 ): Promise<NextResponse> {
@@ -64,7 +64,7 @@ async function reconcileLocalToRemote(
 
 export async function reconcileStoryById(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
-  linearIssueSync: NonNullable<typeof domainRuntime.storyMap.linearIssueSync>;
+  linearIssueSync: NonNullable<typeof runtime.storyMap.linearIssueSync>;
   storyId: string;
 }): Promise<NextResponse> {
   const { data: story, error: storyError } = await input.supabase
@@ -92,10 +92,10 @@ export async function reconcileStoryById(input: {
 }
 
 export async function POST(request: Request) {
-  const auth = await domainRuntime.storyMap.auth.requireAuth();
+  const auth = await runtime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
 
-  const linearIssueSync = domainRuntime.storyMap.linearIssueSync;
+  const linearIssueSync = runtime.storyMap.linearIssueSync;
   if (!linearIssueSync) {
     return NextResponse.json({ error: 'Linear integration is not enabled' }, { status: 503 });
   }

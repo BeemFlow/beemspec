@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createOpenCodeSessionPort } from './session';
+import { createOpenCodeSessions } from './session';
 
 const create = vi.fn();
 const prompt = vi.fn();
@@ -23,11 +23,11 @@ describe('opencode session port', () => {
   });
 
   it('returns null when disabled', () => {
-    expect(createOpenCodeSessionPort(false)).toBeNull();
+    expect(createOpenCodeSessions(false)).toBeNull();
   });
 
   it('creates session and injects story context via SDK', async () => {
-    const port = createOpenCodeSessionPort(true);
+    const port = createOpenCodeSessions(true);
     if (!port) throw new Error('Expected session port');
 
     create.mockResolvedValue({ data: { id: 'session_1', status: 'active', createdAt: '2026-02-15T00:00:00.000Z' } });
@@ -55,7 +55,7 @@ describe('opencode session port', () => {
   });
 
   it('reads existing session by id', async () => {
-    const port = createOpenCodeSessionPort(true);
+    const port = createOpenCodeSessions(true);
     if (!port) throw new Error('Expected session port');
 
     get.mockResolvedValue({ data: { id: 'session_2', status: 'idle', createdAt: '2026-02-15T00:00:00.000Z' } });

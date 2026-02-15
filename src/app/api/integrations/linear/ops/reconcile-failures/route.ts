@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { domainRuntime } from '@/domains/runtime';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { runtime } from '@/runtime';
 
 function parseLimit(url: string): number {
   const raw = new URL(url).searchParams.get('limit');
@@ -11,7 +11,7 @@ function parseLimit(url: string): number {
 }
 
 export async function GET(request: Request) {
-  const auth = await domainRuntime.storyMap.auth.requireAuth();
+  const auth = await runtime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const limit = parseLimit(request.url);

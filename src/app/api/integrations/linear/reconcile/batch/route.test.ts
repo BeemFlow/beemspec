@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { domainRuntime } from '@/domains/runtime';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { runtime } from '@/runtime';
 import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({
@@ -32,7 +32,7 @@ describe('linear batch reconcile route', () => {
     vi.clearAllMocks();
     delete process.env.BEEMSPEC_RECONCILE_CRON_TOKEN;
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
-    domainRuntime.storyMap.linearIssueSync = {
+    runtime.storyMap.linearIssueSync = {
       getIssueById: vi.fn(),
       createIssue: vi.fn(),
       updateIssue: vi.fn(),

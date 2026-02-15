@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { domainRuntime } from '@/domains/runtime';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
+import type { ReleaseRunStatus } from '@/orchestration/release-build';
+import { runtime } from '@/runtime';
 
 function parseLimit(url: string): number {
   const raw = new URL(url).searchParams.get('limit');
@@ -20,7 +21,7 @@ function parseOffset(url: string): number {
   return value;
 }
 
-function parseStatus(url: string): 'queued' | 'running' | 'completed' | 'failed' | null {
+function parseStatus(url: string): ReleaseRunStatus | null {
   const raw = new URL(url).searchParams.get('status');
   if (!raw) return null;
   if (raw === 'queued' || raw === 'running' || raw === 'completed' || raw === 'failed') return raw;
@@ -28,7 +29,7 @@ function parseStatus(url: string): 'queued' | 'running' | 'completed' | 'failed'
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await domainRuntime.storyMap.auth.requireAuth();
+  const auth = await runtime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
 
   const { id: releaseId } = await params;

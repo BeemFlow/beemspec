@@ -20,7 +20,7 @@ export interface LinearIssueUpsertInput {
   stateId?: LinearStateId;
 }
 
-export interface LinearIssueSyncPort {
+export interface LinearIssueSync {
   getIssueById(issueId: LinearIssueId): Promise<LinearIssueSnapshot | null>;
   createIssue(input: LinearIssueUpsertInput): Promise<LinearIssueSnapshot>;
   updateIssue(issueId: LinearIssueId, input: Partial<LinearIssueUpsertInput>): Promise<LinearIssueSnapshot>;
@@ -34,10 +34,10 @@ export interface LinearWebhookEvent {
   payload: unknown;
 }
 
-export interface LinearWebhookVerifier {
+export interface LinearWebhookSignatureVerifier {
   verify(input: { rawBody: string; signature: string; timestamp: string }): boolean;
 }
 
-export interface LinearWebhookIngestPort {
+export interface LinearWebhookIngest {
   parseAndValidate(input: { rawBody: string; headers: Headers }): LinearWebhookEvent;
 }
