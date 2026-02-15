@@ -94,6 +94,7 @@ Completed so far:
   - `src/app/api/releases/[id]/build/route.ts`
 - Added release run visibility/read endpoints:
   - `GET /api/releases/:id/runs`
+  - `GET /api/releases/:id/story-states`
   - `GET /api/release-runs/:id`
 - Added release run retry endpoint for failed items:
   - `POST /api/release-runs/:id/retry`
@@ -150,6 +151,20 @@ Completed so far:
 - Added simple operator docs:
   - `docs/setup-and-usage.md`
   - `docs/system-flow.md`
+  - `docs/opencode-runtime-rollout.md`
+
+### Durable Queue (Release Worker)
+
+Status: Implemented.
+
+Completed so far:
+
+- Added durable orchestration job table:
+  - `supabase/migrations/005_orchestration_jobs.sql`
+- Release build now enqueues `release_build` jobs and dispatches inline opportunistically.
+- Added dispatch API for queued job processing:
+  - `POST /api/orchestration/jobs/dispatch`
+  - optional machine token: `BEEMSPEC_RELEASE_WORKER_TOKEN`
 
 Tests added:
 

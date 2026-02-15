@@ -33,6 +33,10 @@ Optional batch reconcile auth:
 
 - `BEEMSPEC_RECONCILE_CRON_TOKEN`
 
+Optional release worker dispatch auth:
+
+- `BEEMSPEC_RELEASE_WORKER_TOKEN`
+
 ## 3) Database migrations
 
 Apply all migrations in `supabase/migrations`.
@@ -95,3 +99,11 @@ Tool-backed endpoints used by plugin:
 
 - `GET /api/opencode/story/:id`
 - `POST /api/opencode/blocked`
+
+## 9) Durable queue dispatch
+
+Release builds are enqueued as orchestration jobs and also dispatched inline on trigger.
+
+You can dispatch queued jobs manually with:
+
+- `POST /api/orchestration/jobs/dispatch?limit=5`

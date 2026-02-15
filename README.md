@@ -69,10 +69,12 @@ Release build orchestration foundation:
 
 - `POST /api/releases/:id/build`
 - `GET /api/releases/:id/runs` (supports `limit`, `offset`, optional `status`)
+- `GET /api/releases/:id/story-states` (latest run state per story)
 - `GET /api/release-runs/:id`
 - `POST /api/release-runs/:id/retry`
 - `POST /api/stories/:id/build` (single-story build)
 - `POST /api/stories/:id/sync-linear` (manual per-story Linear sync)
+- `POST /api/orchestration/jobs/dispatch` (durable queue worker dispatch)
 
 Story map UI now includes a Release Runs panel for:
 
@@ -99,12 +101,17 @@ Shared token for plugin-to-app calls:
 
 - `BEEMSPEC_OPENCODE_TOKEN`
 
+Optional worker token for orchestration dispatch endpoint:
+
+- `BEEMSPEC_RELEASE_WORKER_TOKEN`
+
 OpenCode plugin package is implemented at `packages/opencode-beemspec` with hook + custom-tool support.
 
 Quick docs:
 
 - Setup + usage: `docs/setup-and-usage.md`
 - System flow: `docs/system-flow.md`
+- OpenCode runtime rollout: `docs/opencode-runtime-rollout.md`
 
 Inbound webhook sync requires a webhook signing secret:
 

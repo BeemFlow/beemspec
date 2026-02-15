@@ -9,12 +9,14 @@
 ## Main release flow
 
 1. User clicks **Build Release**.
-2. BeemSpec creates `release_runs` row.
+2. BeemSpec creates `release_runs` row and enqueues `orchestration_jobs` row.
 3. For each story:
    - syncs to Linear (`story_linear_links` upsert)
    - creates OpenCode session via `@opencode-ai/sdk`
    - writes `release_run_items` with issue + session links
 4. BeemSpec finalizes run status and counts.
+
+If processing is interrupted, queued jobs can be resumed via dispatch endpoint.
 
 ## Single-story flow
 
