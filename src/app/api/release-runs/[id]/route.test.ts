@@ -41,9 +41,16 @@ describe('release run detail route', () => {
     const itemsEq = vi.fn().mockReturnValue({ order: itemsOrder });
     const itemsSelect = vi.fn().mockReturnValue({ eq: itemsEq });
 
+    const linksIn = vi.fn().mockResolvedValue({
+      data: [{ story_id: 'story_1', linear_issue_identifier: 'ENG-1' }],
+      error: null,
+    });
+    const linksSelect = vi.fn().mockReturnValue({ in: linksIn });
+
     const from = vi.fn((table: string) => {
       if (table === 'release_runs') return { select: runSelect };
       if (table === 'release_run_items') return { select: itemsSelect };
+      if (table === 'story_linear_links') return { select: linksSelect };
       return {};
     });
 
@@ -58,6 +65,7 @@ describe('release run detail route', () => {
         expect.objectContaining({
           opencode_session_id: 'session_1',
           opencode_session_url: 'https://opencode.ai/sessions/session_1',
+          linear_issue_identifier: 'ENG-1',
           retry_count: 2,
           last_retry_at: '2026-02-14T11:10:00.000Z',
         }),

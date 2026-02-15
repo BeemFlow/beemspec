@@ -16,7 +16,7 @@ BeemSpec is being built as the planning source of truth.
 
 - BeemSpec: planning context (`what` and `why`).
 - Linear: execution coordination (`when` and `who`) - story sync foundation implemented.
-- OpenCode: implementation runtime - planned, not yet implemented.
+- OpenCode: implementation runtime - session orchestration is implemented through the official SDK.
 
 Near-term focus is hardening and polishing the Story Map experience for daily dogfooding before building integrations.
 
@@ -71,6 +71,8 @@ Release build orchestration foundation:
 - `GET /api/releases/:id/runs` (supports `limit`, `offset`, optional `status`)
 - `GET /api/release-runs/:id`
 - `POST /api/release-runs/:id/retry`
+- `POST /api/stories/:id/build` (single-story build)
+- `POST /api/stories/:id/sync-linear` (manual per-story Linear sync)
 
 Story map UI now includes a Release Runs panel for:
 
@@ -83,7 +85,26 @@ Release run item diagnostics include `retry_count` and `last_retry_at` for retry
 
 Release run items also persist OpenCode session linkage (`opencode_session_id`, `opencode_session_url`) when OpenCode integration is enabled.
 
-OpenCode plugin package scaffold now exists at `packages/opencode-beemspec` with contract-first hook/tool interfaces.
+OpenCode runtime session integration uses the official SDK (`@opencode-ai/sdk`) against:
+
+- `BEEMSPEC_OPENCODE_BASE_URL` (defaults to `http://127.0.0.1:4096`)
+- optional `BEEMSPEC_OPENCODE_WEB_BASE_URL` for deep-link URL generation
+
+OpenCode plugin tool endpoints (token or authenticated user):
+
+- `GET /api/opencode/story/:id`
+- `POST /api/opencode/blocked`
+
+Shared token for plugin-to-app calls:
+
+- `BEEMSPEC_OPENCODE_TOKEN`
+
+OpenCode plugin package is implemented at `packages/opencode-beemspec` with hook + custom-tool support.
+
+Quick docs:
+
+- Setup + usage: `docs/setup-and-usage.md`
+- System flow: `docs/system-flow.md`
 
 Inbound webhook sync requires a webhook signing secret:
 

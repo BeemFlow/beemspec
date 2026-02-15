@@ -245,6 +245,11 @@ export const linearReconcileBatchSchema = z
   })
   .default({});
 
+export const opencodeMarkBlockedSchema = z.object({
+  story_id: uuid,
+  reason: z.string().min(1).max(2000),
+});
+
 // Type Exports
 export type CreateTeam = z.infer<typeof createTeamSchema>;
 export type UpdateTeam = z.infer<typeof updateTeamSchema>;
@@ -252,6 +257,7 @@ export type InviteEmail = z.infer<typeof inviteEmailSchema>;
 export type UpdateLinearIntegrationSettings = z.infer<typeof updateLinearIntegrationSettingsSchema>;
 export type LinearReconcileStoryRequest = z.infer<typeof linearReconcileStorySchema>;
 export type LinearReconcileBatchRequest = z.infer<typeof linearReconcileBatchSchema>;
+export type OpenCodeMarkBlockedRequest = z.infer<typeof opencodeMarkBlockedSchema>;
 
 export type CreateStoryMap = z.infer<typeof createStoryMapSchema>;
 export type UpdateStoryMap = z.infer<typeof updateStoryMapSchema>;

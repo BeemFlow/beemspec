@@ -34,6 +34,8 @@ This document captures the minimum official integration contract for BeemSpec Ph
 - Plugins: https://opencode.ai/docs/plugins/
 - Custom tools: https://opencode.ai/docs/custom-tools/
 - Config: https://opencode.ai/docs/config/
+- npm SDK package: `@opencode-ai/sdk`
+- npm plugin package: `@opencode-ai/plugin`
 - Plugin type surface (authoritative for hook signatures):
   - https://github.com/anomalyco/opencode/blob/dev/packages/plugin/src/index.ts
 
@@ -109,6 +111,14 @@ This document captures the minimum official integration contract for BeemSpec Ph
   - `session.updated`
   - `session.idle`
   - `session.error`
+
+### Runtime integration
+
+- BeemSpec release orchestration creates OpenCode sessions through official SDK client (`@opencode-ai/sdk`) using server APIs.
+- Session context injection uses `session.prompt(... noReply: true)` immediately after session creation.
+- Plugin tools call BeemSpec API endpoints:
+  - `GET /api/opencode/story/:id`
+  - `POST /api/opencode/blocked`
 
 ### Custom tools
 

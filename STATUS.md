@@ -1,6 +1,6 @@
 # STATUS.md
 
-Last updated: 2026-02-14
+Last updated: 2026-02-15
 
 ## Snapshot
 
@@ -115,20 +115,41 @@ Completed so far:
 - Release-runs history API now supports status filter and offset pagination:
   - `GET /api/releases/:id/runs?limit=20&offset=0&status=failed`
 - Story-map release-runs panel now supports status filters and next/previous pagination.
+- Added single-story build route to run full Linear+OpenCode orchestration for one story:
+  - `POST /api/stories/:id/build`
 
 ### Phase 5 - `opencode-beemspec` Plugin Package
 
-Status: Started (scaffold slice).
+Status: Functionally implemented.
 
 Completed so far:
 
-- Added package scaffold at `packages/opencode-beemspec`.
-- Added contract surface for hooks/events/tools:
+- Added package implementation at `packages/opencode-beemspec`.
+- Added contract + implementation surface for hooks/events/tools:
   - `experimental.session.compacting`
   - `experimental.chat.system.transform`
   - `session.created | session.updated | session.idle | session.error`
   - `beemspec_story` and `beemspec_blocked`
-- Added plugin factory shell (`createBeemSpecPlugin`) to wire host callbacks.
+- Added network-backed tool adapters to call BeemSpec API (`/api/opencode/story/:id`, `/api/opencode/blocked`).
+- Added official OpenCode runtime SDK integration (`@opencode-ai/sdk`) for session create/get + context injection.
+- Added plugin runtime module (`opencode-beemspec/runtime`) with official `@opencode-ai/plugin` hooks/tools.
+
+### Phase 6 - Closed-Loop Execution UX
+
+Status: In progress.
+
+Completed so far:
+
+- Release run detail now includes deep links:
+  - story -> Linear issue
+  - story -> OpenCode session
+- Added manual controls in release run detail:
+  - per-story build (`POST /api/stories/:id/build`)
+  - per-story re-sync (`POST /api/stories/:id/sync-linear`)
+  - mark blocked with reason (`POST /api/opencode/blocked`)
+- Added simple operator docs:
+  - `docs/setup-and-usage.md`
+  - `docs/system-flow.md`
 
 Tests added:
 
@@ -144,5 +165,5 @@ Tests added:
 ## Next Steps (Ordered)
 
 1. Hook scheduled cron on main machine to `scripts/reconcile-linear-batch.sh` and monitor error rates.
-2. Wire `packages/opencode-beemspec` into real OpenCode runtime config and publish/install flow.
-3. Add run-detail API test coverage for session-link and retry metadata fields.
+2. Publish/install `opencode-beemspec` package in real OpenCode runtime environments and verify load via `opencode.json`.
+3. Add release dashboard aggregation for per-story latest session/run state across multiple runs.

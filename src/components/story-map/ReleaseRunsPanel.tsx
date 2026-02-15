@@ -28,12 +28,14 @@ interface ReleaseRunItem {
   id: string;
   story_id: string;
   linear_issue_id: string | null;
+  linear_issue_identifier: string | null;
   opencode_session_id: string | null;
   opencode_session_url: string | null;
   status: 'pending' | 'synced' | 'failed';
   error: string | null;
   retry_count: number;
   last_retry_at: string | null;
+  story?: { title: string; status: string } | null;
   created_at: string;
   updated_at: string;
 }
@@ -142,13 +144,25 @@ function RunDetailSection({
   runLoading,
   runError,
   retryingRunId,
+  syncingStoryId,
+  blockingStoryId,
+  buildingStoryId,
   onRetry,
+  onResyncStory,
+  onMarkBlocked,
+  onBuildStory,
 }: {
   selectedRun: ReleaseRunDetail | null;
   runLoading: boolean;
   runError: string | null;
   retryingRunId: string | null;
+  syncingStoryId: string | null;
+  blockingStoryId: string | null;
+  buildingStoryId: string | null;
   onRetry: () => void;
+  onResyncStory: (storyId: string) => void;
+  onMarkBlocked: (storyId: string) => void;
+  onBuildStory: (storyId: string) => void;
 }) {
   return (
     <div className="space-y-2">
@@ -187,9 +201,21 @@ function RunDetailSection({
             {selectedRun.items.map((item) => (
               <div key={item.id} className="rounded border px-2 py-1 text-xs">
                 <div className="flex items-center justify-between gap-2">
-                  <code className="text-[11px] text-muted-foreground">story {shortId(item.story_id)}</code>
+                  <code className="text-[11px] text-muted-foreground">
+                    {item.story?.title ? item.story.title : `story ${shortId(item.story_id)}`}
+                  </code>
                   <Badge variant={itemBadgeVariant(item.status)}>{item.status}</Badge>
                 </div>
+                {item.linear_issue_identifier && (
+                  <a
+                    className="mt-1 block text-[11px] text-primary underline-offset-2 hover:underline"
+                    href={linearIssueUrl(item.linear_issue_identifier)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Linear issue {item.linear_issue_identifier}
+                  </a>
+                )}
                 {item.opencode_session_url && (
                   <a
                     className="mt-1 block text-[11px] text-primary underline-offset-2 hover:underline"
@@ -205,6 +231,38 @@ function RunDetailSection({
                     retries {item.retry_count}, last {formatTime(item.last_retry_at)}
                   </div>
                 )}
+                <div className="mt-2 flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[11px]"
+                    disabled={buildingStoryId === item.story_id}
+                    onClick={() => onBuildStory(item.story_id)}
+                  >
+                    {buildingStoryId === item.story_id ? 'Building...' : 'Build story'}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[11px]"
+                    disabled={syncingStoryId === item.story_id}
+                    onClick={() => onResyncStory(item.story_id)}
+                  >
+                    {syncingStoryId === item.story_id ? 'Syncing...' : 'Re-sync'}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[11px]"
+                    disabled={blockingStoryId === item.story_id}
+                    onClick={() => onMarkBlocked(item.story_id)}
+                  >
+                    {blockingStoryId === item.story_id ? 'Saving...' : 'Mark blocked'}
+                  </Button>
+                </div>
                 {item.error && <div className="mt-1 text-destructive">{item.error}</div>}
               </div>
             ))}
@@ -251,6 +309,10 @@ function shortId(value: string): string {
   return value.slice(0, 8);
 }
 
+function linearIssueUrl(identifier: string): string {
+  return `https://linear.app/issue/${identifier}`;
+}
+
 export function ReleaseRunsPanel({ releases, onError }: Props) {
   const pageSize = 20;
   const sortedReleases = useMemo(
@@ -271,6 +333,9 @@ export function ReleaseRunsPanel({ releases, onError }: Props) {
   const [runError, setRunError] = useState<string | null>(null);
   const [buildingReleaseId, setBuildingReleaseId] = useState<string | null>(null);
   const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
+  const [syncingStoryId, setSyncingStoryId] = useState<string | null>(null);
+  const [blockingStoryId, setBlockingStoryId] = useState<string | null>(null);
+  const [buildingStoryId, setBuildingStoryId] = useState<string | null>(null);
 
   useEffect(() => {
     if (sortedReleases.length === 0) {
@@ -412,6 +477,79 @@ export function ReleaseRunsPanel({ releases, onError }: Props) {
     }
   }, [loadRunDetail, loadRuns, onError, selectedReleaseId, selectedRun]);
 
+  const handleResyncStory = useCallback(
+    async (storyId: string) => {
+      if (!selectedRunId || !selectedReleaseId) return;
+
+      setSyncingStoryId(storyId);
+      try {
+        await fetchJson(
+          `/api/stories/${storyId}/sync-linear`,
+          { method: 'POST' },
+          'Failed to manually sync story to Linear',
+        );
+        await Promise.all([loadRunDetail(selectedRunId), loadRuns(selectedReleaseId, { nextOffset: offset })]);
+      } catch (err) {
+        onError(errorMessage(err));
+      } finally {
+        setSyncingStoryId(null);
+      }
+    },
+    [loadRunDetail, loadRuns, offset, onError, selectedReleaseId, selectedRunId],
+  );
+
+  const handleMarkBlocked = useCallback(
+    async (storyId: string) => {
+      const reason = window.prompt('Blocked reason');
+      if (!reason || !reason.trim()) return;
+      if (!selectedRunId || !selectedReleaseId) return;
+
+      setBlockingStoryId(storyId);
+      try {
+        await fetchJson(
+          '/api/opencode/blocked',
+          {
+            method: 'POST',
+            body: JSON.stringify({ story_id: storyId, reason: reason.trim() }),
+            headers: { 'content-type': 'application/json' },
+          },
+          'Failed to mark story blocked',
+        );
+        await Promise.all([loadRunDetail(selectedRunId), loadRuns(selectedReleaseId, { nextOffset: offset })]);
+      } catch (err) {
+        onError(errorMessage(err));
+      } finally {
+        setBlockingStoryId(null);
+      }
+    },
+    [loadRunDetail, loadRuns, offset, onError, selectedReleaseId, selectedRunId],
+  );
+
+  const handleBuildStory = useCallback(
+    async (storyId: string) => {
+      if (!selectedReleaseId) return;
+
+      setBuildingStoryId(storyId);
+      try {
+        const result = await fetchJson<{ run_id: string }>(
+          `/api/stories/${storyId}/build`,
+          { method: 'POST' },
+          'Failed to build story',
+        );
+
+        await Promise.all([
+          loadRuns(selectedReleaseId, { preferredRunId: result.run_id, nextOffset: 0 }),
+          loadRunDetail(result.run_id),
+        ]);
+      } catch (err) {
+        onError(errorMessage(err));
+      } finally {
+        setBuildingStoryId(null);
+      }
+    },
+    [loadRunDetail, loadRuns, onError, selectedReleaseId],
+  );
+
   if (sortedReleases.length === 0) return null;
 
   return (
@@ -500,7 +638,13 @@ export function ReleaseRunsPanel({ releases, onError }: Props) {
             runLoading={runLoading}
             runError={runError}
             retryingRunId={retryingRunId}
+            syncingStoryId={syncingStoryId}
+            blockingStoryId={blockingStoryId}
+            buildingStoryId={buildingStoryId}
             onRetry={handleRetryFailedItems}
+            onResyncStory={handleResyncStory}
+            onMarkBlocked={handleMarkBlocked}
+            onBuildStory={handleBuildStory}
           />
         </div>
       </CardContent>

@@ -6,7 +6,8 @@
   "description": "BeemSpec OpenCode plugin hooks and tools",
   "main": "src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./runtime": "./src/runtime.ts"
   },
   "peerDependencies": {
     "zod": "^4.3.3"

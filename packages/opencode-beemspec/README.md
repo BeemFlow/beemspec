@@ -1,11 +1,34 @@
 # opencode-beemspec
 
-Scaffold package for BeemSpec's OpenCode integration surface.
+BeemSpec OpenCode plugin package.
 
-Current scope:
+It provides:
 
-- hook contracts for `experimental.session.compacting` and `experimental.chat.system.transform`
-- event contract for `session.created`, `session.updated`, `session.idle`, and `session.error`
-- tool contracts for `beemspec_story` and `beemspec_blocked`
+- OpenCode hook adapters for `experimental.session.compacting` and `experimental.chat.system.transform`
+- lifecycle event handling (`session.created`, `session.updated`, `session.idle`, `session.error`)
+- custom tools:
+  - `beemspec_story`
+  - `beemspec_blocked`
 
-This package is intentionally implementation-light in this phase. It exists so BeemSpec app code can target stable contracts while runtime integration details continue to harden.
+## Usage
+
+Add to `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-beemspec"]
+}
+```
+
+For local plugin files, import the runtime export:
+
+```ts
+import BeemSpecPlugin from 'opencode-beemspec/runtime'
+export default BeemSpecPlugin
+```
+
+Required env for network-backed tools:
+
+- `BEEMSPEC_BASE_URL` (for example `http://127.0.0.1:3000`)
+- `BEEMSPEC_OPENCODE_TOKEN` (shared bearer token with BeemSpec API)
