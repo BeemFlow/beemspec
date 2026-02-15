@@ -11,11 +11,15 @@ vi.mock('@/orchestration/release-build', () => ({ enqueueStoryBuildJob: vi.fn() 
 
 const RUN_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
-describe('release run retry route', () => {
+describe('build run retry route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
-    runtime.storyMap.openCodeSessions = { createSession: vi.fn(), getSessionById: vi.fn() };
+    runtime.storyMap.openCodeSessions = {
+      createSession: vi.fn(),
+      getSessionById: vi.fn(),
+      appendStoryAssignment: vi.fn(),
+    };
   });
 
   it('queues retry job for failed run items', async () => {
@@ -33,8 +37,8 @@ describe('release run retry route', () => {
     const runUpdate = vi.fn().mockReturnValue({ eq: runUpdateEq });
 
     const from = vi.fn((table: string) => {
-      if (table === 'release_runs') return { select: () => ({ eq: runEq }), update: runUpdate };
-      if (table === 'release_run_items') return { select: failedItemsSelect };
+      if (table === 'build_runs') return { select: () => ({ eq: runEq }), update: runUpdate };
+      if (table === 'build_run_items') return { select: failedItemsSelect };
       return {};
     });
 
@@ -51,7 +55,7 @@ describe('release run retry route', () => {
     expect(response.status).toBe(202);
     expect(enqueueStoryBuildJob).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ releaseRunId: RUN_ID, storyIds: ['story_1'] }),
+      expect.objectContaining({ buildRunId: RUN_ID, storyIds: ['story_1'] }),
     );
     await expect(response.json()).resolves.toMatchObject({ run_id: RUN_ID, job_id: 'job_1', status: 'queued' });
   });

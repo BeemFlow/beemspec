@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-import type { ReleaseRunItemStatus, ReleaseRunStatus } from '@/orchestration/release-build';
+import type { BuildRunItemStatus, BuildRunStatus } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -10,8 +10,8 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 interface StoryStateRow {
   story_id: string;
   run_id: string;
-  run_status: ReleaseRunStatus | 'unknown';
-  item_status: ReleaseRunItemStatus;
+  run_status: BuildRunStatus | 'unknown';
+  item_status: BuildRunItemStatus;
   item_error: string | null;
   linear_issue_id: string | null;
   opencode_session_id: string | null;
@@ -29,11 +29,11 @@ async function loadReleaseStories(supabase: Supabase, releaseId: string) {
     .order('sort_order', { ascending: true });
 }
 
-async function loadReleaseRunItems(supabase: Supabase, releaseId: string) {
+async function loadBuildRunItems(supabase: Supabase, releaseId: string) {
   return supabase
-    .from('release_run_items')
+    .from('build_run_items')
     .select(
-      'story_id, release_run_id, status, error, linear_issue_id, opencode_session_id, opencode_session_url, retry_count, last_retry_at, created_at, run:release_runs!inner(id, release_id, status)',
+      'story_id, build_run_id, status, error, linear_issue_id, opencode_session_id, opencode_session_url, retry_count, last_retry_at, created_at, run:build_runs!inner(id, release_id, status)',
     )
     .eq('run.release_id', releaseId)
     .order('created_at', { ascending: false });
@@ -55,7 +55,7 @@ function latestByStory(items: Array<Record<string, unknown>>): Map<string, Story
         runStatus === 'queued' || runStatus === 'running' || runStatus === 'completed' || runStatus === 'failed'
           ? runStatus
           : 'unknown',
-      item_status: item.status as ReleaseRunItemStatus,
+      item_status: item.status as BuildRunItemStatus,
       item_error: (item.error as string | null) ?? null,
       linear_issue_id: (item.linear_issue_id as string | null) ?? null,
       opencode_session_id: (item.opencode_session_id as string | null) ?? null,
@@ -81,8 +81,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { data: stories, error: storiesError } = await loadReleaseStories(supabase, releaseId);
   if (storiesError) return serverErrorResponse('Failed to load release stories', storiesError);
 
-  const { data: items, error: itemsError } = await loadReleaseRunItems(supabase, releaseId);
-  if (itemsError) return serverErrorResponse('Failed to load release run items', itemsError);
+  const { data: items, error: itemsError } = await loadBuildRunItems(supabase, releaseId);
+  if (itemsError) return serverErrorResponse('Failed to load build run items', itemsError);
 
   const latest = latestByStory((items ?? []) as Array<Record<string, unknown>>);
 

@@ -28,7 +28,7 @@ describe('opencode blocked route', () => {
     const update = vi.fn().mockReturnValue({ eq: eqUpdate });
 
     const from = vi.fn((table: string) => {
-      if (table === 'release_run_items') return { select, update };
+      if (table === 'build_run_items') return { select, update };
       return {};
     });
     vi.mocked(createClient).mockResolvedValue({ from } as never);
@@ -54,7 +54,7 @@ describe('opencode blocked route', () => {
     const select = vi.fn().mockReturnValue({ eq: eqSelect });
     const eqUpdate = vi.fn().mockResolvedValue({ error: null });
     const update = vi.fn().mockReturnValue({ eq: eqUpdate });
-    const from = vi.fn((table: string) => (table === 'release_run_items' ? { select, update } : {}));
+    const from = vi.fn((table: string) => (table === 'build_run_items' ? { select, update } : {}));
     vi.mocked(createAdminClient).mockReturnValue({ from } as never);
 
     const response = await POST(

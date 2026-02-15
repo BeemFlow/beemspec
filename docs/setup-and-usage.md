@@ -41,7 +41,7 @@ Optional release worker dispatch auth:
 
 Apply all migrations in `supabase/migrations`.
 
-Note: release-run retry/session metadata is now consolidated directly in `004_release_runs.sql`.
+Note: build-run retry/session metadata is now consolidated directly in `004_build_runs.sql`.
 
 ## 4) Configure team integration
 
@@ -56,12 +56,13 @@ API equivalent:
 In Story Map page:
 
 1. Open a map with release stories.
-2. Use **Release Runs** panel.
+2. Use **Build Runs** panel.
 3. Click **Build Release**.
 
 This will:
 
-- create one OpenCode session per story
+- create/reuse one OpenCode session per build run
+- reuse the latest active run for the release when appending new stories
 - store run + item results
 - fail items that are not yet synced to Linear
 
@@ -85,7 +86,7 @@ From run detail:
 
 APIs:
 
-- `POST /api/release-runs/:id/retry`
+- `POST /api/build-runs/:id/retry`
 - `POST /api/stories/:id/sync-linear`
 - `POST /api/opencode/blocked`
 

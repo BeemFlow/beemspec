@@ -64,4 +64,29 @@ describe('opencode session port', () => {
     expect(get).toHaveBeenCalledWith({ path: { id: 'session_2' } });
     expect(session).toMatchObject({ id: 'session_2', state: 'completed' });
   });
+
+  it('appends story assignment prompt to existing session', async () => {
+    const port = createOpenCodeSessions(true);
+    if (!port) throw new Error('Expected session port');
+
+    prompt.mockResolvedValue({ data: {} });
+
+    await port.appendStoryAssignment({
+      sessionId: 'session_3',
+      runId: 'run_1',
+      storyId: 'story_1',
+      storyTitle: 'Authentication flow',
+      linearIssueIdentifier: 'ENG-1',
+      requirements: 'User can sign in',
+      acceptanceCriteria: 'Given valid credentials, sign-in succeeds',
+      technicalGuidelines: null,
+    });
+
+    expect(prompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { id: 'session_3' },
+        body: expect.objectContaining({ noReply: true }),
+      }),
+    );
+  });
 });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { createReleaseRun, enqueueStoryBuildJob } from '@/orchestration/release-build';
+import { createBuildRun, enqueueStoryBuildJob } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 import { POST } from './route';
 
@@ -11,7 +11,7 @@ vi.mock('@/orchestration/release-build', async () => {
   const actual = await vi.importActual<typeof import('@/orchestration/release-build')>('@/orchestration/release-build');
   return {
     ...actual,
-    createReleaseRun: vi.fn(),
+    createBuildRun: vi.fn(),
     enqueueStoryBuildJob: vi.fn(),
   };
 });
@@ -59,8 +59,12 @@ describe('story build route', () => {
 
     vi.mocked(createClient).mockResolvedValue({ from } as never);
 
-    runtime.storyMap.openCodeSessions = { createSession: vi.fn(), getSessionById: vi.fn() };
-    vi.mocked(createReleaseRun).mockResolvedValue({ data: { id: 'run_1' }, error: null } as never);
+    runtime.storyMap.openCodeSessions = {
+      createSession: vi.fn(),
+      getSessionById: vi.fn(),
+      appendStoryAssignment: vi.fn(),
+    };
+    vi.mocked(createBuildRun).mockResolvedValue({ data: { id: 'run_1' }, error: null } as never);
     vi.mocked(enqueueStoryBuildJob).mockResolvedValue({
       data: { id: 'job_1', status: 'queued' },
       error: null,

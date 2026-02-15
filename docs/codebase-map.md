@@ -16,10 +16,10 @@
 - `src/lib`: auth, errors, validation, supabase clients, utility helpers.
 - `src/components`: app and UI components.
 
-## Release orchestration terminology
+## Build orchestration terminology
 
-- `release_runs`: user-facing execution attempt (what happened for a release build request).
-- `release_run_items`: per-story result rows for that run.
+- `build_runs`: user-facing execution attempt (what happened for a build request).
+- `build_run_items`: per-story result rows for that run.
 - `orchestration_jobs`: internal durable queue jobs that execute runs.
 
 Short version: **run = business record**, **job = worker record**.

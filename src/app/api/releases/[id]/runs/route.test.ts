@@ -8,13 +8,13 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 
 const RELEASE_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
-describe('release runs history route', () => {
+describe('build runs history route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
   });
 
-  it('returns release run history for release', async () => {
+  it('returns build run history for release', async () => {
     const range = vi.fn().mockResolvedValue({
       data: [{ id: 'run_1', release_id: RELEASE_ID, status: 'completed' }],
       error: null,

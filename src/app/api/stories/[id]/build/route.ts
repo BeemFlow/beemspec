@@ -2,16 +2,13 @@ import { NextResponse } from 'next/server';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-import { createReleaseRun, enqueueStoryBuildJob, loadStoryBuildContext } from '@/orchestration/release-build';
+import { createBuildRun, enqueueStoryBuildJob, loadStoryBuildContext } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 
 function responseForStoryContextFailure(
   loaded: Extract<Awaited<ReturnType<typeof loadStoryBuildContext>>, { ok: false }>,
 ) {
   if (loaded.reason === 'story_not_found') return NextResponse.json({ error: 'Story not found' }, { status: 404 });
-  if (loaded.reason === 'story_missing_release') {
-    return NextResponse.json({ error: 'Story is not assigned to a release' }, { status: 400 });
-  }
   if (loaded.reason === 'story_task_not_found') {
     return serverErrorResponse('Failed to resolve story task', loaded.error ?? new Error('Task not found'));
   }
@@ -34,7 +31,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
 
   const { story, storyMapId } = loaded.data;
 
-  const { data: run, error: runCreateError } = await createReleaseRun(supabase, {
+  const { data: run, error: runCreateError } = await createBuildRun(supabase, {
     releaseId: story.release_id,
     storyMapId,
     userId: auth.user.id,
@@ -47,7 +44,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
 
   const { data: job, error: jobError } = await enqueueStoryBuildJob(supabase, {
     releaseId: story.release_id,
-    releaseRunId: run.id,
+    buildRunId: run.id,
     storyMapId,
     storyIds: [storyId],
   });
@@ -58,6 +55,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
   return NextResponse.json(
     {
       run_id: run.id,
+      build_run_id: run.id,
       job_id: job.id,
       story_id: storyId,
       status: 'queued',

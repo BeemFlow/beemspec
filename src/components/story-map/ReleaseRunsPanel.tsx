@@ -9,12 +9,12 @@ import { errorMessage } from '@/lib/errors';
 import { fetchJson } from '@/lib/http';
 import type { Release } from '@/types';
 
-type ReleaseRunStatus = 'queued' | 'running' | 'completed' | 'failed';
+type BuildRunStatus = 'queued' | 'running' | 'completed' | 'failed';
 
-interface ReleaseRunSummary {
+interface BuildRunSummary {
   id: string;
   release_id: string;
-  status: ReleaseRunStatus;
+  status: BuildRunStatus;
   total_items: number;
   completed_items: number;
   failed_items: number;
@@ -24,7 +24,7 @@ interface ReleaseRunSummary {
   created_at: string;
 }
 
-interface ReleaseRunItem {
+interface BuildRunItem {
   id: string;
   story_id: string;
   linear_issue_id: string | null;
@@ -40,15 +40,15 @@ interface ReleaseRunItem {
   updated_at: string;
 }
 
-interface ReleaseRunDetail extends ReleaseRunSummary {
-  items: ReleaseRunItem[];
+interface BuildRunDetail extends BuildRunSummary {
+  items: BuildRunItem[];
 }
 
-interface ReleaseRunsResponse {
+interface BuildRunsResponse {
   limit: number;
   offset: number;
   next_offset: number | null;
-  runs: ReleaseRunSummary[];
+  runs: BuildRunSummary[];
 }
 
 interface ReleaseStoryState {
@@ -88,7 +88,7 @@ function RecentRunsSection({
   selectedRunId,
   onSelectRun,
 }: {
-  runs: ReleaseRunSummary[];
+  runs: BuildRunSummary[];
   runsLoading: boolean;
   runsError: string | null;
   selectedRunId: string | null;
@@ -135,10 +135,10 @@ function RunStatusFilters({
   value,
   onChange,
 }: {
-  value: 'all' | ReleaseRunStatus;
-  onChange: (next: 'all' | ReleaseRunStatus) => void;
+  value: 'all' | BuildRunStatus;
+  onChange: (next: 'all' | BuildRunStatus) => void;
 }) {
-  const options: Array<'all' | ReleaseRunStatus> = ['all', 'running', 'failed', 'completed'];
+  const options: Array<'all' | BuildRunStatus> = ['all', 'running', 'failed', 'completed'];
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -169,7 +169,7 @@ function RunDetailSection({
   onMarkBlocked,
   onBuildStory,
 }: {
-  selectedRun: ReleaseRunDetail | null;
+  selectedRun: BuildRunDetail | null;
   runLoading: boolean;
   runError: string | null;
   retryingRunId: string | null;
@@ -290,7 +290,7 @@ function RunDetailSection({
   );
 }
 
-function statusBadgeVariant(status: ReleaseRunStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
+function statusBadgeVariant(status: BuildRunStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (status) {
     case 'completed':
       return 'secondary';
@@ -304,7 +304,7 @@ function statusBadgeVariant(status: ReleaseRunStatus): 'default' | 'secondary' |
   }
 }
 
-function itemBadgeVariant(status: ReleaseRunItem['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
+function itemBadgeVariant(status: BuildRunItem['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
   if (status === 'failed') return 'destructive';
   if (status === 'synced') return 'secondary';
   return 'outline';
@@ -330,7 +330,7 @@ function linearIssueUrl(identifier: string): string {
   return `https://linear.app/issue/${identifier}`;
 }
 
-export function ReleaseRunsPanel({ releases, onError }: Props) {
+export function BuildRunsPanel({ releases, onError }: Props) {
   const pageSize = 20;
   const sortedReleases = useMemo(
     () => [...releases].sort((left, right) => left.sort_order - right.sort_order),
@@ -338,14 +338,14 @@ export function ReleaseRunsPanel({ releases, onError }: Props) {
   );
 
   const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(sortedReleases[0]?.id ?? null);
-  const [runs, setRuns] = useState<ReleaseRunSummary[]>([]);
+  const [runs, setRuns] = useState<BuildRunSummary[]>([]);
   const [runsLoading, setRunsLoading] = useState(false);
   const [runsError, setRunsError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | ReleaseRunStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | BuildRunStatus>('all');
   const [offset, setOffset] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const [selectedRun, setSelectedRun] = useState<ReleaseRunDetail | null>(null);
+  const [selectedRun, setSelectedRun] = useState<BuildRunDetail | null>(null);
   const [storyStates, setStoryStates] = useState<ReleaseStoryState[]>([]);
   const [storyStatesLoading, setStoryStatesLoading] = useState(false);
   const [runLoading, setRunLoading] = useState(false);
@@ -370,7 +370,7 @@ export function ReleaseRunsPanel({ releases, onError }: Props) {
   const loadRuns = useCallback(
     async (
       releaseId: string,
-      input?: { preferredRunId?: string; nextOffset?: number; nextFilter?: 'all' | ReleaseRunStatus },
+      input?: { preferredRunId?: string; nextOffset?: number; nextFilter?: 'all' | BuildRunStatus },
     ) => {
       setRunsLoading(true);
       setRunsError(null);
@@ -381,10 +381,10 @@ export function ReleaseRunsPanel({ releases, onError }: Props) {
       if (resolvedFilter !== 'all') query.set('status', resolvedFilter);
 
       try {
-        const payload = await fetchJson<ReleaseRunsResponse>(
+        const payload = await fetchJson<BuildRunsResponse>(
           `/api/releases/${releaseId}/runs?${query.toString()}`,
           undefined,
-          'Failed to load release runs',
+          'Failed to load build runs',
         );
         const nextRuns = payload.runs ?? [];
         setRuns(nextRuns);
@@ -417,10 +417,10 @@ export function ReleaseRunsPanel({ releases, onError }: Props) {
       setRunError(null);
 
       try {
-        const payload = await fetchJson<ReleaseRunDetail>(
-          `/api/release-runs/${runId}`,
+        const payload = await fetchJson<BuildRunDetail>(
+          `/api/build-runs/${runId}`,
           undefined,
-          'Failed to load release run detail',
+          'Failed to load build run detail',
         );
         setSelectedRun(payload);
       } catch (err) {
@@ -501,9 +501,9 @@ export function ReleaseRunsPanel({ releases, onError }: Props) {
     setRetryingRunId(selectedRun.id);
     try {
       const result = await fetchJson<RetryRunResponse>(
-        `/api/release-runs/${selectedRun.id}/retry`,
+        `/api/build-runs/${selectedRun.id}/retry`,
         { method: 'POST' },
-        'Failed to retry release run items',
+        'Failed to retry build run items',
       );
       await Promise.all([
         loadRuns(selectedReleaseId, { preferredRunId: result.run_id, nextOffset: 0 }),
@@ -598,7 +598,7 @@ export function ReleaseRunsPanel({ releases, onError }: Props) {
   return (
     <Card className="mb-4 gap-4 py-4">
       <CardHeader className="px-4">
-        <CardTitle className="text-sm">Release Runs</CardTitle>
+        <CardTitle className="text-sm">Build Runs</CardTitle>
         <CardDescription>Build releases and inspect run history, failures, and retries.</CardDescription>
       </CardHeader>
 

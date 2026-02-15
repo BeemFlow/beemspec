@@ -2,7 +2,7 @@ import type { LinearIssueSync } from '@/integrations/linear/types';
 import type { OpenCodeSessions } from '@/integrations/opencode/types';
 import type { createClient } from '@/lib/supabase/server';
 import { processStoryLinearSyncById } from '@/orchestration/release-build/linear-sync-processor';
-import { processReleaseRunById } from '@/orchestration/release-build/run-processor';
+import { processBuildRunById } from '@/orchestration/release-build/run-processor';
 import type {
   OrchestrationJobDispatchResult,
   OrchestrationJobRow,
@@ -18,8 +18,8 @@ export async function enqueueStoryBuildJob(
   supabase: Supabase,
   input: {
     storyMapId: string;
-    releaseRunId: string;
-    releaseId: string;
+    buildRunId: string;
+    releaseId: string | null;
     storyIds: string[];
   },
 ) {
@@ -27,12 +27,12 @@ export async function enqueueStoryBuildJob(
     .from('orchestration_jobs')
     .insert({
       story_map_id: input.storyMapId,
-      release_run_id: input.releaseRunId,
+      build_run_id: input.buildRunId,
       kind: 'story_build',
       status: 'queued',
       payload: {
         release_id: input.releaseId,
-        release_run_id: input.releaseRunId,
+        build_run_id: input.buildRunId,
         story_map_id: input.storyMapId,
         story_ids: input.storyIds,
       },
@@ -153,8 +153,8 @@ export async function dispatchOrchestrationJobById(
   try {
     if (job.kind === 'story_build') {
       const payload = job.payload as StoryBuildJobPayload;
-      await processReleaseRunById(supabase, {
-        runId: payload.release_run_id,
+      await processBuildRunById(supabase, {
+        runId: payload.build_run_id,
         releaseId: payload.release_id,
         storyIds: payload.story_ids,
         openCodeSessions: input.openCodeSessions,

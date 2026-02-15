@@ -40,10 +40,27 @@ export interface OpenCodePluginPort {
 }
 
 export interface OpenCodeSessionCreateInput {
-  releaseId: string;
+  releaseId?: string;
+  runId?: string;
+  storyId?: string;
+  storyTitle?: string;
+  linearIssueId?: string;
+  linearIssueIdentifier?: string;
+  requirements?: string;
+  acceptanceCriteria?: string;
+  technicalGuidelines: string | null;
+  stories?: Array<{
+    storyId: string;
+    storyTitle: string;
+    linearIssueIdentifier?: string | null;
+  }>;
+}
+
+export interface OpenCodeSessionStoryAssignmentInput {
+  sessionId: string;
+  runId: string;
   storyId: string;
   storyTitle: string;
-  linearIssueId: string;
   linearIssueIdentifier: string;
   requirements: string;
   acceptanceCriteria: string;
@@ -60,6 +77,7 @@ export interface OpenCodeSessionSnapshot {
 export interface OpenCodeSessionPort {
   createSession(input: OpenCodeSessionCreateInput): Promise<OpenCodeSessionSnapshot>;
   getSessionById(sessionId: string): Promise<OpenCodeSessionSnapshot | null>;
+  appendStoryAssignment(input: OpenCodeSessionStoryAssignmentInput): Promise<void>;
 }
 
 export interface BeemSpecStoryToolInput {

@@ -68,27 +68,27 @@ Release build orchestration foundation:
 - `POST /api/releases/:id/build`
 - `GET /api/releases/:id/runs` (supports `limit`, `offset`, optional `status`)
 - `GET /api/releases/:id/story-states` (latest run state per story)
-- `GET /api/release-runs/:id`
-- `POST /api/release-runs/:id/retry`
+- `GET /api/build-runs/:id`
+- `POST /api/build-runs/:id/retry`
 - `POST /api/stories/:id/build` (single-story build)
 - `POST /api/stories/:id/sync-linear` (manual per-story Linear sync)
 - `POST /api/orchestration/jobs/dispatch` (durable queue worker dispatch)
 
 Terminology:
 
-- `release_runs` = user-visible build attempts and outcomes
+- `build_runs` = user-visible build attempts and outcomes
 - `orchestration_jobs` = internal durable worker queue records that execute those runs
 
-Story map UI now includes a Release Runs panel for:
+Story map UI now includes a Build Runs panel for:
 
 - selecting a release
 - triggering `Build Release`
 - viewing recent run history and item-level details
 - retrying failed run items
 
-Release run item diagnostics include `retry_count` and `last_retry_at` for retry observability.
+Build run item diagnostics include `retry_count` and `last_retry_at` for retry observability.
 
-Release run items also persist OpenCode session linkage (`opencode_session_id`, `opencode_session_url`) when OpenCode integration is enabled.
+Build run items also persist OpenCode session linkage (`opencode_session_id`, `opencode_session_url`) when OpenCode integration is enabled.
 
 OpenCode runtime session integration uses the official SDK (`@opencode-ai/sdk`) against:
 

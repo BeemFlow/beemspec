@@ -5,7 +5,7 @@
 CREATE TABLE orchestration_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   story_map_id UUID NOT NULL REFERENCES story_maps(id) ON DELETE CASCADE,
-  release_run_id UUID REFERENCES release_runs(id) ON DELETE CASCADE,
+  build_run_id UUID REFERENCES build_runs(id) ON DELETE CASCADE,
   kind TEXT NOT NULL CHECK (kind IN ('story_build', 'story_linear_sync')),
   status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'failed')),
   payload JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -22,9 +22,9 @@ CREATE TABLE orchestration_jobs (
 CREATE INDEX idx_orchestration_jobs_status_available
   ON orchestration_jobs(status, available_at, created_at);
 
-CREATE INDEX idx_orchestration_jobs_release_run
-  ON orchestration_jobs(release_run_id)
-  WHERE release_run_id IS NOT NULL;
+CREATE INDEX idx_orchestration_jobs_build_run
+  ON orchestration_jobs(build_run_id)
+  WHERE build_run_id IS NOT NULL;
 
 ALTER TABLE orchestration_jobs ENABLE ROW LEVEL SECURITY;
 

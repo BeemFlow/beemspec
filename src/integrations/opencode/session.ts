@@ -2,6 +2,7 @@ import { createOpencodeClient } from '@opencode-ai/sdk';
 import type {
   OpenCodeSessionCreateInput,
   OpenCodeSessionSnapshot,
+  OpenCodeSessionStoryAssignmentInput,
   OpenCodeSessions,
 } from '@/integrations/opencode/types';
 
@@ -29,10 +30,69 @@ function toSessionState(status: unknown): OpenCodeSessionSnapshot['state'] {
   return 'active';
 }
 
+function buildSessionTitle(input: OpenCodeSessionCreateInput): string {
+  if (input.storyTitle && input.linearIssueIdentifier) {
+    return `${input.linearIssueIdentifier} ${input.storyTitle}`;
+  }
+  if (input.storyTitle) {
+    return input.storyTitle;
+  }
+  if (input.runId) {
+    return `Build run ${input.runId}`;
+  }
+  return `Release ${input.releaseId}`;
+}
+
 function buildSessionContextPrompt(input: OpenCodeSessionCreateInput): string {
+  const hasStoryContext = Boolean(
+    input.storyId && input.storyTitle && input.linearIssueIdentifier && input.requirements && input.acceptanceCriteria,
+  );
+
+  if (hasStoryContext) {
+    return [
+      '# BeemSpec Story Context',
+      `Release ID: ${input.releaseId ?? 'none'}`,
+      `Story ID: ${input.storyId}`,
+      `Story Title: ${input.storyTitle}`,
+      `Linear Issue: ${input.linearIssueIdentifier}`,
+      '',
+      '## Requirements',
+      input.requirements as string,
+      '',
+      '## Acceptance Criteria',
+      input.acceptanceCriteria as string,
+      '',
+      '## Technical Guidelines',
+      input.technicalGuidelines?.trim() || 'None provided.',
+    ].join('\n');
+  }
+
+  const stories = input.stories ?? [];
+  const storyLines =
+    stories.length > 0
+      ? stories.map(
+          (story) =>
+            `- ${story.storyTitle} (${story.storyId})${story.linearIssueIdentifier ? ` [${story.linearIssueIdentifier}]` : ''}`,
+        )
+      : ['- No stories provided'];
+
   return [
-    '# BeemSpec Story Context',
-    `Release ID: ${input.releaseId}`,
+    '# BeemSpec Build Run Context',
+    `Release ID: ${input.releaseId ?? 'none'}`,
+    `Run ID: ${input.runId ?? 'unknown'}`,
+    '',
+    '## Assigned Stories',
+    ...storyLines,
+    '',
+    '## Technical Guidelines',
+    input.technicalGuidelines?.trim() || 'None provided.',
+  ].join('\n');
+}
+
+function buildStoryAssignmentPrompt(input: OpenCodeSessionStoryAssignmentInput): string {
+  return [
+    '# BeemSpec Story Assignment',
+    `Run ID: ${input.runId}`,
     `Story ID: ${input.storyId}`,
     `Story Title: ${input.storyTitle}`,
     `Linear Issue: ${input.linearIssueIdentifier}`,
@@ -54,7 +114,7 @@ async function createAndSeedSession(
 ): Promise<OpenCodeSessionSnapshot> {
   const created = await client.session.create({
     body: {
-      title: `${input.linearIssueIdentifier} ${input.storyTitle}`,
+      title: buildSessionTitle(input),
     },
   });
 
@@ -105,6 +165,16 @@ export function createOpenCodeSessions(enabled: boolean): OpenCodeSessions | nul
       } catch {
         return null;
       }
+    },
+    async appendStoryAssignment(input: OpenCodeSessionStoryAssignmentInput): Promise<void> {
+      const client = getClient();
+      await client.session.prompt({
+        path: { id: input.sessionId },
+        body: {
+          noReply: true,
+          parts: [{ type: 'text', text: buildStoryAssignmentPrompt(input) }],
+        },
+      });
     },
   };
 }

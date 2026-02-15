@@ -8,7 +8,7 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 
 const RUN_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
-describe('release run detail route', () => {
+describe('build run detail route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
@@ -48,8 +48,8 @@ describe('release run detail route', () => {
     const linksSelect = vi.fn().mockReturnValue({ in: linksIn });
 
     const from = vi.fn((table: string) => {
-      if (table === 'release_runs') return { select: runSelect };
-      if (table === 'release_run_items') return { select: itemsSelect };
+      if (table === 'build_runs') return { select: runSelect };
+      if (table === 'build_run_items') return { select: itemsSelect };
       if (table === 'story_linear_links') return { select: linksSelect };
       return {};
     });
@@ -81,7 +81,7 @@ describe('release run detail route', () => {
     const runEq = vi.fn().mockReturnValue({ single: runSingle });
     const runSelect = vi.fn().mockReturnValue({ eq: runEq });
     const from = vi.fn((table: string) => {
-      if (table === 'release_runs') return { select: runSelect };
+      if (table === 'build_runs') return { select: runSelect };
       return {};
     });
 

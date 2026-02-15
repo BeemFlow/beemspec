@@ -3,19 +3,13 @@ import type { Story } from '@/types';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-type StoryBuildContextFailureReason =
-  | 'story_not_found'
-  | 'story_missing_release'
-  | 'story_task_not_found'
-  | 'story_activity_not_found';
-
-type StoryAssignedToRelease = Story & { release_id: string };
+type StoryBuildContextFailureReason = 'story_not_found' | 'story_task_not_found' | 'story_activity_not_found';
 
 export type StoryBuildContextResult =
   | {
       ok: true;
       data: {
-        story: StoryAssignedToRelease;
+        story: Story;
         storyMapId: string;
       };
     }
@@ -70,14 +64,8 @@ export async function loadStoryBuildContext(supabase: Supabase, storyId: string)
   const context = await loadStoryWithStoryMap(supabase, storyId);
   if (!context.ok) return context;
 
-  const { story, storyMapId } = context.data;
-  if (!story.release_id) return { ok: false, reason: 'story_missing_release' };
-
   return {
     ok: true,
-    data: {
-      story: story as StoryAssignedToRelease,
-      storyMapId,
-    },
+    data: context.data,
   };
 }

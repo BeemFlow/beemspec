@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-import type { ReleaseRunStatus } from '@/orchestration/release-build';
+import type { BuildRunStatus } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 
 function parseLimit(url: string): number {
@@ -21,7 +21,7 @@ function parseOffset(url: string): number {
   return value;
 }
 
-function parseStatus(url: string): ReleaseRunStatus | null {
+function parseStatus(url: string): BuildRunStatus | null {
   const raw = new URL(url).searchParams.get('status');
   if (!raw) return null;
   if (raw === 'queued' || raw === 'running' || raw === 'completed' || raw === 'failed') return raw;
@@ -40,9 +40,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const status = parseStatus(request.url);
   const supabase = await createClient();
   let query = supabase
-    .from('release_runs')
+    .from('build_runs')
     .select(
-      'id, release_id, status, total_items, completed_items, failed_items, error, started_at, finished_at, created_at',
+      'id, release_id, status, total_items, completed_items, failed_items, error, opencode_session_id, opencode_session_url, started_at, finished_at, created_at',
     )
     .eq('release_id', releaseId)
     .order('created_at', { ascending: false })
@@ -53,7 +53,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { data, error } = await query;
 
   if (error) {
-    return serverErrorResponse('Failed to load release runs', error);
+    return serverErrorResponse('Failed to load build runs', error);
   }
 
   return NextResponse.json({

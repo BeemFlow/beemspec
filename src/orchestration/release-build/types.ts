@@ -1,14 +1,14 @@
-export type ReleaseRunStatus = 'queued' | 'running' | 'completed' | 'failed';
+export type BuildRunStatus = 'queued' | 'running' | 'completed' | 'failed';
 
-export type ReleaseRunItemStatus = 'pending' | 'synced' | 'failed';
+export type BuildRunItemStatus = 'pending' | 'synced' | 'failed';
 
 export type OrchestrationJobKind = 'story_build' | 'story_linear_sync';
 
 export type OrchestrationJobStatus = 'queued' | 'running' | 'completed' | 'failed';
 
 export interface StoryBuildJobPayload {
-  release_id: string;
-  release_run_id: string;
+  release_id: string | null;
+  build_run_id: string;
   story_map_id: string;
   story_ids: string[];
 }

@@ -44,7 +44,7 @@ describe('release story states route', () => {
 
     const from = vi.fn((table: string) => {
       if (table === 'stories') return { select: storiesSelect };
-      if (table === 'release_run_items') return { select: itemsSelect };
+      if (table === 'build_run_items') return { select: itemsSelect };
       return {};
     });
 

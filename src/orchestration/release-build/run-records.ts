@@ -1,5 +1,5 @@
 import type { createClient } from '@/lib/supabase/server';
-import type { ReleaseRunStatus } from '@/orchestration/release-build/types';
+import type { BuildRunStatus } from '@/orchestration/release-build/types';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -8,18 +8,18 @@ export function toErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-export async function createReleaseRun(
+export async function createBuildRun(
   supabase: Supabase,
   input: {
-    releaseId: string;
+    releaseId: string | null;
     storyMapId: string;
     userId: string;
     totalItems: number;
-    status: ReleaseRunStatus;
+    status: BuildRunStatus;
   },
 ) {
   return supabase
-    .from('release_runs')
+    .from('build_runs')
     .insert({
       release_id: input.releaseId,
       story_map_id: input.storyMapId,
@@ -34,7 +34,7 @@ export async function createReleaseRun(
     .single();
 }
 
-export async function finishReleaseRun(
+export async function finishBuildRun(
   supabase: Supabase,
   input: {
     runId: string;
@@ -45,7 +45,7 @@ export async function finishReleaseRun(
   },
 ) {
   return supabase
-    .from('release_runs')
+    .from('build_runs')
     .update({
       status: input.status,
       completed_items: input.completedItems,
@@ -56,20 +56,20 @@ export async function finishReleaseRun(
     .eq('id', input.runId);
 }
 
-export async function markReleaseRunRunning(supabase: Supabase, runId: string) {
-  return supabase.from('release_runs').update({ status: 'running', error: null }).eq('id', runId);
+export async function markBuildRunRunning(supabase: Supabase, runId: string) {
+  return supabase.from('build_runs').update({ status: 'running', error: null }).eq('id', runId);
 }
 
-export async function summarizeAndFinishReleaseRun(supabase: Supabase, runId: string) {
+export async function summarizeAndFinishBuildRun(supabase: Supabase, runId: string) {
   const { data: items, error: itemsError } = await supabase
-    .from('release_run_items')
+    .from('build_run_items')
     .select('status')
-    .eq('release_run_id', runId);
-  if (itemsError || !items) throw itemsError ?? new Error('Failed to load release run items');
+    .eq('build_run_id', runId);
+  if (itemsError || !items) throw itemsError ?? new Error('Failed to load build run items');
 
-  const { completed, failed } = summarizeRunItemStatuses(items as Array<{ status: string }>);
+  const { completed, failed } = summarizeBuildRunItemStatuses(items as Array<{ status: string }>);
   const status = failed > 0 ? 'failed' : 'completed';
-  await finishReleaseRun(supabase, {
+  await finishBuildRun(supabase, {
     runId,
     status,
     completedItems: completed,
@@ -80,7 +80,7 @@ export async function summarizeAndFinishReleaseRun(supabase: Supabase, runId: st
   return { status, completed, failed };
 }
 
-export function summarizeRunItemStatuses(items: Array<{ status: string }>) {
+export function summarizeBuildRunItemStatuses(items: Array<{ status: string }>) {
   const completed = items.filter((item) => item.status === 'synced').length;
   const failed = items.filter((item) => item.status === 'failed').length;
   return { completed, failed };
