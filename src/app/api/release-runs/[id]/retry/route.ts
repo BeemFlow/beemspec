@@ -3,6 +3,7 @@ import { domainRuntime } from '@/domains/runtime';
 import { getLinearStorySyncTargetForStoryMap } from '@/integrations/linear/settings';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { syncStoryToLinear } from '@/integrations/linear/story-sync';
+import type { OpenCodeSessionPort } from '@/integrations/opencode/contracts';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
@@ -21,21 +22,30 @@ function summarizeStatuses(items: Array<{ status: string }>) {
 }
 
 async function loadRun(supabase: Supabase, runId: string) {
-  return supabase.from('release_runs').select('id, story_map_id, total_items').eq('id', runId).single();
+  return supabase.from('release_runs').select('id, release_id, story_map_id, total_items').eq('id', runId).single();
 }
 
 async function loadFailedItems(supabase: Supabase, runId: string) {
-  return supabase.from('release_run_items').select('id, story_id').eq('release_run_id', runId).eq('status', 'failed');
+  return supabase
+    .from('release_run_items')
+    .select('id, story_id, retry_count')
+    .eq('release_run_id', runId)
+    .eq('status', 'failed');
 }
 
 async function retryFailedItem(
   supabase: Supabase,
   input: {
-    item: { id: string; story_id: string };
+    item: { id: string; story_id: string; retry_count: number };
+    releaseId: string;
     linearIssueSync: NonNullable<typeof domainRuntime.storyMap.linearIssueSync>;
+    openCodeSessions: OpenCodeSessionPort | null;
     target: { teamId: string; projectId?: string; stateId?: string };
   },
 ): Promise<'synced' | 'failed'> {
+  const retryCount = (input.item.retry_count ?? 0) + 1;
+  const retriedAt = new Date().toISOString();
+
   try {
     const { data: story, error: storyError } = await supabase
       .from('stories')
@@ -61,12 +71,29 @@ async function retryFailedItem(
       lastLinearUpdatedAt: linearIssue.updatedAt,
     });
 
+    const openCodeSession = input.openCodeSessions
+      ? await input.openCodeSessions.createSession({
+          releaseId: input.releaseId,
+          storyId: input.item.story_id,
+          storyTitle: story.title,
+          linearIssueId: linearIssue.id,
+          linearIssueIdentifier: linearIssue.identifier,
+          requirements: story.requirements,
+          acceptanceCriteria: story.acceptance_criteria,
+          technicalGuidelines: story.technical_guidelines,
+        })
+      : null;
+
     await supabase
       .from('release_run_items')
       .update({
         status: 'synced',
         linear_issue_id: linearIssue.id,
+        opencode_session_id: openCodeSession?.id ?? null,
+        opencode_session_url: openCodeSession?.url ?? null,
         error: null,
+        retry_count: retryCount,
+        last_retry_at: retriedAt,
       })
       .eq('id', input.item.id);
 
@@ -77,6 +104,8 @@ async function retryFailedItem(
       .update({
         status: 'failed',
         error: toErrorMessage(error),
+        retry_count: retryCount,
+        last_retry_at: retriedAt,
       })
       .eq('id', input.item.id);
     return 'failed';
@@ -132,6 +161,7 @@ async function retryReleaseRunById(
   input: {
     runId: string;
     linearIssueSync: NonNullable<typeof domainRuntime.storyMap.linearIssueSync>;
+    openCodeSessions: OpenCodeSessionPort | null;
   },
 ) {
   const { data: run, error: runError } = await loadRun(supabase, input.runId);
@@ -166,7 +196,9 @@ async function retryReleaseRunById(
   for (const item of failedItems) {
     const result = await retryFailedItem(supabase, {
       item,
+      releaseId: run.release_id,
       linearIssueSync: input.linearIssueSync,
+      openCodeSessions: input.openCodeSessions,
       target,
     });
     if (result === 'synced') retriedSucceeded += 1;
@@ -196,6 +228,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
 
   const linearIssueSync = domainRuntime.storyMap.linearIssueSync;
   if (!linearIssueSync) return NextResponse.json({ error: 'Linear integration is not enabled' }, { status: 503 });
+  const openCodeSessions = domainRuntime.storyMap.openCodeSessions;
 
   const { id: runId } = await params;
   if (!isValidUuid(runId)) return invalidIdResponse();
@@ -204,5 +237,6 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
   return retryReleaseRunById(supabase, {
     runId,
     linearIssueSync,
+    openCodeSessions,
   });
 }

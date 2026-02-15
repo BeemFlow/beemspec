@@ -93,6 +93,7 @@ This document captures the minimum official integration contract for BeemSpec Ph
 ### Packaging and load model
 
 - Plugin package target: `packages/opencode-beemspec`.
+- Current repo includes scaffold contracts/factory under `packages/opencode-beemspec/src`.
 - Local plugin paths:
   - project: `.opencode/plugins/`
   - global: `~/.config/opencode/plugins/`

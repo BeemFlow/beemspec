@@ -3,9 +3,11 @@ import { domainRuntime } from '@/domains/runtime';
 import { getLinearStorySyncTargetForStoryMap } from '@/integrations/linear/settings';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { syncStoryToLinear } from '@/integrations/linear/story-sync';
+import type { OpenCodeSessionPort } from '@/integrations/opencode/contracts';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
+import type { Story } from '@/types';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -25,7 +27,7 @@ async function loadReleaseStories(supabase: Supabase, releaseId: string) {
     .select('*')
     .eq('release_id', releaseId)
     .order('sort_order', { ascending: true });
-  return { data: data ?? [], error };
+  return { data: (data ?? []) as Story[], error };
 }
 
 async function createReleaseRun(
@@ -80,23 +82,21 @@ async function finishRun(
 async function processRunItems(
   supabase: Supabase,
   runId: string,
-  stories: Record<string, unknown>[],
+  releaseId: string,
+  stories: Story[],
   linearIssueSync: NonNullable<typeof domainRuntime.storyMap.linearIssueSync>,
+  openCodeSessions: OpenCodeSessionPort | null,
   target: { teamId: string; projectId?: string; stateId?: string },
 ) {
   let completedItems = 0;
   let failedItems = 0;
 
   for (const story of stories) {
+    const storyId = story.id;
+
     try {
-      const storyId = story.id as string;
       const existingLink = await getStoryLinearLink(supabase, storyId);
-      const linearIssue = await syncStoryToLinear(
-        story as never,
-        linearIssueSync,
-        existingLink?.linearIssueId ?? null,
-        target,
-      );
+      const linearIssue = await syncStoryToLinear(story, linearIssueSync, existingLink?.linearIssueId ?? null, target);
       if (!linearIssue) throw new Error('Linear sync returned no issue snapshot');
 
       await upsertStoryLinearLink(supabase, {
@@ -107,10 +107,25 @@ async function processRunItems(
         lastLinearUpdatedAt: linearIssue.updatedAt,
       });
 
+      const openCodeSession = openCodeSessions
+        ? await openCodeSessions.createSession({
+            releaseId,
+            storyId,
+            storyTitle: story.title,
+            linearIssueId: linearIssue.id,
+            linearIssueIdentifier: linearIssue.identifier,
+            requirements: story.requirements,
+            acceptanceCriteria: story.acceptance_criteria,
+            technicalGuidelines: story.technical_guidelines,
+          })
+        : null;
+
       await supabase.from('release_run_items').insert({
         release_run_id: runId,
         story_id: storyId,
         linear_issue_id: linearIssue.id,
+        opencode_session_id: openCodeSession?.id ?? null,
+        opencode_session_url: openCodeSession?.url ?? null,
         status: 'synced',
       });
 
@@ -119,7 +134,7 @@ async function processRunItems(
       failedItems += 1;
       await supabase.from('release_run_items').insert({
         release_run_id: runId,
-        story_id: story.id as string,
+        story_id: storyId,
         status: 'failed',
         error: toErrorMessage(error),
       });
@@ -135,6 +150,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
 
   const linearIssueSync = domainRuntime.storyMap.linearIssueSync;
   if (!linearIssueSync) return NextResponse.json({ error: 'Linear integration is not enabled' }, { status: 503 });
+  const openCodeSessions = domainRuntime.storyMap.openCodeSessions;
 
   const { id: releaseId } = await params;
   if (!isValidUuid(releaseId)) return invalidIdResponse();
@@ -181,7 +197,15 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     );
   }
 
-  const { completedItems, failedItems } = await processRunItems(supabase, run.id, stories, linearIssueSync, target);
+  const { completedItems, failedItems } = await processRunItems(
+    supabase,
+    run.id,
+    releaseId,
+    stories,
+    linearIssueSync,
+    openCodeSessions,
+    target,
+  );
   const finalStatus = failedItems > 0 ? 'failed' : 'completed';
 
   const { error: runUpdateError } = await finishRun(supabase, run.id, {

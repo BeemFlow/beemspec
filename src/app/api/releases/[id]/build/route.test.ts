@@ -83,6 +83,7 @@ describe('release build route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
+    domainRuntime.storyMap.openCodeSessions = null;
   });
 
   it('creates completed run when all release stories sync', async () => {
@@ -132,12 +133,27 @@ describe('release build route', () => {
       createIssue,
       updateIssue: vi.fn(),
     };
+    domainRuntime.storyMap.openCodeSessions = {
+      createSession: vi.fn().mockResolvedValue({
+        id: 'session_1',
+        url: 'https://opencode.ai/sessions/session_1',
+        state: 'active',
+        createdAt: '2026-02-14T11:01:00.000Z',
+      }),
+      getSessionById: vi.fn(),
+    };
 
     const response = await POST(new Request('http://localhost/api/test', { method: 'POST' }), {
       params: Promise.resolve({ id: RELEASE_ID }),
     });
 
     expect(runItemsInsert).toHaveBeenCalledTimes(2);
+    expect(runItemsInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        opencode_session_id: 'session_1',
+        opencode_session_url: 'https://opencode.ai/sessions/session_1',
+      }),
+    );
     expect(runUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'completed',

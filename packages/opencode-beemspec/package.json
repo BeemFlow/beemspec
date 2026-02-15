@@ -1,0 +1,14 @@
+{
+  "name": "opencode-beemspec",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BeemSpec OpenCode plugin hooks and tools",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "zod": "^4.3.3"
+  }
+}

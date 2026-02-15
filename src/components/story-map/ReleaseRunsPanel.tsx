@@ -1,0 +1,509 @@
+'use client';
+
+import { Loader2, RefreshCcw, Rocket, RotateCcw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { errorMessage } from '@/lib/errors';
+import { fetchJson } from '@/lib/http';
+import type { Release } from '@/types';
+
+type ReleaseRunStatus = 'queued' | 'running' | 'completed' | 'failed';
+
+interface ReleaseRunSummary {
+  id: string;
+  release_id: string;
+  status: ReleaseRunStatus;
+  total_items: number;
+  completed_items: number;
+  failed_items: number;
+  error: string | null;
+  started_at: string;
+  finished_at: string | null;
+  created_at: string;
+}
+
+interface ReleaseRunItem {
+  id: string;
+  story_id: string;
+  linear_issue_id: string | null;
+  opencode_session_id: string | null;
+  opencode_session_url: string | null;
+  status: 'pending' | 'synced' | 'failed';
+  error: string | null;
+  retry_count: number;
+  last_retry_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ReleaseRunDetail extends ReleaseRunSummary {
+  items: ReleaseRunItem[];
+}
+
+interface ReleaseRunsResponse {
+  limit: number;
+  offset: number;
+  next_offset: number | null;
+  runs: ReleaseRunSummary[];
+}
+
+interface BuildReleaseResponse {
+  run_id: string;
+}
+
+interface RetryRunResponse {
+  run_id: string;
+}
+
+interface Props {
+  releases: Release[];
+  onError: (message: string) => void;
+}
+
+function RecentRunsSection({
+  runs,
+  runsLoading,
+  runsError,
+  selectedRunId,
+  onSelectRun,
+}: {
+  runs: ReleaseRunSummary[];
+  runsLoading: boolean;
+  runsError: string | null;
+  selectedRunId: string | null;
+  onSelectRun: (runId: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="text-xs font-medium text-muted-foreground">Recent runs</div>
+      {runsLoading && <p className="text-sm text-muted-foreground">Loading runs...</p>}
+      {!runsLoading && runsError && <p className="text-sm text-destructive">{runsError}</p>}
+      {!runsLoading && !runsError && runs.length === 0 && (
+        <p className="text-sm text-muted-foreground">No runs yet for this release.</p>
+      )}
+      {!runsLoading &&
+        !runsError &&
+        runs.map((run) => {
+          const isSelected = run.id === selectedRunId;
+
+          return (
+            <button
+              type="button"
+              key={run.id}
+              className={`w-full rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted/60'
+              }`}
+              onClick={() => onSelectRun(run.id)}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-medium">Run {shortId(run.id)}</div>
+                <Badge variant={statusBadgeVariant(run.status)}>{run.status}</Badge>
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {run.completed_items}/{run.total_items} synced, {run.failed_items} failed, started{' '}
+                {formatTime(run.started_at)}
+              </div>
+            </button>
+          );
+        })}
+    </div>
+  );
+}
+
+function RunStatusFilters({
+  value,
+  onChange,
+}: {
+  value: 'all' | ReleaseRunStatus;
+  onChange: (next: 'all' | ReleaseRunStatus) => void;
+}) {
+  const options: Array<'all' | ReleaseRunStatus> = ['all', 'running', 'failed', 'completed'];
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {options.map((option) => (
+        <Button
+          key={option}
+          size="sm"
+          variant={option === value ? 'default' : 'outline'}
+          onClick={() => onChange(option)}
+        >
+          {option}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+function RunDetailSection({
+  selectedRun,
+  runLoading,
+  runError,
+  retryingRunId,
+  onRetry,
+}: {
+  selectedRun: ReleaseRunDetail | null;
+  runLoading: boolean;
+  runError: string | null;
+  retryingRunId: string | null;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-medium text-muted-foreground">Run detail</div>
+        {selectedRun && selectedRun.failed_items > 0 && (
+          <Button size="sm" variant="outline" onClick={onRetry} disabled={retryingRunId === selectedRun.id}>
+            {retryingRunId === selectedRun.id ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RotateCcw className="mr-2 h-4 w-4" />
+            )}
+            Retry failed
+          </Button>
+        )}
+      </div>
+
+      {runLoading && <p className="text-sm text-muted-foreground">Loading run detail...</p>}
+      {!runLoading && runError && <p className="text-sm text-destructive">{runError}</p>}
+      {!runLoading && !runError && !selectedRun && (
+        <p className="text-sm text-muted-foreground">Select a run to inspect item-level results.</p>
+      )}
+
+      {!runLoading && !runError && selectedRun && (
+        <div className="space-y-2 rounded-md border p-3">
+          <div className="flex items-center gap-2">
+            <Badge variant={statusBadgeVariant(selectedRun.status)}>{selectedRun.status}</Badge>
+            <span className="text-xs text-muted-foreground">Finished {formatTime(selectedRun.finished_at)}</span>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {selectedRun.completed_items}/{selectedRun.total_items} synced, {selectedRun.failed_items} failed
+          </div>
+          {selectedRun.error && <div className="text-xs text-destructive">{selectedRun.error}</div>}
+
+          <div className="max-h-56 space-y-1 overflow-auto pr-1">
+            {selectedRun.items.map((item) => (
+              <div key={item.id} className="rounded border px-2 py-1 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <code className="text-[11px] text-muted-foreground">story {shortId(item.story_id)}</code>
+                  <Badge variant={itemBadgeVariant(item.status)}>{item.status}</Badge>
+                </div>
+                {item.opencode_session_url && (
+                  <a
+                    className="mt-1 block text-[11px] text-primary underline-offset-2 hover:underline"
+                    href={item.opencode_session_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    OpenCode session {shortId(item.opencode_session_id ?? '')}
+                  </a>
+                )}
+                {item.retry_count > 0 && (
+                  <div className="mt-1 text-[11px] text-muted-foreground">
+                    retries {item.retry_count}, last {formatTime(item.last_retry_at)}
+                  </div>
+                )}
+                {item.error && <div className="mt-1 text-destructive">{item.error}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function statusBadgeVariant(status: ReleaseRunStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
+  switch (status) {
+    case 'completed':
+      return 'secondary';
+    case 'failed':
+      return 'destructive';
+    case 'queued':
+    case 'running':
+      return 'outline';
+    default:
+      return 'outline';
+  }
+}
+
+function itemBadgeVariant(status: ReleaseRunItem['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
+  if (status === 'failed') return 'destructive';
+  if (status === 'synced') return 'secondary';
+  return 'outline';
+}
+
+function formatTime(value: string | null): string {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(parsed);
+}
+
+function shortId(value: string): string {
+  return value.slice(0, 8);
+}
+
+export function ReleaseRunsPanel({ releases, onError }: Props) {
+  const pageSize = 20;
+  const sortedReleases = useMemo(
+    () => [...releases].sort((left, right) => left.sort_order - right.sort_order),
+    [releases],
+  );
+
+  const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(sortedReleases[0]?.id ?? null);
+  const [runs, setRuns] = useState<ReleaseRunSummary[]>([]);
+  const [runsLoading, setRunsLoading] = useState(false);
+  const [runsError, setRunsError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | ReleaseRunStatus>('all');
+  const [offset, setOffset] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedRun, setSelectedRun] = useState<ReleaseRunDetail | null>(null);
+  const [runLoading, setRunLoading] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [buildingReleaseId, setBuildingReleaseId] = useState<string | null>(null);
+  const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (sortedReleases.length === 0) {
+      setSelectedReleaseId(null);
+      return;
+    }
+
+    if (!selectedReleaseId || !sortedReleases.some((release) => release.id === selectedReleaseId)) {
+      setSelectedReleaseId(sortedReleases[0].id);
+    }
+  }, [sortedReleases, selectedReleaseId]);
+
+  const loadRuns = useCallback(
+    async (
+      releaseId: string,
+      input?: { preferredRunId?: string; nextOffset?: number; nextFilter?: 'all' | ReleaseRunStatus },
+    ) => {
+      setRunsLoading(true);
+      setRunsError(null);
+
+      const resolvedOffset = input?.nextOffset ?? offset;
+      const resolvedFilter = input?.nextFilter ?? statusFilter;
+      const query = new URLSearchParams({ limit: String(pageSize), offset: String(resolvedOffset) });
+      if (resolvedFilter !== 'all') query.set('status', resolvedFilter);
+
+      try {
+        const payload = await fetchJson<ReleaseRunsResponse>(
+          `/api/releases/${releaseId}/runs?${query.toString()}`,
+          undefined,
+          'Failed to load release runs',
+        );
+        const nextRuns = payload.runs ?? [];
+        setRuns(nextRuns);
+        setOffset(payload.offset ?? resolvedOffset);
+        setHasNextPage(payload.next_offset !== null);
+
+        setSelectedRunId((current) => {
+          if (input?.preferredRunId && nextRuns.some((run) => run.id === input.preferredRunId)) {
+            return input.preferredRunId;
+          }
+          if (current && nextRuns.some((run) => run.id === current)) {
+            return current;
+          }
+          return nextRuns[0]?.id ?? null;
+        });
+      } catch (err) {
+        const message = errorMessage(err);
+        setRunsError(message);
+        onError(message);
+      } finally {
+        setRunsLoading(false);
+      }
+    },
+    [offset, onError, statusFilter],
+  );
+
+  const loadRunDetail = useCallback(
+    async (runId: string) => {
+      setRunLoading(true);
+      setRunError(null);
+
+      try {
+        const payload = await fetchJson<ReleaseRunDetail>(
+          `/api/release-runs/${runId}`,
+          undefined,
+          'Failed to load release run detail',
+        );
+        setSelectedRun(payload);
+      } catch (err) {
+        const message = errorMessage(err);
+        setRunError(message);
+        onError(message);
+      } finally {
+        setRunLoading(false);
+      }
+    },
+    [onError],
+  );
+
+  useEffect(() => {
+    if (!selectedReleaseId) {
+      setRuns([]);
+      setSelectedRunId(null);
+      setSelectedRun(null);
+      return;
+    }
+
+    setOffset(0);
+    void loadRuns(selectedReleaseId, { nextOffset: 0, nextFilter: statusFilter });
+  }, [selectedReleaseId, statusFilter, loadRuns]);
+
+  useEffect(() => {
+    if (!selectedRunId) {
+      setSelectedRun(null);
+      setRunError(null);
+      return;
+    }
+
+    void loadRunDetail(selectedRunId);
+  }, [selectedRunId, loadRunDetail]);
+
+  const handleBuildRelease = useCallback(async () => {
+    if (!selectedReleaseId) return;
+
+    setBuildingReleaseId(selectedReleaseId);
+    try {
+      const result = await fetchJson<BuildReleaseResponse>(
+        `/api/releases/${selectedReleaseId}/build`,
+        { method: 'POST' },
+        'Failed to build release',
+      );
+      await loadRuns(selectedReleaseId, { preferredRunId: result.run_id, nextOffset: 0 });
+    } catch (err) {
+      onError(errorMessage(err));
+      await loadRuns(selectedReleaseId, { nextOffset: 0 });
+    } finally {
+      setBuildingReleaseId(null);
+    }
+  }, [loadRuns, onError, selectedReleaseId]);
+
+  const handleRetryFailedItems = useCallback(async () => {
+    if (!selectedRun || !selectedReleaseId) return;
+
+    setRetryingRunId(selectedRun.id);
+    try {
+      const result = await fetchJson<RetryRunResponse>(
+        `/api/release-runs/${selectedRun.id}/retry`,
+        { method: 'POST' },
+        'Failed to retry release run items',
+      );
+      await Promise.all([
+        loadRuns(selectedReleaseId, { preferredRunId: result.run_id, nextOffset: 0 }),
+        loadRunDetail(result.run_id),
+      ]);
+    } catch (err) {
+      onError(errorMessage(err));
+    } finally {
+      setRetryingRunId(null);
+    }
+  }, [loadRunDetail, loadRuns, onError, selectedReleaseId, selectedRun]);
+
+  if (sortedReleases.length === 0) return null;
+
+  return (
+    <Card className="mb-4 gap-4 py-4">
+      <CardHeader className="px-4">
+        <CardTitle className="text-sm">Release Runs</CardTitle>
+        <CardDescription>Build releases and inspect run history, failures, and retries.</CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-3 px-4">
+        <div className="flex flex-wrap gap-2">
+          {sortedReleases.map((release) => {
+            const isSelected = release.id === selectedReleaseId;
+            return (
+              <Button
+                key={release.id}
+                size="sm"
+                variant={isSelected ? 'default' : 'outline'}
+                onClick={() => setSelectedReleaseId(release.id)}
+              >
+                {release.name}
+              </Button>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            onClick={handleBuildRelease}
+            disabled={!selectedReleaseId || buildingReleaseId === selectedReleaseId}
+          >
+            {buildingReleaseId === selectedReleaseId ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Rocket className="mr-2 h-4 w-4" />
+            )}
+            Build Release
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => selectedReleaseId && void loadRuns(selectedReleaseId, { nextOffset: offset })}
+            disabled={!selectedReleaseId || runsLoading}
+          >
+            <RefreshCcw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <RunStatusFilters value={statusFilter} onChange={setStatusFilter} />
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={offset === 0 || runsLoading || !selectedReleaseId}
+              onClick={() =>
+                selectedReleaseId && void loadRuns(selectedReleaseId, { nextOffset: Math.max(offset - pageSize, 0) })
+              }
+            >
+              Previous
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!hasNextPage || runsLoading || !selectedReleaseId}
+              onClick={() => selectedReleaseId && void loadRuns(selectedReleaseId, { nextOffset: offset + pageSize })}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          <RecentRunsSection
+            runs={runs}
+            runsLoading={runsLoading}
+            runsError={runsError}
+            selectedRunId={selectedRunId}
+            onSelectRun={setSelectedRunId}
+          />
+          <RunDetailSection
+            selectedRun={selectedRun}
+            runLoading={runLoading}
+            runError={runError}
+            retryingRunId={retryingRunId}
+            onRetry={handleRetryFailedItems}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

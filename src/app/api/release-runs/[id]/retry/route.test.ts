@@ -13,6 +13,7 @@ function createRetryClient() {
   const runSingle = vi.fn().mockResolvedValue({
     data: {
       id: RUN_ID,
+      release_id: 'release_1',
       story_map_id: 'story_map_1',
       total_items: 2,
     },
@@ -103,6 +104,7 @@ describe('release run retry route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
+    domainRuntime.storyMap.openCodeSessions = null;
   });
 
   it('retries failed items and finalizes run status', async () => {
@@ -121,12 +123,27 @@ describe('release run retry route', () => {
       }),
       updateIssue: vi.fn(),
     };
+    domainRuntime.storyMap.openCodeSessions = {
+      createSession: vi.fn().mockResolvedValue({
+        id: 'session_1',
+        url: 'https://opencode.ai/sessions/session_1',
+        state: 'active',
+        createdAt: '2026-02-14T11:01:00.000Z',
+      }),
+      getSessionById: vi.fn(),
+    };
 
     const response = await POST(new Request('http://localhost/api/test', { method: 'POST' }), {
       params: Promise.resolve({ id: RUN_ID }),
     });
 
     expect(runItemsUpdate).toHaveBeenCalled();
+    expect(runItemsUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        opencode_session_id: 'session_1',
+        opencode_session_url: 'https://opencode.ai/sessions/session_1',
+      }),
+    );
     expect(runUpdate).toHaveBeenLastCalledWith(
       expect.objectContaining({
         status: 'completed',

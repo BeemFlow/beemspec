@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { use, useCallback, useEffect, useState } from 'react';
 import { ActivityDialog } from '@/components/story-map/ActivityDialog';
+import { ReleaseRunsPanel } from '@/components/story-map/ReleaseRunsPanel';
 import { StoryDialog } from '@/components/story-map/StoryDialog';
 import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas';
 import { TaskDialog } from '@/components/story-map/TaskDialog';
@@ -373,6 +374,10 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
           </Button>
         </div>
       )}
+
+      <div className="px-4 pt-4">
+        <ReleaseRunsPanel releases={storyMap.releases} onError={setUiError} />
+      </div>
 
       <ScrollArea className="flex-1">
         <div className="p-4">

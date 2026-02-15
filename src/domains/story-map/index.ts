@@ -4,8 +4,9 @@ import { integrationFlags } from '@/integrations/flags';
 import type { LinearIssueSyncPort, LinearWebhookIngestPort } from '@/integrations/linear/contracts';
 import { createLinearIssueSyncPort } from '@/integrations/linear/issue-sync';
 import { createLinearWebhookIngestStub } from '@/integrations/linear/stub';
-import type { OpenCodePluginPort } from '@/integrations/opencode/contracts';
-import { createOpenCodePluginStub } from '@/integrations/opencode/stub';
+import { createOpenCodePluginAdapter } from '@/integrations/opencode/adapter';
+import type { OpenCodePluginPort, OpenCodeSessionPort } from '@/integrations/opencode/contracts';
+import { createOpenCodeSessionStub } from '@/integrations/opencode/stub';
 import type { ReleaseRunnerPort } from '@/orchestration/release-runner/contracts';
 import { createReleaseRunnerStub } from '@/orchestration/release-runner/stub';
 
@@ -14,6 +15,7 @@ export interface StoryMapDomainPorts {
   linearIssueSync: LinearIssueSyncPort | null;
   linearWebhookIngest: LinearWebhookIngestPort | null;
   openCode: OpenCodePluginPort | null;
+  openCodeSessions: OpenCodeSessionPort | null;
   releaseRunner: ReleaseRunnerPort | null;
 }
 
@@ -22,7 +24,8 @@ export function createStoryMapDomainPorts(overrides: Partial<StoryMapDomainPorts
     auth: authDomainPort,
     linearIssueSync: createLinearIssueSyncPort(integrationFlags.linear),
     linearWebhookIngest: createLinearWebhookIngestStub(integrationFlags.linear),
-    openCode: createOpenCodePluginStub(integrationFlags.opencode),
+    openCode: createOpenCodePluginAdapter(integrationFlags.opencode),
+    openCodeSessions: createOpenCodeSessionStub(integrationFlags.opencode),
     releaseRunner: createReleaseRunnerStub(integrationFlags.releaseRunner),
     ...overrides,
   };

@@ -15,11 +15,11 @@ describe('release runs history route', () => {
   });
 
   it('returns release run history for release', async () => {
-    const limit = vi.fn().mockResolvedValue({
+    const range = vi.fn().mockResolvedValue({
       data: [{ id: 'run_1', release_id: RELEASE_ID, status: 'completed' }],
       error: null,
     });
-    const order = vi.fn().mockReturnValue({ limit });
+    const order = vi.fn().mockReturnValue({ range });
     const eq = vi.fn().mockReturnValue({ order });
     const select = vi.fn().mockReturnValue({ eq });
     const from = vi.fn().mockReturnValue({ select });
@@ -30,7 +30,32 @@ describe('release runs history route', () => {
       params: Promise.resolve({ id: RELEASE_ID }),
     });
 
-    expect(limit).toHaveBeenCalledWith(10);
-    await expect(response.json()).resolves.toMatchObject({ count: 1 });
+    expect(range).toHaveBeenCalledWith(0, 9);
+    await expect(response.json()).resolves.toMatchObject({ count: 1, limit: 10, offset: 0, next_offset: null });
+  });
+
+  it('applies status filter and offset pagination', async () => {
+    const eqStatus = vi.fn().mockResolvedValue({
+      data: [{ id: 'run_2', release_id: RELEASE_ID, status: 'failed' }],
+      error: null,
+    });
+    const range = vi.fn().mockReturnValue({ eq: eqStatus });
+    const order = vi.fn().mockReturnValue({ range });
+    const eqRelease = vi.fn().mockReturnValue({ order });
+    const select = vi.fn().mockReturnValue({ eq: eqRelease });
+    const from = vi.fn().mockReturnValue({ select });
+
+    vi.mocked(createClient).mockResolvedValue({ from } as never);
+
+    const response = await GET(
+      new Request(`http://localhost/api/releases/${RELEASE_ID}/runs?limit=5&offset=5&status=failed`),
+      {
+        params: Promise.resolve({ id: RELEASE_ID }),
+      },
+    );
+
+    expect(range).toHaveBeenCalledWith(5, 9);
+    expect(eqStatus).toHaveBeenCalledWith('status', 'failed');
+    await expect(response.json()).resolves.toMatchObject({ count: 1, limit: 5, offset: 5 });
   });
 });

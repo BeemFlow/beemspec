@@ -27,7 +27,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
   const { data: items, error: itemsError } = await supabase
     .from('release_run_items')
-    .select('id, story_id, linear_issue_id, status, error, created_at, updated_at')
+    .select(
+      'id, story_id, linear_issue_id, opencode_session_id, opencode_session_url, status, error, retry_count, last_retry_at, created_at, updated_at',
+    )
     .eq('release_run_id', runId)
     .order('created_at', { ascending: true });
 

@@ -68,9 +68,22 @@ Helper script for local cron:
 Release build orchestration foundation:
 
 - `POST /api/releases/:id/build`
-- `GET /api/releases/:id/runs`
+- `GET /api/releases/:id/runs` (supports `limit`, `offset`, optional `status`)
 - `GET /api/release-runs/:id`
 - `POST /api/release-runs/:id/retry`
+
+Story map UI now includes a Release Runs panel for:
+
+- selecting a release
+- triggering `Build Release`
+- viewing recent run history and item-level details
+- retrying failed run items
+
+Release run item diagnostics include `retry_count` and `last_retry_at` for retry observability.
+
+Release run items also persist OpenCode session linkage (`opencode_session_id`, `opencode_session_url`) when OpenCode integration is enabled.
+
+OpenCode plugin package scaffold now exists at `packages/opencode-beemspec` with contract-first hook/tool interfaces.
 
 Inbound webhook sync requires a webhook signing secret:
 

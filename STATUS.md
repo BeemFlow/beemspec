@@ -98,6 +98,37 @@ Completed so far:
 - Added release run retry endpoint for failed items:
   - `POST /api/release-runs/:id/retry`
 - Route creates run + run items, syncs release stories to Linear, and finalizes run with deterministic status counts.
+- Added story-map UI release-runs panel with release-scoped run history + detail drill-in:
+  - uses `GET /api/releases/:id/runs`
+  - uses `GET /api/release-runs/:id`
+- Added in-UI release build trigger and failed-item retry controls:
+  - uses `POST /api/releases/:id/build`
+  - uses `POST /api/release-runs/:id/retry`
+- Added retry diagnostics fields for release run items:
+  - migration: `supabase/migrations/005_release_run_retry_metadata.sql`
+  - fields: `retry_count`, `last_retry_at`
+- Added OpenCode session linkage for release run items:
+  - migration: `supabase/migrations/006_release_run_session_linkage.sql`
+  - fields: `opencode_session_id`, `opencode_session_url`
+- Build/retry orchestration now starts OpenCode sessions when `BEEMSPEC_ENABLE_OPENCODE` is enabled:
+  - session linkage persisted into `release_run_items`
+- Release-runs history API now supports status filter and offset pagination:
+  - `GET /api/releases/:id/runs?limit=20&offset=0&status=failed`
+- Story-map release-runs panel now supports status filters and next/previous pagination.
+
+### Phase 5 - `opencode-beemspec` Plugin Package
+
+Status: Started (scaffold slice).
+
+Completed so far:
+
+- Added package scaffold at `packages/opencode-beemspec`.
+- Added contract surface for hooks/events/tools:
+  - `experimental.session.compacting`
+  - `experimental.chat.system.transform`
+  - `session.created | session.updated | session.idle | session.error`
+  - `beemspec_story` and `beemspec_blocked`
+- Added plugin factory shell (`createBeemSpecPlugin`) to wire host callbacks.
 
 Tests added:
 
@@ -112,6 +143,6 @@ Tests added:
 
 ## Next Steps (Ordered)
 
-1. Add release-run list view in UI using `GET /api/releases/:id/runs` and drill-in with `GET /api/release-runs/:id`.
-2. Add item-level retry metadata (`retry_count`, `last_retry_at`) if observed failures need deeper diagnostics.
-3. Hook scheduled cron on main machine to `scripts/reconcile-linear-batch.sh` and monitor error rates.
+1. Hook scheduled cron on main machine to `scripts/reconcile-linear-batch.sh` and monitor error rates.
+2. Wire `packages/opencode-beemspec` into real OpenCode runtime config and publish/install flow.
+3. Add run-detail API test coverage for session-link and retry metadata fields.
