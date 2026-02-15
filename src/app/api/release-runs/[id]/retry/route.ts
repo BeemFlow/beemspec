@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import { domainRuntime } from '@/domains/runtime';
 import { getLinearStorySyncTargetForStoryMap } from '@/integrations/linear/settings';
-import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import { syncStoryToLinear } from '@/integrations/linear/story-sync';
 import type { OpenCodeSessionPort } from '@/integrations/opencode/contracts';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
+import { syncStoryRunItem } from '@/orchestration/release-runner/story-item';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -54,43 +53,22 @@ async function retryFailedItem(
       .single();
     if (storyError || !story) throw storyError ?? new Error('Story not found');
 
-    const existingLink = await getStoryLinearLink(supabase, input.item.story_id);
-    const linearIssue = await syncStoryToLinear(
+    const { linearIssue, session } = await syncStoryRunItem({
+      supabase,
       story,
-      input.linearIssueSync,
-      existingLink?.linearIssueId ?? null,
-      input.target,
-    );
-    if (!linearIssue) throw new Error('Linear sync returned no issue snapshot');
-
-    await upsertStoryLinearLink(supabase, {
-      storyId: input.item.story_id,
-      linearIssueId: linearIssue.id,
-      linearIssueIdentifier: linearIssue.identifier,
-      lastLocalUpdatedAt: story.updated_at ?? null,
-      lastLinearUpdatedAt: linearIssue.updatedAt,
+      releaseId: input.releaseId,
+      linearIssueSync: input.linearIssueSync,
+      openCodeSessions: input.openCodeSessions,
+      target: input.target,
     });
-
-    const openCodeSession = input.openCodeSessions
-      ? await input.openCodeSessions.createSession({
-          releaseId: input.releaseId,
-          storyId: input.item.story_id,
-          storyTitle: story.title,
-          linearIssueId: linearIssue.id,
-          linearIssueIdentifier: linearIssue.identifier,
-          requirements: story.requirements,
-          acceptanceCriteria: story.acceptance_criteria,
-          technicalGuidelines: story.technical_guidelines,
-        })
-      : null;
 
     await supabase
       .from('release_run_items')
       .update({
         status: 'synced',
         linear_issue_id: linearIssue.id,
-        opencode_session_id: openCodeSession?.id ?? null,
-        opencode_session_url: openCodeSession?.url ?? null,
+        opencode_session_id: session?.id ?? null,
+        opencode_session_url: session?.url ?? null,
         error: null,
         retry_count: retryCount,
         last_retry_at: retriedAt,

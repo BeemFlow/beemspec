@@ -27,8 +27,12 @@ CREATE TABLE release_run_items (
   release_run_id UUID NOT NULL REFERENCES release_runs(id) ON DELETE CASCADE,
   story_id UUID NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
   linear_issue_id TEXT,
+  opencode_session_id TEXT,
+  opencode_session_url TEXT,
   status TEXT NOT NULL CHECK (status IN ('pending', 'synced', 'failed')),
   error TEXT,
+  retry_count INTEGER NOT NULL DEFAULT 0 CHECK (retry_count >= 0),
+  last_retry_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (release_run_id, story_id)
@@ -37,6 +41,8 @@ CREATE TABLE release_run_items (
 CREATE INDEX idx_release_run_items_run ON release_run_items(release_run_id);
 CREATE INDEX idx_release_run_items_story ON release_run_items(story_id);
 CREATE INDEX idx_release_run_items_status ON release_run_items(status);
+CREATE INDEX idx_release_run_items_opencode_session_id ON release_run_items(opencode_session_id)
+  WHERE opencode_session_id IS NOT NULL;
 
 ALTER TABLE release_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE release_run_items ENABLE ROW LEVEL SECURITY;

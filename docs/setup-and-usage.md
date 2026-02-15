@@ -35,10 +35,9 @@ Optional batch reconcile auth:
 
 ## 3) Database migrations
 
-Apply all migrations in `supabase/migrations`, including:
+Apply all migrations in `supabase/migrations`.
 
-- `005_release_run_retry_metadata.sql`
-- `006_release_run_session_linkage.sql`
+Note: release-run retry/session metadata is now consolidated directly in `004_release_runs.sql`.
 
 ## 4) Configure team integration
 

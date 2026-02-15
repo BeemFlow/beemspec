@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import { domainRuntime } from '@/domains/runtime';
 import { getLinearStorySyncTargetForStoryMap } from '@/integrations/linear/settings';
-import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import { syncStoryToLinear } from '@/integrations/linear/story-sync';
 import type { OpenCodeSessionPort } from '@/integrations/opencode/contracts';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
+import { syncStoryRunItem } from '@/orchestration/release-runner/story-item';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -90,40 +89,32 @@ async function buildStoryRunItem(
   input: {
     runId: string;
     storyId: string;
-    story: Record<string, unknown>;
+    story: {
+      id: string;
+      title: string;
+      requirements: string;
+      acceptance_criteria: string;
+      edge_cases: string | null;
+      figma_link: string | null;
+      status: string;
+      technical_guidelines: string | null;
+      updated_at: string | null;
+    };
     releaseId: string;
     linearIssueSync: NonNullable<typeof domainRuntime.storyMap.linearIssueSync>;
     openCodeSessions: OpenCodeSessionPort;
     target: { teamId: string; projectId?: string; stateId?: string };
   },
 ) {
-  const existingLink = await getStoryLinearLink(supabase, input.storyId);
-  const linearIssue = await syncStoryToLinear(
-    input.story as never,
-    input.linearIssueSync,
-    existingLink?.linearIssueId ?? null,
-    input.target,
-  );
-  if (!linearIssue) throw new Error('Linear sync returned no issue snapshot');
-
-  await upsertStoryLinearLink(supabase, {
-    storyId: input.storyId,
-    linearIssueId: linearIssue.id,
-    linearIssueIdentifier: linearIssue.identifier,
-    lastLocalUpdatedAt: (input.story.updated_at as string | null) ?? null,
-    lastLinearUpdatedAt: linearIssue.updatedAt,
-  });
-
-  const session = await input.openCodeSessions.createSession({
+  const { linearIssue, session } = await syncStoryRunItem({
+    supabase,
+    story: input.story,
     releaseId: input.releaseId,
-    storyId: input.storyId,
-    storyTitle: input.story.title as string,
-    linearIssueId: linearIssue.id,
-    linearIssueIdentifier: linearIssue.identifier,
-    requirements: input.story.requirements as string,
-    acceptanceCriteria: input.story.acceptance_criteria as string,
-    technicalGuidelines: (input.story.technical_guidelines as string | null) ?? null,
+    linearIssueSync: input.linearIssueSync,
+    openCodeSessions: input.openCodeSessions,
+    target: input.target,
   });
+  if (!session) throw new Error('OpenCode session not created');
 
   await supabase.from('release_run_items').insert({
     release_run_id: input.runId,

@@ -105,10 +105,10 @@ Completed so far:
   - uses `POST /api/releases/:id/build`
   - uses `POST /api/release-runs/:id/retry`
 - Added retry diagnostics fields for release run items:
-  - migration: `supabase/migrations/005_release_run_retry_metadata.sql`
+  - migration: `supabase/migrations/004_release_runs.sql` (consolidated)
   - fields: `retry_count`, `last_retry_at`
 - Added OpenCode session linkage for release run items:
-  - migration: `supabase/migrations/006_release_run_session_linkage.sql`
+  - migration: `supabase/migrations/004_release_runs.sql` (consolidated)
   - fields: `opencode_session_id`, `opencode_session_url`
 - Build/retry orchestration now starts OpenCode sessions when `BEEMSPEC_ENABLE_OPENCODE` is enabled:
   - session linkage persisted into `release_run_items`
