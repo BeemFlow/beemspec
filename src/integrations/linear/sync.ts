@@ -11,6 +11,13 @@ export interface LinearIssueForSync {
   updatedAt: string;
 }
 
+export const LINEAR_SYNC_DIRECTION = {
+  remoteToLocal: 'remote_to_local',
+  localToRemote: 'local_to_remote',
+} as const;
+
+export type LinearSyncDirection = (typeof LINEAR_SYNC_DIRECTION)[keyof typeof LINEAR_SYNC_DIRECTION];
+
 export interface StoryPatchFromLinear {
   title?: string;
   requirements?: string;

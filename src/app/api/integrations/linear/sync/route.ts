@@ -3,7 +3,11 @@ import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
 import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { syncStoryToLinear } from '@/integrations/linear/story-sync';
-import { buildStoryPatchFromLinearIssue, shouldApplyRemoteUpdate } from '@/integrations/linear/sync';
+import {
+  buildStoryPatchFromLinearIssue,
+  LINEAR_SYNC_DIRECTION,
+  shouldApplyRemoteUpdate,
+} from '@/integrations/linear/sync';
 import type { LinearIssueSync } from '@/integrations/linear/types';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
@@ -42,7 +46,7 @@ async function syncRemoteToLocal(
     lastLinearUpdatedAt: remote.updatedAt,
   });
 
-  return NextResponse.json({ success: true, direction: 'remote_to_local', story_id: story.id });
+  return NextResponse.json({ success: true, direction: LINEAR_SYNC_DIRECTION.remoteToLocal, story_id: story.id });
 }
 
 async function syncLocalToRemote(
@@ -63,7 +67,7 @@ async function syncLocalToRemote(
     lastLinearUpdatedAt: synced.updatedAt,
   });
 
-  return NextResponse.json({ success: true, direction: 'local_to_remote', story_id: story.id });
+  return NextResponse.json({ success: true, direction: LINEAR_SYNC_DIRECTION.localToRemote, story_id: story.id });
 }
 
 export async function syncStoryById(input: {

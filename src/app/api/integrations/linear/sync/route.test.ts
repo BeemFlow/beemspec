@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
+import { LINEAR_SYNC_DIRECTION } from '@/integrations/linear/sync';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { POST } from './route';
@@ -153,7 +154,10 @@ describe('linear sync route', () => {
         updated_at: '2026-02-14T11:00:00.000Z',
       }),
     );
-    await expect(response.json()).resolves.toMatchObject({ success: true, direction: 'remote_to_local' });
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      direction: LINEAR_SYNC_DIRECTION.remoteToLocal,
+    });
   });
 
   it('applies local->remote when local is newer', async () => {
@@ -185,7 +189,10 @@ describe('linear sync route', () => {
     const response = await POST(jsonRequest({ story_id: STORY_ID }));
 
     expect(updateIssue).toHaveBeenCalledTimes(1);
-    await expect(response.json()).resolves.toMatchObject({ success: true, direction: 'local_to_remote' });
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      direction: LINEAR_SYNC_DIRECTION.localToRemote,
+    });
   });
 
   it('applies local->remote when timestamps are equal', async () => {
@@ -217,6 +224,9 @@ describe('linear sync route', () => {
     const response = await POST(jsonRequest({ story_id: STORY_ID }));
 
     expect(updateIssue).toHaveBeenCalledTimes(1);
-    await expect(response.json()).resolves.toMatchObject({ success: true, direction: 'local_to_remote' });
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      direction: LINEAR_SYNC_DIRECTION.localToRemote,
+    });
   });
 });

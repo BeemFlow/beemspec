@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { loadStoryWithStoryMap, processStoryLinearSyncById } from '@/build-runs/processor';
+import { loadStoryWithStoryMap } from '@/build-runs/processor';
 import { isLinearSyncAvailableForStoryMap } from '@/integrations/linear/auth';
 import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
+import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
