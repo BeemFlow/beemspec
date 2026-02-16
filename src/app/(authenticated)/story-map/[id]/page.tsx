@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { use, useCallback, useEffect, useState } from 'react';
 import { ActivityDialog } from '@/components/story-map/ActivityDialog';
-import { BuildRunsPanel } from '@/components/story-map/ReleaseRunsPanel';
+import { BuildRunsPanel } from '@/components/story-map/BuildRunsPanel';
 import { StoryDialog } from '@/components/story-map/StoryDialog';
 import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas';
 import { TaskDialog } from '@/components/story-map/TaskDialog';
