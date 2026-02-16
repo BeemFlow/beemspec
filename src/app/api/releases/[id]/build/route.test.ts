@@ -1,26 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/build-runs';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
-vi.mock('@/orchestration/release-build', () => ({
+vi.mock('@/build-runs', () => ({
   createBuildRunWithStoryJob: vi.fn(),
   enqueueBuildRunStoriesAtomically: vi.fn(),
 }));
 
 const RELEASE_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
-describe('release build route', () => {
+describe('release run route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
   });
 
-  it('creates queued run and enqueues orchestration job', async () => {
+  it('creates queued run and enqueues worker job', async () => {
     const releaseSingle = vi
       .fn()
       .mockResolvedValue({ data: { id: RELEASE_ID, story_map_id: 'story_map_1' }, error: null });

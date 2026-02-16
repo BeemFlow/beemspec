@@ -10,20 +10,20 @@
 
 1. User clicks **Build Release**.
 2. BeemSpec reuses latest active run for the release when possible; otherwise creates a new `build_runs` row.
-3. It enqueues `orchestration_jobs` for stories not yet present in the active run.
+3. It enqueues `worker_jobs` for stories not yet present in the active run.
 4. For each story:
    - ensures one OpenCode session exists for the run (`build_runs.opencode_session_id`)
    - reads existing `story_linear_links` mapping
    - writes `build_run_items` with issue + run session links
 5. BeemSpec finalizes run status and counts.
 
-If processing is interrupted, queued jobs can be resumed via dispatch endpoint.
+If processing is interrupted, queued jobs can be resumed via `POST /api/worker/dispatch`.
 
 ### Run vs job
 
 - `build_runs` is the user-visible record of a build attempt.
-- `orchestration_jobs` is the worker queue envelope that executes that run durably.
-- One run usually maps to one release-build job, but they are intentionally separate concerns.
+- `worker_jobs` is the worker queue envelope that executes that run durably.
+- One run usually maps to one build-run job, but they are intentionally separate concerns.
 
 ## Single-story flow
 

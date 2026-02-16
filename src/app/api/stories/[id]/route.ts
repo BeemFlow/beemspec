@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
+import { enqueueStoryLinearSyncJob, loadStoryWithStoryMap } from '@/build-runs';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, pickDefined, updateStorySchema, validateRequest } from '@/lib/validations';
-import { enqueueStoryLinearSyncJob, loadStoryWithStoryMap } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {

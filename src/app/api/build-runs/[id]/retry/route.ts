@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
+import { requeueBuildRunRetryJob } from '@/build-runs';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-import { requeueBuildRunRetryJob } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;

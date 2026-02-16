@@ -35,13 +35,13 @@ Optional batch reconcile auth:
 
 Optional release worker dispatch auth:
 
-- `BEEMSPEC_RELEASE_WORKER_TOKEN`
+- `BEEMSPEC_WORKER_TOKEN`
 
 ## 3) Database migrations
 
 Apply all migrations in `supabase/migrations`.
 
-Note: integrations, build-run schema, orchestration queue schema, and atomic queue functions are consolidated in `003_story_linear_links.sql`.
+Note: integrations, build-run schema, worker queue schema, and atomic queue functions are consolidated in `003_story_linear_links.sql`.
 
 ## 4) Configure team integration
 
@@ -106,8 +106,8 @@ Tool-backed endpoints used by plugin:
 
 ## 9) Durable queue dispatch
 
-Build and Linear sync actions are enqueued as orchestration jobs.
+Build and Linear sync actions are enqueued as worker jobs.
 
 You can dispatch queued jobs manually with:
 
-- `POST /api/orchestration/jobs/dispatch?limit=5`
+- `POST /api/worker/dispatch?limit=5`

@@ -16,7 +16,7 @@ BeemSpec is being built as the planning source of truth.
 
 - BeemSpec: planning context (`what` and `why`).
 - Linear: execution coordination (`when` and `who`) - story sync foundation implemented.
-- OpenCode: implementation runtime - session orchestration is implemented through the official SDK.
+- OpenCode: implementation runtime - session management is implemented through the official SDK.
 
 Near-term focus is hardening and polishing the Story Map experience for daily dogfooding before building integrations.
 
@@ -63,7 +63,7 @@ Cron setup guide:
 
 - `docs/reconcile-cron.md`
 
-Release build orchestration foundation:
+Build-run API foundation:
 
 - `POST /api/releases/:id/build`
 - `GET /api/releases/:id/runs` (supports `limit`, `offset`, optional `status`)
@@ -73,12 +73,12 @@ Release build orchestration foundation:
 - `POST /api/stories/:id/build` (single-story build)
 - `POST /api/stories/:id/build?build_run_id=:id` (append story to existing build run/session)
 - `POST /api/stories/:id/sync-linear` (manual per-story Linear sync)
-- `POST /api/orchestration/jobs/dispatch` (durable queue worker dispatch)
+- `POST /api/worker/dispatch` (durable queue worker dispatch)
 
 Terminology:
 
 - `build_runs` = user-visible build attempts and outcomes
-- `orchestration_jobs` = internal durable worker queue records that execute those runs
+- `worker_jobs` = internal durable worker queue records that execute those runs
 
 Story map UI now includes a Build Runs panel for:
 
@@ -105,9 +105,9 @@ Shared token for plugin-to-app calls:
 
 - `BEEMSPEC_OPENCODE_TOKEN`
 
-Optional worker token for orchestration dispatch endpoint:
+Optional worker token for dispatch endpoint:
 
-- `BEEMSPEC_RELEASE_WORKER_TOKEN`
+- `BEEMSPEC_WORKER_TOKEN`
 
 OpenCode plugin package is implemented at `packages/opencode-beemspec` with hook + custom-tool support.
 

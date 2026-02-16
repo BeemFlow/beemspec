@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
+import { dispatchQueuedWorkerJobs } from '@/build-runs';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
-import { dispatchQueuedOrchestrationJobs } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 
 function isAuthorizedByWorkerToken(request: Request): boolean {
-  const token = process.env.BEEMSPEC_RELEASE_WORKER_TOKEN;
+  const token = process.env.BEEMSPEC_WORKER_TOKEN;
   if (!token) return false;
   return request.headers.get('authorization') === `Bearer ${token}`;
 }
@@ -24,13 +24,13 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
   try {
-    const summary = await dispatchQueuedOrchestrationJobs(supabase, {
+    const summary = await dispatchQueuedWorkerJobs(supabase, {
       limit: parseLimit(request),
       linearIssueSync: runtime.storyMap.linearIssueSync,
       openCodeSessions: runtime.storyMap.openCodeSessions,
     });
     return NextResponse.json({ ok: true, ...summary });
   } catch (error) {
-    return serverErrorResponse('Failed to dispatch orchestration jobs', error);
+    return serverErrorResponse('Failed to dispatch worker jobs', error);
   }
 }

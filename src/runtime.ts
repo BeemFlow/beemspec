@@ -4,7 +4,16 @@ import type { LinearIssueSync, LinearWebhookIngest } from '@/integrations/linear
 import { createLinearWebhookIngest } from '@/integrations/linear/webhook-ingest';
 import { createOpenCodeSessions } from '@/integrations/opencode/session';
 import type { OpenCodeSessions } from '@/integrations/opencode/types';
-import { type AuthPort, authPort } from '@/runtime/auth';
+import type { AuthResult } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
+
+export interface AuthPort {
+  requireAuth(): Promise<AuthResult>;
+}
+
+const authPort: AuthPort = {
+  requireAuth,
+};
 
 export interface StoryMapRuntimeDeps {
   auth: AuthPort;
@@ -13,7 +22,12 @@ export interface StoryMapRuntimeDeps {
   openCodeSessions: OpenCodeSessions | null;
 }
 
-export function createStoryMapRuntimeDeps(overrides: Partial<StoryMapRuntimeDeps> = {}): StoryMapRuntimeDeps {
+export interface TeamsRuntimeDeps {
+  auth: AuthPort;
+  linearIssueSync: LinearIssueSync | null;
+}
+
+function createStoryMapRuntimeDeps(overrides: Partial<StoryMapRuntimeDeps> = {}): StoryMapRuntimeDeps {
   return {
     auth: authPort,
     linearIssueSync: createLinearIssueSync(integrationFlags.linear),
@@ -22,3 +36,16 @@ export function createStoryMapRuntimeDeps(overrides: Partial<StoryMapRuntimeDeps
     ...overrides,
   };
 }
+
+function createTeamsRuntimeDeps(overrides: Partial<TeamsRuntimeDeps> = {}): TeamsRuntimeDeps {
+  return {
+    auth: authPort,
+    linearIssueSync: createLinearIssueSync(integrationFlags.linear),
+    ...overrides,
+  };
+}
+
+export const runtime = {
+  storyMap: createStoryMapRuntimeDeps(),
+  teams: createTeamsRuntimeDeps(),
+};

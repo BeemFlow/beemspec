@@ -1,18 +1,45 @@
+import { processBuildRunById, processStoryLinearSyncById } from '@/build-runs/processor';
 import type { LinearIssueSync } from '@/integrations/linear/types';
 import type { OpenCodeSessions } from '@/integrations/opencode/types';
 import type { createClient } from '@/lib/supabase/server';
-import { processStoryLinearSyncById } from '@/orchestration/release-build/linear-sync-processor';
-import { processBuildRunById } from '@/orchestration/release-build/run-processor';
-import type {
-  OrchestrationJobDispatchResult,
-  OrchestrationJobRow,
-  OrchestrationJobSummary,
-  StoryBuildJobPayload,
-  StoryLinearSyncJobPayload,
-} from '@/orchestration/release-build/types';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 const BASE_RETRY_DELAY_MS = 5000;
+
+interface StoryBuildJobPayload {
+  release_id: string | null;
+  build_run_id: string;
+  story_map_id: string;
+  story_ids: string[];
+}
+
+interface StoryLinearSyncJobPayload {
+  story_id: string;
+}
+
+interface WorkerJobRow {
+  id: string;
+  kind: 'story_build' | 'story_linear_sync';
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  attempts: number;
+  max_attempts: number;
+  payload: StoryBuildJobPayload | StoryLinearSyncJobPayload;
+}
+
+interface WorkerJobDispatchResult {
+  claimed: boolean;
+  completed?: boolean;
+  requeued?: boolean;
+  error?: string;
+}
+
+export interface WorkerJobSummary {
+  considered: number;
+  claimed: number;
+  completed: number;
+  requeued: number;
+  failed: number;
+}
 
 export interface EnqueueBuildRunStoriesResult {
   build_run_id: string;
@@ -93,34 +120,6 @@ export async function requeueBuildRunRetryJob(
     .single<RequeueBuildRunRetryJobResult>();
 }
 
-export async function enqueueStoryBuildJob(
-  supabase: Supabase,
-  input: {
-    storyMapId: string;
-    buildRunId: string;
-    releaseId: string | null;
-    storyIds: string[];
-  },
-) {
-  return supabase
-    .from('orchestration_jobs')
-    .insert({
-      story_map_id: input.storyMapId,
-      build_run_id: input.buildRunId,
-      kind: 'story_build',
-      status: 'queued',
-      payload: {
-        release_id: input.releaseId,
-        build_run_id: input.buildRunId,
-        story_map_id: input.storyMapId,
-        story_ids: input.storyIds,
-      },
-      available_at: new Date().toISOString(),
-    })
-    .select('id, status')
-    .single();
-}
-
 export async function enqueueStoryLinearSyncJob(
   supabase: Supabase,
   input: {
@@ -129,7 +128,7 @@ export async function enqueueStoryLinearSyncJob(
   },
 ) {
   return supabase
-    .from('orchestration_jobs')
+    .from('worker_jobs')
     .insert({
       story_map_id: input.storyMapId,
       kind: 'story_linear_sync',
@@ -143,9 +142,9 @@ export async function enqueueStoryLinearSyncJob(
     .single();
 }
 
-async function claimJobById(supabase: Supabase, jobId: string): Promise<OrchestrationJobRow | null> {
+async function claimJobById(supabase: Supabase, jobId: string): Promise<WorkerJobRow | null> {
   const { data: queuedJob, error: queuedJobError } = await supabase
-    .from('orchestration_jobs')
+    .from('worker_jobs')
     .select('id, kind, status, attempts, max_attempts, payload')
     .eq('id', jobId)
     .eq('status', 'queued')
@@ -155,7 +154,7 @@ async function claimJobById(supabase: Supabase, jobId: string): Promise<Orchestr
 
   const nextAttempts = (queuedJob.attempts as number) + 1;
   const { data, error } = await supabase
-    .from('orchestration_jobs')
+    .from('worker_jobs')
     .update({
       status: 'running',
       started_at: new Date().toISOString(),
@@ -169,7 +168,7 @@ async function claimJobById(supabase: Supabase, jobId: string): Promise<Orchestr
     .maybeSingle();
 
   if (error || !data) return null;
-  return data as OrchestrationJobRow;
+  return data as WorkerJobRow;
 }
 
 async function markJobResult(
@@ -177,7 +176,7 @@ async function markJobResult(
   input: { jobId: string; status: 'completed' | 'failed'; lastError?: string | null },
 ) {
   return supabase
-    .from('orchestration_jobs')
+    .from('worker_jobs')
     .update({
       status: input.status,
       finished_at: new Date().toISOString(),
@@ -205,7 +204,7 @@ async function markJobFailureOrRequeue(
 
   const availableAt = new Date(Date.now() + getRetryDelayMs(input.attempts)).toISOString();
   await supabase
-    .from('orchestration_jobs')
+    .from('worker_jobs')
     .update({
       status: 'queued',
       available_at: availableAt,
@@ -218,14 +217,14 @@ async function markJobFailureOrRequeue(
   return 'requeued';
 }
 
-export async function dispatchOrchestrationJobById(
+export async function dispatchWorkerJobById(
   supabase: Supabase,
   input: {
     jobId: string;
     linearIssueSync: LinearIssueSync | null;
     openCodeSessions: OpenCodeSessions | null;
   },
-): Promise<OrchestrationJobDispatchResult> {
+): Promise<WorkerJobDispatchResult> {
   const job = await claimJobById(supabase, input.jobId);
   if (!job) return { claimed: false as const };
 
@@ -250,7 +249,7 @@ export async function dispatchOrchestrationJobById(
     await markJobResult(supabase, { jobId: job.id, status: 'completed' });
     return { claimed: true as const, completed: true as const };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Orchestration job failed';
+    const message = error instanceof Error ? error.message : 'Worker job failed';
     const outcome = await markJobFailureOrRequeue(supabase, {
       jobId: job.id,
       attempts: job.attempts,
@@ -266,14 +265,14 @@ export async function dispatchOrchestrationJobById(
   }
 }
 
-export async function dispatchQueuedOrchestrationJobs(
+export async function dispatchQueuedWorkerJobs(
   supabase: Supabase,
   input: {
     limit: number;
     linearIssueSync: LinearIssueSync | null;
     openCodeSessions: OpenCodeSessions | null;
   },
-): Promise<OrchestrationJobSummary> {
+): Promise<WorkerJobSummary> {
   let claimed = 0;
   let completed = 0;
   let requeued = 0;
@@ -282,7 +281,7 @@ export async function dispatchQueuedOrchestrationJobs(
 
   while (considered < input.limit) {
     const { data: nextJob, error } = await supabase
-      .from('orchestration_jobs')
+      .from('worker_jobs')
       .select('id')
       .eq('status', 'queued')
       .lte('available_at', new Date().toISOString())
@@ -294,7 +293,7 @@ export async function dispatchQueuedOrchestrationJobs(
     if (!nextJob?.id) break;
 
     considered += 1;
-    const result = await dispatchOrchestrationJobById(supabase, {
+    const result = await dispatchWorkerJobById(supabase, {
       jobId: nextJob.id as string,
       linearIssueSync: input.linearIssueSync,
       openCodeSessions: input.openCodeSessions,

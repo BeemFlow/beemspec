@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
+import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/build-runs';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -27,7 +27,7 @@ async function loadActiveRunForRelease(supabase: Supabase, releaseId: string) {
     .maybeSingle();
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: route handles create-or-append run orchestration flow
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: route handles create-or-append run flow
 export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await runtime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
@@ -78,7 +78,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     }
 
     if (!enqueueResult.job_id) {
-      return serverErrorResponse('Failed to enqueue release build job', new Error('Job not created'));
+      return serverErrorResponse('Failed to enqueue build run job', new Error('Job not created'));
     }
 
     return NextResponse.json(
@@ -115,7 +115,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
   }
 
   if (!runResult.job_id) {
-    return serverErrorResponse('Failed to enqueue release build job', new Error('Job not created'));
+    return serverErrorResponse('Failed to enqueue build run job', new Error('Job not created'));
   }
 
   return NextResponse.json(

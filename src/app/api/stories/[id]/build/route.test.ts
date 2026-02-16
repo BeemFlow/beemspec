@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/build-runs';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
-vi.mock('@/orchestration/release-build', async () => {
-  const actual = await vi.importActual<typeof import('@/orchestration/release-build')>('@/orchestration/release-build');
+vi.mock('@/build-runs', async () => {
+  const actual = await vi.importActual<typeof import('@/build-runs')>('@/build-runs');
   return {
     ...actual,
     createBuildRunWithStoryJob: vi.fn(),

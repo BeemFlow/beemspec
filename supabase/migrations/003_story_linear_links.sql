@@ -291,10 +291,10 @@ CREATE TRIGGER trg_build_run_items_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_build_run_items_updated_at();
 
 -- =============================================================================
--- Orchestration Jobs
+-- Worker Jobs
 -- =============================================================================
 
-CREATE TABLE orchestration_jobs (
+CREATE TABLE worker_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   story_map_id UUID NOT NULL REFERENCES story_maps(id) ON DELETE CASCADE,
   build_run_id UUID REFERENCES build_runs(id) ON DELETE CASCADE,
@@ -311,25 +311,25 @@ CREATE TABLE orchestration_jobs (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_orchestration_jobs_status_available
-  ON orchestration_jobs(status, available_at, created_at);
+CREATE INDEX idx_worker_jobs_status_available
+  ON worker_jobs(status, available_at, created_at);
 
-CREATE INDEX idx_orchestration_jobs_build_run
-  ON orchestration_jobs(build_run_id)
+CREATE INDEX idx_worker_jobs_build_run
+  ON worker_jobs(build_run_id)
   WHERE build_run_id IS NOT NULL;
 
-ALTER TABLE orchestration_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE worker_jobs ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Team members can view orchestration jobs"
-  ON orchestration_jobs FOR SELECT
+CREATE POLICY "Team members can view worker jobs"
+  ON worker_jobs FOR SELECT
   USING (EXISTS (
     SELECT 1 FROM story_maps sm
     WHERE sm.id = story_map_id
       AND is_team_member(sm.team_id)
   ));
 
-CREATE POLICY "Team members can create orchestration jobs"
-  ON orchestration_jobs FOR INSERT
+CREATE POLICY "Team members can create worker jobs"
+  ON worker_jobs FOR INSERT
   TO authenticated
   WITH CHECK (EXISTS (
     SELECT 1 FROM story_maps sm
@@ -337,8 +337,8 @@ CREATE POLICY "Team members can create orchestration jobs"
       AND is_team_member(sm.team_id)
   ));
 
-CREATE POLICY "Team members can update orchestration jobs"
-  ON orchestration_jobs FOR UPDATE
+CREATE POLICY "Team members can update worker jobs"
+  ON worker_jobs FOR UPDATE
   USING (EXISTS (
     SELECT 1 FROM story_maps sm
     WHERE sm.id = story_map_id
@@ -350,7 +350,7 @@ CREATE POLICY "Team members can update orchestration jobs"
       AND is_team_member(sm.team_id)
   ));
 
-CREATE OR REPLACE FUNCTION update_orchestration_jobs_updated_at()
+CREATE OR REPLACE FUNCTION update_worker_jobs_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
@@ -358,9 +358,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_orchestration_jobs_updated_at
-  BEFORE UPDATE ON orchestration_jobs
-  FOR EACH ROW EXECUTE FUNCTION update_orchestration_jobs_updated_at();
+CREATE TRIGGER trg_worker_jobs_updated_at
+  BEFORE UPDATE ON worker_jobs
+  FOR EACH ROW EXECUTE FUNCTION update_worker_jobs_updated_at();
 
 -- =============================================================================
 -- Build Run Queue Functions (Atomic enqueue + run updates)
@@ -440,7 +440,7 @@ BEGIN
     total_items = total_items + cardinality(v_inserted_story_ids)
   WHERE id = p_build_run_id;
 
-  INSERT INTO orchestration_jobs (
+  INSERT INTO worker_jobs (
     story_map_id,
     build_run_id,
     kind,
@@ -583,7 +583,7 @@ BEGIN
     error = NULL
   WHERE id = p_build_run_id;
 
-  INSERT INTO orchestration_jobs (
+  INSERT INTO worker_jobs (
     story_map_id,
     build_run_id,
     kind,

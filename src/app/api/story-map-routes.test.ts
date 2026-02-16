@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { enqueueStoryLinearSyncJob, loadStoryWithStoryMap } from '@/build-runs';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { enqueueStoryLinearSyncJob, loadStoryWithStoryMap } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 import { DELETE as deleteActivityById, PUT as putActivityById } from './activities/[id]/route';
 import { POST as postActivities, PUT as putActivities } from './activities/route';
@@ -20,7 +20,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }));
 
-vi.mock('@/orchestration/release-build', () => ({
+vi.mock('@/build-runs', () => ({
   enqueueStoryLinearSyncJob: vi.fn(),
   loadStoryWithStoryMap: vi.fn(),
 }));

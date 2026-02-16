@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
+import type { BuildRunStatus } from '@/build-runs';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-import type { BuildRunStatus } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 
 function parseLimit(url: string): number {

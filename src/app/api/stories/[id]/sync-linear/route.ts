@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
+import { enqueueStoryLinearSyncJob, loadStoryWithStoryMap } from '@/build-runs';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-import { enqueueStoryLinearSyncJob, loadStoryWithStoryMap } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 
 export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
