@@ -71,6 +71,7 @@ Release build orchestration foundation:
 - `GET /api/build-runs/:id`
 - `POST /api/build-runs/:id/retry`
 - `POST /api/stories/:id/build` (single-story build)
+- `POST /api/stories/:id/build?build_run_id=:id` (append story to existing build run/session)
 - `POST /api/stories/:id/sync-linear` (manual per-story Linear sync)
 - `POST /api/orchestration/jobs/dispatch` (durable queue worker dispatch)
 

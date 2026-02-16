@@ -75,6 +75,7 @@ In run detail, use **Build story** on an item.
 API equivalent:
 
 - `POST /api/stories/:id/build`
+- `POST /api/stories/:id/build?build_run_id=:id` to append to an existing build run session
 
 ## 7) Operate and recover
 

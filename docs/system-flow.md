@@ -32,6 +32,8 @@ If processing is interrupted, queued jobs can be resumed via dispatch endpoint.
 3. Story sync + assignment runs for only that story.
 4. Run and item are finalized and visible in Build Runs panel.
 
+If `build_run_id` is provided, BeemSpec appends the story to that existing build run and reuses its session.
+
 ## Recovery/operations flow
 
 - Retry failed items: `POST /api/build-runs/:id/retry`

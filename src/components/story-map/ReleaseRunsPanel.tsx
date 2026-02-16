@@ -573,8 +573,9 @@ export function BuildRunsPanel({ releases, onError }: Props) {
 
       setBuildingStoryId(storyId);
       try {
+        const runQuery = selectedRunId ? `?build_run_id=${encodeURIComponent(selectedRunId)}` : '';
         const result = await fetchJson<{ run_id: string }>(
-          `/api/stories/${storyId}/build`,
+          `/api/stories/${storyId}/build${runQuery}`,
           { method: 'POST' },
           'Failed to build story',
         );
@@ -590,7 +591,7 @@ export function BuildRunsPanel({ releases, onError }: Props) {
         setBuildingStoryId(null);
       }
     },
-    [loadRunDetail, loadRuns, loadStoryStates, onError, selectedReleaseId],
+    [loadRunDetail, loadRuns, loadStoryStates, onError, selectedReleaseId, selectedRunId],
   );
 
   if (sortedReleases.length === 0) return null;
