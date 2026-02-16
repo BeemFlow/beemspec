@@ -36,7 +36,7 @@ Optional batch reconcile auth:
 
 - `BEEMSPEC_RECONCILE_CRON_TOKEN`
 
-Optional worker dispatch auth:
+Optional build-run dispatch auth:
 
 - `BEEMSPEC_WORKER_TOKEN`
 
@@ -79,7 +79,7 @@ This will:
 - store run + item results
 - fail items that are not yet synced to Linear
 
-Story create/update with Linear enabled will enqueue a story sync job automatically.
+Story create/update with Linear enabled will attempt direct sync automatically (best effort).
 
 ## 6) Build one story
 
@@ -95,7 +95,7 @@ API equivalent:
 From run detail:
 
 - **Retry failed**: enqueues retry for failed run items
-- **Re-sync**: enqueues story sync to Linear
+- **Re-sync**: runs direct story sync to Linear
 - **Mark blocked**: mark latest story run item blocked with a reason
 
 APIs:
@@ -119,8 +119,8 @@ Tool-backed endpoints used by plugin:
 
 ## 9) Durable queue dispatch
 
-Build and Linear sync actions are enqueued as worker jobs.
+Only build-run execution is queued.
 
-You can dispatch queued jobs manually with:
+You can dispatch queued build-run jobs manually with:
 
-- `POST /api/worker/dispatch?limit=5`
+- `POST /api/build-runs/dispatch?limit=5`

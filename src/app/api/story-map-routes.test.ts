@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadStoryWithStoryMap } from '@/build-runs/processor';
-import { enqueueStoryLinearSyncJob } from '@/build-runs/queue';
+import { loadStoryWithStoryMap, processStoryLinearSyncById } from '@/build-runs/processor';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { runtime } from '@/runtime';
@@ -21,12 +20,9 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }));
 
-vi.mock('@/build-runs/queue', () => ({
-  enqueueStoryLinearSyncJob: vi.fn(),
-}));
-
 vi.mock('@/build-runs/processor', () => ({
   loadStoryWithStoryMap: vi.fn(),
+  processStoryLinearSyncById: vi.fn(),
 }));
 
 const VALID_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
@@ -215,7 +211,14 @@ describe('story map API routes', () => {
       ok: true,
       data: { story: { id: VALID_ID }, storyMapId: 'map_1' },
     } as never);
-    vi.mocked(enqueueStoryLinearSyncJob).mockResolvedValue({ data: { id: 'job_1' }, error: null } as never);
+    vi.mocked(processStoryLinearSyncById).mockResolvedValue({
+      id: 'lin_issue_1',
+      identifier: 'ENG-101',
+      title: 'Issue title',
+      description: null,
+      stateId: null,
+      updatedAt: '2026-02-16T00:00:00.000Z',
+    });
     runtime.storyMap.linearIssueSync = null;
   });
 
@@ -412,11 +415,11 @@ describe('story map API routes', () => {
         }),
       );
 
-      expect(enqueueStoryLinearSyncJob).toHaveBeenCalledWith(
+      expect(processStoryLinearSyncById).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
           storyId: VALID_ID,
-          storyMapId: 'map_1',
+          linearIssueSync: runtime.storyMap.linearIssueSync,
         }),
       );
 
@@ -424,8 +427,9 @@ describe('story map API routes', () => {
         id: VALID_ID,
         title: 'Login',
         linear_sync: {
-          status: 'queued',
-          job_id: 'job_1',
+          status: 'synced',
+          linear_issue_id: 'lin_issue_1',
+          linear_issue_identifier: 'ENG-101',
         },
       });
     });
@@ -510,19 +514,20 @@ describe('story map API routes', () => {
         params: Promise.resolve({ id: VALID_ID }),
       });
 
-      expect(enqueueStoryLinearSyncJob).toHaveBeenCalledWith(
+      expect(processStoryLinearSyncById).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
           storyId: VALID_ID,
-          storyMapId: 'map_1',
+          linearIssueSync: runtime.storyMap.linearIssueSync,
         }),
       );
 
       await expect(response.json()).resolves.toMatchObject({
         id: VALID_ID,
         linear_sync: {
-          status: 'queued',
-          job_id: 'job_1',
+          status: 'synced',
+          linear_issue_id: 'lin_issue_1',
+          linear_issue_identifier: 'ENG-101',
         },
       });
     });

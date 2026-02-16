@@ -74,12 +74,12 @@ Build-run API foundation:
 - `POST /api/stories/:id/build` (single-story build)
 - `POST /api/stories/:id/build?build_run_id=:id` (append story to existing build run/session)
 - `POST /api/stories/:id/sync-linear` (manual per-story Linear sync)
-- `POST /api/worker/dispatch` (durable queue worker dispatch)
+- `POST /api/build-runs/dispatch` (durable build-run queue dispatch)
 
 Terminology:
 
 - `build_runs` = user-visible build attempts and outcomes
-- `worker_jobs` = internal durable worker queue records that execute those runs
+- `worker_jobs` = internal durable queue records for build-run execution
 
 Story map UI now includes a Build Runs panel for:
 

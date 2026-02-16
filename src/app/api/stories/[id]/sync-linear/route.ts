@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { loadStoryWithStoryMap } from '@/build-runs/processor';
-import { enqueueStoryLinearSyncJob } from '@/build-runs/queue';
+import { loadStoryWithStoryMap, processStoryLinearSyncById } from '@/build-runs/processor';
 import { isLinearSyncAvailableForStoryMap } from '@/integrations/linear/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -35,20 +34,19 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     return NextResponse.json({ error: 'Linear integration is not enabled' }, { status: 503 });
   }
 
-  const { data: job, error: jobError } = await enqueueStoryLinearSyncJob(supabase, {
-    storyMapId: context.data.storyMapId,
-    storyId,
-  });
-  if (jobError || !job) {
-    return serverErrorResponse('Failed to enqueue story linear sync job', jobError ?? new Error('Job not created'));
-  }
+  try {
+    const linearIssue = await processStoryLinearSyncById(supabase, {
+      storyId,
+      linearIssueSync: runtime.storyMap.linearIssueSync,
+    });
 
-  return NextResponse.json(
-    {
+    return NextResponse.json({
       story_id: storyId,
-      job_id: job.id,
-      status: 'queued',
-    },
-    { status: 202 },
-  );
+      status: 'synced',
+      linear_issue_id: linearIssue.id,
+      linear_issue_identifier: linearIssue.identifier,
+    });
+  } catch (error) {
+    return serverErrorResponse('Failed to sync story to Linear', error);
+  }
 }

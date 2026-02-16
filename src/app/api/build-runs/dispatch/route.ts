@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { dispatchQueuedWorkerJobs } from '@/build-runs/queue';
+import { dispatchQueuedBuildRunJobs } from '@/build-runs/queue';
 import { env } from '@/lib/env';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -25,13 +25,12 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
   try {
-    const summary = await dispatchQueuedWorkerJobs(supabase, {
+    const summary = await dispatchQueuedBuildRunJobs(supabase, {
       limit: parseLimit(request),
-      linearIssueSync: runtime.storyMap.linearIssueSync,
       openCodeSessions: runtime.storyMap.openCodeSessions,
     });
     return NextResponse.json({ ok: true, ...summary });
   } catch (error) {
-    return serverErrorResponse('Failed to dispatch worker jobs', error);
+    return serverErrorResponse('Failed to dispatch build-run jobs', error);
   }
 }

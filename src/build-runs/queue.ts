@@ -5,8 +5,7 @@ import {
   type WorkerJobKind,
   type WorkerJobStatus,
 } from '@/build-runs/constants';
-import { processBuildRunById, processStoryLinearSyncById } from '@/build-runs/processor';
-import type { LinearIssueSync } from '@/integrations/linear/types';
+import { processBuildRunById } from '@/build-runs/processor';
 import type { OpenCodeSessions } from '@/integrations/opencode/session';
 import type { createClient } from '@/lib/supabase/server';
 
@@ -20,17 +19,13 @@ interface StoryBuildJobPayload {
   story_ids: string[];
 }
 
-interface StoryLinearSyncJobPayload {
-  story_id: string;
-}
-
 interface WorkerJobRow {
   id: string;
   kind: WorkerJobKind;
   status: WorkerJobStatus;
   attempts: number;
   max_attempts: number;
-  payload: StoryBuildJobPayload | StoryLinearSyncJobPayload;
+  payload: StoryBuildJobPayload;
 }
 
 interface WorkerJobProcessResult {
@@ -39,7 +34,7 @@ interface WorkerJobProcessResult {
   error?: string;
 }
 
-export interface WorkerJobSummary {
+export interface BuildRunJobDispatchSummary {
   considered: number;
   claimed: number;
   completed: number;
@@ -126,28 +121,6 @@ export async function requeueBuildRunRetryJob(
     .single<RequeueBuildRunRetryJobResult>();
 }
 
-export async function enqueueStoryLinearSyncJob(
-  supabase: Supabase,
-  input: {
-    storyMapId: string;
-    storyId: string;
-  },
-) {
-  return supabase
-    .from(WORKER_JOBS_TABLE)
-    .insert({
-      story_map_id: input.storyMapId,
-      kind: WORKER_JOB_KIND.storyLinearSync,
-      status: WORKER_JOB_STATUS.queued,
-      payload: {
-        story_id: input.storyId,
-      },
-      available_at: new Date().toISOString(),
-    })
-    .select('id, status')
-    .single();
-}
-
 async function claimNextWorkerJob(supabase: Supabase): Promise<WorkerJobRow | null> {
   const { data, error } = await supabase.rpc('claim_next_worker_job').maybeSingle<WorkerJobRow>();
   if (error) throw error;
@@ -208,26 +181,21 @@ async function processClaimedWorkerJob(
   supabase: Supabase,
   input: {
     job: WorkerJobRow;
-    linearIssueSync: LinearIssueSync | null;
     openCodeSessions: OpenCodeSessions | null;
   },
 ): Promise<WorkerJobProcessResult> {
   try {
-    if (input.job.kind === WORKER_JOB_KIND.storyBuild) {
-      const payload = input.job.payload as StoryBuildJobPayload;
-      await processBuildRunById(supabase, {
-        runId: payload.build_run_id,
-        releaseId: payload.release_id,
-        storyIds: payload.story_ids,
-        openCodeSessions: input.openCodeSessions,
-      });
-    } else {
-      const payload = input.job.payload as StoryLinearSyncJobPayload;
-      await processStoryLinearSyncById(supabase, {
-        storyId: payload.story_id,
-        linearIssueSync: input.linearIssueSync,
-      });
+    if (input.job.kind !== WORKER_JOB_KIND.storyBuild) {
+      throw new Error(`Unsupported build-run job kind: ${input.job.kind}`);
     }
+
+    const payload = input.job.payload as StoryBuildJobPayload;
+    await processBuildRunById(supabase, {
+      runId: payload.build_run_id,
+      releaseId: payload.release_id,
+      storyIds: payload.story_ids,
+      openCodeSessions: input.openCodeSessions,
+    });
 
     await markJobResult(supabase, { jobId: input.job.id, status: WORKER_JOB_STATUS.completed });
     return { completed: true as const };
@@ -247,14 +215,13 @@ async function processClaimedWorkerJob(
   }
 }
 
-export async function dispatchQueuedWorkerJobs(
+export async function dispatchQueuedBuildRunJobs(
   supabase: Supabase,
   input: {
     limit: number;
-    linearIssueSync: LinearIssueSync | null;
     openCodeSessions: OpenCodeSessions | null;
   },
-): Promise<WorkerJobSummary> {
+): Promise<BuildRunJobDispatchSummary> {
   let claimed = 0;
   let completed = 0;
   let requeued = 0;
@@ -269,7 +236,6 @@ export async function dispatchQueuedWorkerJobs(
     claimed += 1;
     const result = await processClaimedWorkerJob(supabase, {
       job,
-      linearIssueSync: input.linearIssueSync,
       openCodeSessions: input.openCodeSessions,
     });
 

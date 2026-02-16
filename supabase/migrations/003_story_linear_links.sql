@@ -332,7 +332,7 @@ CREATE TABLE worker_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   story_map_id UUID NOT NULL REFERENCES story_maps(id) ON DELETE CASCADE,
   build_run_id UUID REFERENCES build_runs(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('story_build', 'story_linear_sync')),
+  kind TEXT NOT NULL CHECK (kind IN ('story_build')),
   status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'failed')),
   payload JSONB NOT NULL DEFAULT '{}'::jsonb,
   attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
@@ -413,6 +413,7 @@ BEGIN
     SELECT w.id, w.attempts
     FROM worker_jobs w
     WHERE w.status = 'queued'
+      AND w.kind = 'story_build'
       AND w.available_at <= NOW()
     ORDER BY w.created_at ASC
     FOR UPDATE SKIP LOCKED

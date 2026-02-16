@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { loadStoryWithStoryMap } from '@/build-runs/processor';
-import { enqueueStoryLinearSyncJob } from '@/build-runs/queue';
+import { loadStoryWithStoryMap, processStoryLinearSyncById } from '@/build-runs/processor';
 import { isLinearSyncAvailableForStoryMap } from '@/integrations/linear/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -65,16 +64,22 @@ export async function POST(request: Request) {
     });
     if (!linearSyncEnabled) return NextResponse.json(data);
 
-    const { data: job } = await enqueueStoryLinearSyncJob(supabase, {
-      storyMapId: context.data.storyMapId,
+    const linearIssue = await processStoryLinearSyncById(supabase, {
       storyId: data.id,
+      linearIssueSync: runtime.storyMap.linearIssueSync,
     });
-    if (!job) return NextResponse.json(data);
 
-    return NextResponse.json({ ...data, linear_sync: { status: 'queued', job_id: job.id } });
-  } catch (queueError) {
-    // biome-ignore lint/suspicious/noConsole: best-effort outbound sync enqueue
-    console.error('Failed to enqueue story sync to Linear', queueError);
+    return NextResponse.json({
+      ...data,
+      linear_sync: {
+        status: 'synced',
+        linear_issue_id: linearIssue.id,
+        linear_issue_identifier: linearIssue.identifier,
+      },
+    });
+  } catch (syncError) {
+    // biome-ignore lint/suspicious/noConsole: best-effort outbound sync for story creation
+    console.error('Failed to sync story to Linear', syncError);
     return NextResponse.json(data);
   }
 }

@@ -17,7 +17,7 @@
    - writes `build_run_items` with issue + run session links
 5. BeemSpec finalizes run status and counts.
 
-If processing is interrupted, queued jobs can be resumed via `POST /api/worker/dispatch`.
+If processing is interrupted, queued jobs can be resumed via `POST /api/build-runs/dispatch`.
 
 ### Run vs job
 
@@ -37,7 +37,7 @@ If `build_run_id` is provided, BeemSpec appends the story to that existing build
 ## Recovery/operations flow
 
 - Retry failed items: `POST /api/build-runs/:id/retry`
-- Manual per-story sync: `POST /api/stories/:id/sync-linear` (enqueue)
+- Manual per-story sync: `POST /api/stories/:id/sync-linear` (direct sync)
 - Mark blocked: `POST /api/opencode/blocked`
 - Batch reconcile (optional machine token): `POST /api/integrations/linear/reconcile/batch`
 
@@ -48,7 +48,7 @@ Queue dispatch notes:
 
 ## Authoring sync behavior
 
-- Story create/update with Linear enabled enqueues a `story_linear_sync` job.
+- Story create/update with Linear enabled attempts direct best-effort sync.
 - Story build/rebuild never performs inline Linear sync; it requires an existing link.
 
 ## Data tables involved

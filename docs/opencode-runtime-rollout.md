@@ -54,7 +54,7 @@ Confirm both tools are callable in session:
 Run dispatcher endpoint manually:
 
 ```bash
-curl -X POST "http://127.0.0.1:3000/api/worker/dispatch?limit=5" \
+curl -X POST "http://127.0.0.1:3000/api/build-runs/dispatch?limit=5" \
   -H "Authorization: Bearer $BEEMSPEC_WORKER_TOKEN"
 ```
 

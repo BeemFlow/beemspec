@@ -17,7 +17,6 @@ export type BuildRunItemStatus = (typeof BUILD_RUN_ITEM_STATUS)[keyof typeof BUI
 
 export const WORKER_JOB_KIND = {
   storyBuild: 'story_build',
-  storyLinearSync: 'story_linear_sync',
 } as const;
 
 export type WorkerJobKind = (typeof WORKER_JOB_KIND)[keyof typeof WORKER_JOB_KIND];
