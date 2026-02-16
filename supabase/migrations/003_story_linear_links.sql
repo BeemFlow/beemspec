@@ -362,6 +362,43 @@ CREATE TRIGGER trg_worker_jobs_updated_at
   BEFORE UPDATE ON worker_jobs
   FOR EACH ROW EXECUTE FUNCTION update_worker_jobs_updated_at();
 
+CREATE OR REPLACE FUNCTION claim_next_worker_job()
+RETURNS TABLE (
+  id UUID,
+  kind TEXT,
+  status TEXT,
+  attempts INTEGER,
+  max_attempts INTEGER,
+  payload JSONB
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH next_job AS (
+    SELECT w.id, w.attempts
+    FROM worker_jobs w
+    WHERE w.status = 'queued'
+      AND w.available_at <= NOW()
+    ORDER BY w.created_at ASC
+    FOR UPDATE SKIP LOCKED
+    LIMIT 1
+  ), claimed AS (
+    UPDATE worker_jobs w
+    SET
+      status = 'running',
+      started_at = NOW(),
+      attempts = next_job.attempts + 1,
+      last_error = NULL
+    FROM next_job
+    WHERE w.id = next_job.id
+    RETURNING w.id, w.kind, w.status, w.attempts, w.max_attempts, w.payload
+  )
+  SELECT claimed.id, claimed.kind, claimed.status, claimed.attempts, claimed.max_attempts, claimed.payload
+  FROM claimed;
+END;
+$$;
+
 -- =============================================================================
 -- Build Run Queue Functions (Atomic enqueue + run updates)
 -- =============================================================================

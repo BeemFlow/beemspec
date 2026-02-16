@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { enqueueStoryLinearSyncJob, loadStoryWithStoryMap } from '@/build-runs';
+import { loadStoryWithStoryMap } from '@/build-runs/processor';
+import { enqueueStoryLinearSyncJob } from '@/build-runs/queue';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { createStorySchema, reorderStoriesSchema, validateRequest } from '@/lib/validations';

@@ -26,8 +26,7 @@ interface WorkerJobRow {
   payload: StoryBuildJobPayload | StoryLinearSyncJobPayload;
 }
 
-interface WorkerJobDispatchResult {
-  claimed: boolean;
+interface WorkerJobProcessResult {
   completed?: boolean;
   requeued?: boolean;
   error?: string;
@@ -142,33 +141,10 @@ export async function enqueueStoryLinearSyncJob(
     .single();
 }
 
-async function claimJobById(supabase: Supabase, jobId: string): Promise<WorkerJobRow | null> {
-  const { data: queuedJob, error: queuedJobError } = await supabase
-    .from('worker_jobs')
-    .select('id, kind, status, attempts, max_attempts, payload')
-    .eq('id', jobId)
-    .eq('status', 'queued')
-    .maybeSingle();
-
-  if (queuedJobError || !queuedJob) return null;
-
-  const nextAttempts = (queuedJob.attempts as number) + 1;
-  const { data, error } = await supabase
-    .from('worker_jobs')
-    .update({
-      status: 'running',
-      started_at: new Date().toISOString(),
-      attempts: nextAttempts,
-      last_error: null,
-    })
-    .eq('id', jobId)
-    .eq('status', 'queued')
-    .eq('attempts', queuedJob.attempts as number)
-    .select('id, kind, status, attempts, max_attempts, payload')
-    .maybeSingle();
-
-  if (error || !data) return null;
-  return data as WorkerJobRow;
+async function claimNextWorkerJob(supabase: Supabase): Promise<WorkerJobRow | null> {
+  const { data, error } = await supabase.rpc('claim_next_worker_job').maybeSingle<WorkerJobRow>();
+  if (error) throw error;
+  return data ?? null;
 }
 
 async function markJobResult(
@@ -217,20 +193,17 @@ async function markJobFailureOrRequeue(
   return 'requeued';
 }
 
-export async function dispatchWorkerJobById(
+async function processClaimedWorkerJob(
   supabase: Supabase,
   input: {
-    jobId: string;
+    job: WorkerJobRow;
     linearIssueSync: LinearIssueSync | null;
     openCodeSessions: OpenCodeSessions | null;
   },
-): Promise<WorkerJobDispatchResult> {
-  const job = await claimJobById(supabase, input.jobId);
-  if (!job) return { claimed: false as const };
-
+): Promise<WorkerJobProcessResult> {
   try {
-    if (job.kind === 'story_build') {
-      const payload = job.payload as StoryBuildJobPayload;
+    if (input.job.kind === 'story_build') {
+      const payload = input.job.payload as StoryBuildJobPayload;
       await processBuildRunById(supabase, {
         runId: payload.build_run_id,
         releaseId: payload.release_id,
@@ -239,25 +212,24 @@ export async function dispatchWorkerJobById(
       });
     } else {
       if (!input.linearIssueSync) throw new Error('Linear integration is not enabled');
-      const payload = job.payload as StoryLinearSyncJobPayload;
+      const payload = input.job.payload as StoryLinearSyncJobPayload;
       await processStoryLinearSyncById(supabase, {
         storyId: payload.story_id,
         linearIssueSync: input.linearIssueSync,
       });
     }
 
-    await markJobResult(supabase, { jobId: job.id, status: 'completed' });
-    return { claimed: true as const, completed: true as const };
+    await markJobResult(supabase, { jobId: input.job.id, status: 'completed' });
+    return { completed: true as const };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Worker job failed';
     const outcome = await markJobFailureOrRequeue(supabase, {
-      jobId: job.id,
-      attempts: job.attempts,
-      maxAttempts: job.max_attempts,
+      jobId: input.job.id,
+      attempts: input.job.attempts,
+      maxAttempts: input.job.max_attempts,
       lastError: message,
     });
     return {
-      claimed: true as const,
       completed: false as const,
       requeued: outcome === 'requeued',
       error: message,
@@ -280,27 +252,17 @@ export async function dispatchQueuedWorkerJobs(
   let considered = 0;
 
   while (considered < input.limit) {
-    const { data: nextJob, error } = await supabase
-      .from('worker_jobs')
-      .select('id')
-      .eq('status', 'queued')
-      .lte('available_at', new Date().toISOString())
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) throw error;
-    if (!nextJob?.id) break;
+    const job = await claimNextWorkerJob(supabase);
+    if (!job) break;
 
     considered += 1;
-    const result = await dispatchWorkerJobById(supabase, {
-      jobId: nextJob.id as string,
+    claimed += 1;
+    const result = await processClaimedWorkerJob(supabase, {
+      job,
       linearIssueSync: input.linearIssueSync,
       openCodeSessions: input.openCodeSessions,
     });
 
-    if (!result.claimed) continue;
-    claimed += 1;
     if (result.completed) completed += 1;
     else if (result.requeued) requeued += 1;
     else failed += 1;

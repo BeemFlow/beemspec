@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { dispatchQueuedWorkerJobs } from '@/build-runs';
+import { dispatchQueuedWorkerJobs } from '@/build-runs/queue';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
-vi.mock('@/build-runs', () => ({ dispatchQueuedWorkerJobs: vi.fn() }));
+vi.mock('@/build-runs/queue', () => ({ dispatchQueuedWorkerJobs: vi.fn() }));
 
 describe('worker dispatch route', () => {
   beforeEach(() => {

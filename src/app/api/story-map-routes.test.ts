@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { enqueueStoryLinearSyncJob, loadStoryWithStoryMap } from '@/build-runs';
+import { loadStoryWithStoryMap } from '@/build-runs/processor';
+import { enqueueStoryLinearSyncJob } from '@/build-runs/queue';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { runtime } from '@/runtime';
@@ -20,8 +21,11 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }));
 
-vi.mock('@/build-runs', () => ({
+vi.mock('@/build-runs/queue', () => ({
   enqueueStoryLinearSyncJob: vi.fn(),
+}));
+
+vi.mock('@/build-runs/processor', () => ({
   loadStoryWithStoryMap: vi.fn(),
 }));
 

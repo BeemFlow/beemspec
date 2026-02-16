@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requeueBuildRunRetryJob } from '@/build-runs';
+import { requeueBuildRunRetryJob } from '@/build-runs/queue';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';

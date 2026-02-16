@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { requeueBuildRunRetryJob } from '@/build-runs';
+import { requeueBuildRunRetryJob } from '@/build-runs/queue';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { runtime } from '@/runtime';
@@ -7,7 +7,7 @@ import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
-vi.mock('@/build-runs', () => ({ requeueBuildRunRetryJob: vi.fn() }));
+vi.mock('@/build-runs/queue', () => ({ requeueBuildRunRetryJob: vi.fn() }));
 
 const RUN_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import type { BuildRunItemStatus, BuildRunStatus } from '@/build-runs';
+import type { BuildRunItemStatus, BuildRunStatus } from '@/build-runs/processor';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';

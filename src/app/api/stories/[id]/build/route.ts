@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically, loadStoryBuildContext } from '@/build-runs';
+import { loadStoryBuildContext } from '@/build-runs/processor';
+import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/build-runs/queue';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';

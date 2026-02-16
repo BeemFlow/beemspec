@@ -27,7 +27,6 @@ Short version: **run = business record**, **job = worker record**.
 ## Practical reading order
 
 1. `docs/system-flow.md`
-2. `src/build-runs/index.ts`
+2. `src/build-runs/queue.ts`
 3. `src/app/api/releases/[id]/build/route.ts`
-4. `src/build-runs/queue.ts`
-5. `src/build-runs/processor.ts`
+4. `src/build-runs/processor.ts`

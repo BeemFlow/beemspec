@@ -33,7 +33,7 @@ Optional batch reconcile auth:
 
 - `BEEMSPEC_RECONCILE_CRON_TOKEN`
 
-Optional release worker dispatch auth:
+Optional worker dispatch auth:
 
 - `BEEMSPEC_WORKER_TOKEN`
 

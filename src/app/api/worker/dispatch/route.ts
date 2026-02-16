@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { dispatchQueuedWorkerJobs } from '@/build-runs';
+import { dispatchQueuedWorkerJobs } from '@/build-runs/queue';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { runtime } from '@/runtime';

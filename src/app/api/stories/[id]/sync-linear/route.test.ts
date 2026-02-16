@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { enqueueStoryLinearSyncJob } from '@/build-runs';
+import { enqueueStoryLinearSyncJob } from '@/build-runs/queue';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { runtime } from '@/runtime';
@@ -7,13 +7,7 @@ import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
-vi.mock('@/build-runs', async () => {
-  const actual = await vi.importActual<typeof import('@/build-runs')>('@/build-runs');
-  return {
-    ...actual,
-    enqueueStoryLinearSyncJob: vi.fn(),
-  };
-});
+vi.mock('@/build-runs/queue', () => ({ enqueueStoryLinearSyncJob: vi.fn() }));
 
 const STORY_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
