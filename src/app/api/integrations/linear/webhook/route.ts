@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
+import { getStoryLinearLinkByLinearIssueId, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import {
   buildStoryPatchFromLinearIssue,
   hasMutableStoryFields,
   shouldApplyRemoteUpdate,
-} from '@/integrations/linear/reconcile';
-import { getStoryLinearLinkByLinearIssueId, upsertStoryLinearLink } from '@/integrations/linear/story-links';
+} from '@/integrations/linear/sync';
 import type { LinearWebhookEvent } from '@/integrations/linear/types';
 import { createLinearWebhookSignatureVerifier, getLinearWebhookIngest } from '@/integrations/linear/webhook-ingest';
 import { serverErrorResponse } from '@/lib/errors';

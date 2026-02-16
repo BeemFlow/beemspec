@@ -45,24 +45,24 @@ Linear OAuth connect API:
 
 Inbound sync uses a code-defined latest-write-wins policy (newer `updated_at` wins) to keep both systems convergent.
 
-Manual reconciliation endpoint:
+Manual sync backfill endpoint:
 
-- `POST /api/integrations/linear/reconcile`
+- `POST /api/integrations/linear/sync`
 - body: `{ "story_id": "<uuid>" }`
 
-Batch reconciliation endpoint (for lightweight periodic drift correction):
+Batch sync backfill endpoint (for lightweight periodic drift correction):
 
-- `POST /api/integrations/linear/reconcile/batch`
+- `POST /api/integrations/linear/sync/batch`
 - body: `{ "limit": 25, "older_than_minutes": 30 }` (both optional)
 
-Batch reconciliation supports machine-trigger auth token:
+Batch sync supports machine-trigger auth token:
 
-- `BEEMSPEC_RECONCILE_CRON_TOKEN`
+- `BEEMSPEC_SYNC_CRON_TOKEN`
 - call with `Authorization: Bearer <token>`
 
 Cron setup guide:
 
-- `docs/reconcile-cron.md`
+- `docs/sync-cron.md`
 
 Build-run API foundation:
 

@@ -54,7 +54,7 @@ export const env = {
     return readEnv('BEEMSPEC_WORKER_TOKEN');
   },
 
-  reconcileCronToken(): string | null {
-    return readEnv('BEEMSPEC_RECONCILE_CRON_TOKEN');
+  syncCronToken(): string | null {
+    return readEnv('BEEMSPEC_SYNC_CRON_TOKEN');
   },
 };

@@ -229,11 +229,11 @@ export const updateLinearIntegrationSettingsSchema = z
   })
   .refine(atLeastOneField, atLeastOneFieldMessage);
 
-export const linearReconcileStorySchema = z.object({
+export const linearSyncStorySchema = z.object({
   story_id: uuid,
 });
 
-export const linearReconcileBatchSchema = z
+export const linearSyncBatchSchema = z
   .object({
     limit: z.number().int().min(1).max(200).optional(),
     older_than_minutes: z
@@ -255,8 +255,8 @@ export type CreateTeam = z.infer<typeof createTeamSchema>;
 export type UpdateTeam = z.infer<typeof updateTeamSchema>;
 export type InviteEmail = z.infer<typeof inviteEmailSchema>;
 export type UpdateLinearIntegrationSettings = z.infer<typeof updateLinearIntegrationSettingsSchema>;
-export type LinearReconcileStoryRequest = z.infer<typeof linearReconcileStorySchema>;
-export type LinearReconcileBatchRequest = z.infer<typeof linearReconcileBatchSchema>;
+export type LinearSyncStoryRequest = z.infer<typeof linearSyncStorySchema>;
+export type LinearSyncBatchRequest = z.infer<typeof linearSyncBatchSchema>;
 export type OpenCodeMarkBlockedRequest = z.infer<typeof opencodeMarkBlockedSchema>;
 
 export type CreateStoryMap = z.infer<typeof createStoryMapSchema>;

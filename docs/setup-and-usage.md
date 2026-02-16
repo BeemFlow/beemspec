@@ -32,9 +32,9 @@ OpenCode:
 - `BEEMSPEC_OPENCODE_WEB_BASE_URL` (optional deep-link host)
 - `BEEMSPEC_OPENCODE_TOKEN` (shared token for plugin -> BeemSpec API)
 
-Optional batch reconcile auth:
+Optional batch sync auth:
 
-- `BEEMSPEC_RECONCILE_CRON_TOKEN`
+- `BEEMSPEC_SYNC_CRON_TOKEN`
 
 Optional build-run dispatch auth:
 

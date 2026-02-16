@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
-import { reconcileStoryById } from '@/app/api/integrations/linear/reconcile/route';
+import { syncStoryById } from '@/app/api/integrations/linear/sync/route';
 import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
 import { requireAuth } from '@/lib/auth';
 import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
-import { linearReconcileBatchSchema, validateRequest } from '@/lib/validations';
+import { linearSyncBatchSchema, validateRequest } from '@/lib/validations';
 
 function isSuccessResponseStatus(status: number): boolean {
   return status >= 200 && status < 300;
 }
 
 function isAuthorizedByCronToken(request: Request): boolean {
-  const token = env.reconcileCronToken();
+  const token = env.syncCronToken();
   if (!token) return false;
 
   const authHeader = request.headers.get('authorization') ?? '';
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
   const linearIssueSync = getLinearIssueSync();
 
-  const validation = await validateRequest(request, linearReconcileBatchSchema);
+  const validation = await validateRequest(request, linearSyncBatchSchema);
   if (!validation.success) return validation.response;
 
   const limit = validation.data.limit ?? 25;
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 
   for (const storyId of storyIds) {
     try {
-      const response = await reconcileStoryById({
+      const response = await syncStoryById({
         supabase,
         fallbackLinearIssueSync: linearIssueSync,
         storyId,

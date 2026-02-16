@@ -4,9 +4,9 @@ import {
   hasMutableStoryFields,
   parseTimestampMs,
   shouldApplyRemoteUpdate,
-} from './reconcile';
+} from './sync';
 
-describe('linear reconcile helpers', () => {
+describe('linear sync helpers', () => {
   it('decides remote should apply when newer', () => {
     expect(shouldApplyRemoteUpdate('2026-02-14T11:00:00.000Z', '2026-02-14T10:00:00.000Z')).toBe(true);
     expect(shouldApplyRemoteUpdate('2026-02-14T10:00:00.000Z', '2026-02-14T11:00:00.000Z')).toBe(false);

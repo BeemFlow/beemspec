@@ -9,7 +9,7 @@
 ## Main folders
 
 - `src/build-runs`: queue + processing logic for build runs and story linear sync jobs.
-- `src/integrations/linear`: Linear API + webhook ingest + sync/reconcile helpers.
+- `src/integrations/linear`: Linear API + webhook ingest + sync helpers.
 - `src/integrations/opencode`: OpenCode session runtime adapter.
 - `src/app/api`: HTTP boundaries only.
 - `src/lib`: auth, errors, validation, supabase clients, utility helpers.

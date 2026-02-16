@@ -17,24 +17,24 @@ vi.mock('@/integrations/linear/issue-sync', () => ({
   getLinearIssueSync: vi.fn(),
 }));
 
-vi.mock('@/app/api/integrations/linear/reconcile/route', () => ({
-  reconcileStoryById: vi.fn(),
+vi.mock('@/app/api/integrations/linear/sync/route', () => ({
+  syncStoryById: vi.fn(),
 }));
 
-import { reconcileStoryById } from '@/app/api/integrations/linear/reconcile/route';
+import { syncStoryById } from '@/app/api/integrations/linear/sync/route';
 
 function jsonRequest(body: unknown): Request {
-  return new Request('http://localhost/api/integrations/linear/reconcile/batch', {
+  return new Request('http://localhost/api/integrations/linear/sync/batch', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
 }
 
-describe('linear batch reconcile route', () => {
+describe('linear batch sync route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.BEEMSPEC_RECONCILE_CRON_TOKEN;
+    delete process.env.BEEMSPEC_SYNC_CRON_TOKEN;
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
     vi.mocked(getLinearIssueSync).mockReturnValue({
       getIssueById: vi.fn(),
@@ -43,7 +43,7 @@ describe('linear batch reconcile route', () => {
     });
   });
 
-  it('reconciles stories selected by stale last_synced_at and returns summary', async () => {
+  it('syncs stories selected by stale last_synced_at and returns summary', async () => {
     const limit = vi.fn().mockResolvedValue({
       data: [{ story_id: 'story_1' }, { story_id: 'story_2' }],
       error: null,
@@ -54,13 +54,13 @@ describe('linear batch reconcile route', () => {
     const from = vi.fn().mockReturnValue({ select });
     vi.mocked(createClient).mockResolvedValue({ from } as never);
 
-    vi.mocked(reconcileStoryById)
+    vi.mocked(syncStoryById)
       .mockResolvedValueOnce(NextResponse.json({ success: true }, { status: 200 }))
       .mockResolvedValueOnce(NextResponse.json({ error: 'failed' }, { status: 500 }));
 
     const response = await POST(jsonRequest({ limit: 10, older_than_minutes: 60 }));
 
-    expect(reconcileStoryById).toHaveBeenCalledTimes(2);
+    expect(syncStoryById).toHaveBeenCalledTimes(2);
     await expect(response.json()).resolves.toMatchObject({
       success: true,
       considered: 2,
@@ -70,7 +70,7 @@ describe('linear batch reconcile route', () => {
   });
 
   it('allows cron token authorization without user session', async () => {
-    process.env.BEEMSPEC_RECONCILE_CRON_TOKEN = 'cron_secret';
+    process.env.BEEMSPEC_SYNC_CRON_TOKEN = 'cron_secret';
     vi.mocked(requireAuth).mockResolvedValue({
       success: false,
       response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
@@ -83,7 +83,7 @@ describe('linear batch reconcile route', () => {
     const from = vi.fn().mockReturnValue({ select });
     vi.mocked(createClient).mockResolvedValue({ from } as never);
 
-    const request = new Request('http://localhost/api/integrations/linear/reconcile/batch', {
+    const request = new Request('http://localhost/api/integrations/linear/sync/batch', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

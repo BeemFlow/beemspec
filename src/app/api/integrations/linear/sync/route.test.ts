@@ -19,14 +19,14 @@ vi.mock('@/integrations/linear/issue-sync', () => ({
 const STORY_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
 function jsonRequest(body: unknown): Request {
-  return new Request('http://localhost/api/integrations/linear/reconcile', {
+  return new Request('http://localhost/api/integrations/linear/sync', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
 }
 
-function createReconcileClient(storyUpdatedAt: string) {
+function createSyncClient(storyUpdatedAt: string) {
   const storySingle = vi.fn().mockResolvedValue({
     data: {
       id: STORY_ID,
@@ -118,7 +118,7 @@ function createReconcileClient(storyUpdatedAt: string) {
   };
 }
 
-describe('linear reconcile route', () => {
+describe('linear sync route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
@@ -126,7 +126,7 @@ describe('linear reconcile route', () => {
   });
 
   it('applies remote->local when remote is newer', async () => {
-    const { client, storyUpdate } = createReconcileClient('2026-02-14T10:00:00.000Z');
+    const { client, storyUpdate } = createSyncClient('2026-02-14T10:00:00.000Z');
     vi.mocked(createClient).mockResolvedValue(client as never);
 
     vi.mocked(getLinearIssueSync).mockReturnValue({
@@ -157,7 +157,7 @@ describe('linear reconcile route', () => {
   });
 
   it('applies local->remote when local is newer', async () => {
-    const { client } = createReconcileClient('2026-02-14T12:00:00.000Z');
+    const { client } = createSyncClient('2026-02-14T12:00:00.000Z');
     vi.mocked(createClient).mockResolvedValue(client as never);
 
     const updateIssue = vi.fn().mockResolvedValue({
@@ -189,7 +189,7 @@ describe('linear reconcile route', () => {
   });
 
   it('applies local->remote when timestamps are equal', async () => {
-    const { client } = createReconcileClient('2026-02-14T11:00:00.000Z');
+    const { client } = createSyncClient('2026-02-14T11:00:00.000Z');
     vi.mocked(createClient).mockResolvedValue(client as never);
 
     const updateIssue = vi.fn().mockResolvedValue({

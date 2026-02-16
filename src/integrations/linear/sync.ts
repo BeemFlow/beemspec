@@ -4,7 +4,7 @@ import {
   type StoryStatus,
 } from '@/integrations/linear/story-sync';
 
-export interface LinearIssueForReconcile {
+export interface LinearIssueForSync {
   title: string | null;
   description: string | null;
   stateName: string | null;
@@ -35,7 +35,7 @@ export function shouldApplyRemoteUpdate(remoteUpdatedAt: string | null, localUpd
   return remoteMs > localMs;
 }
 
-export function buildStoryPatchFromLinearIssue(input: LinearIssueForReconcile): StoryPatchFromLinear {
+export function buildStoryPatchFromLinearIssue(input: LinearIssueForSync): StoryPatchFromLinear {
   const fromDescription = parseLinearDescriptionToStoryFields(input.description);
   const patch: StoryPatchFromLinear = {
     updated_at: input.updatedAt,

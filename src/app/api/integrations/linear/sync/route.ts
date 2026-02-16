@@ -1,20 +1,20 @@
 import { NextResponse } from 'next/server';
 import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
 import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
-import { buildStoryPatchFromLinearIssue, shouldApplyRemoteUpdate } from '@/integrations/linear/reconcile';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { syncStoryToLinear } from '@/integrations/linear/story-sync';
+import { buildStoryPatchFromLinearIssue, shouldApplyRemoteUpdate } from '@/integrations/linear/sync';
 import type { LinearIssueSync } from '@/integrations/linear/types';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
-import { linearReconcileStorySchema, validateRequest } from '@/lib/validations';
+import { linearSyncStorySchema, validateRequest } from '@/lib/validations';
 
 function ignored(reason: string): NextResponse {
   return NextResponse.json({ success: true, ignored: true, reason });
 }
 
-async function reconcileRemoteToLocal(
+async function syncRemoteToLocal(
   supabase: Awaited<ReturnType<typeof createClient>>,
   story: { id: string },
   remote: { id: string; identifier: string; title: string; description: string | null; updatedAt: string },
@@ -41,7 +41,7 @@ async function reconcileRemoteToLocal(
   return NextResponse.json({ success: true, direction: 'remote_to_local', story_id: story.id });
 }
 
-async function reconcileLocalToRemote(
+async function syncLocalToRemote(
   supabase: Awaited<ReturnType<typeof createClient>>,
   linearIssueSync: NonNullable<LinearIssueSync>,
   target: Parameters<typeof syncStoryToLinear>[3],
@@ -62,7 +62,7 @@ async function reconcileLocalToRemote(
   return NextResponse.json({ success: true, direction: 'local_to_remote', story_id: story.id });
 }
 
-export async function reconcileStoryById(input: {
+export async function syncStoryById(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   fallbackLinearIssueSync: LinearIssueSync | null;
   storyId: string;
@@ -97,27 +97,21 @@ export async function reconcileStoryById(input: {
 
   const localUpdatedAt = (story.updated_at as string | null) ?? null;
   if (shouldApplyRemoteUpdate(remote.updatedAt, localUpdatedAt)) {
-    return reconcileRemoteToLocal(input.supabase, story, remote);
+    return syncRemoteToLocal(input.supabase, story, remote);
   }
 
-  return reconcileLocalToRemote(
-    input.supabase,
-    linearSyncContext.linearIssueSync,
-    linearSyncContext.target,
-    story,
-    link,
-  );
+  return syncLocalToRemote(input.supabase, linearSyncContext.linearIssueSync, linearSyncContext.target, story, link);
 }
 
 export async function POST(request: Request) {
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
-  const validation = await validateRequest(request, linearReconcileStorySchema);
+  const validation = await validateRequest(request, linearSyncStorySchema);
   if (!validation.success) return validation.response;
 
   const supabase = await createClient();
-  return reconcileStoryById({
+  return syncStoryById({
     supabase,
     fallbackLinearIssueSync: getLinearIssueSync(),
     storyId: validation.data.story_id,
