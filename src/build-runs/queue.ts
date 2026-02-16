@@ -1,3 +1,10 @@
+import {
+  WORKER_JOB_KIND,
+  WORKER_JOB_STATUS,
+  WORKER_JOBS_TABLE,
+  type WorkerJobKind,
+  type WorkerJobStatus,
+} from '@/build-runs/constants';
 import { processBuildRunById, processStoryLinearSyncById } from '@/build-runs/processor';
 import type { LinearIssueSync } from '@/integrations/linear/types';
 import type { OpenCodeSessions } from '@/integrations/opencode/types';
@@ -19,8 +26,8 @@ interface StoryLinearSyncJobPayload {
 
 interface WorkerJobRow {
   id: string;
-  kind: 'story_build' | 'story_linear_sync';
-  status: 'queued' | 'running' | 'completed' | 'failed';
+  kind: WorkerJobKind;
+  status: WorkerJobStatus;
   attempts: number;
   max_attempts: number;
   payload: StoryBuildJobPayload | StoryLinearSyncJobPayload;
@@ -127,11 +134,11 @@ export async function enqueueStoryLinearSyncJob(
   },
 ) {
   return supabase
-    .from('worker_jobs')
+    .from(WORKER_JOBS_TABLE)
     .insert({
       story_map_id: input.storyMapId,
-      kind: 'story_linear_sync',
-      status: 'queued',
+      kind: WORKER_JOB_KIND.storyLinearSync,
+      status: WORKER_JOB_STATUS.queued,
       payload: {
         story_id: input.storyId,
       },
@@ -149,10 +156,14 @@ async function claimNextWorkerJob(supabase: Supabase): Promise<WorkerJobRow | nu
 
 async function markJobResult(
   supabase: Supabase,
-  input: { jobId: string; status: 'completed' | 'failed'; lastError?: string | null },
+  input: {
+    jobId: string;
+    status: typeof WORKER_JOB_STATUS.completed | typeof WORKER_JOB_STATUS.failed;
+    lastError?: string | null;
+  },
 ) {
   return supabase
-    .from('worker_jobs')
+    .from(WORKER_JOBS_TABLE)
     .update({
       status: input.status,
       finished_at: new Date().toISOString(),
@@ -172,7 +183,7 @@ async function markJobFailureOrRequeue(
   if (input.attempts >= input.maxAttempts) {
     await markJobResult(supabase, {
       jobId: input.jobId,
-      status: 'failed',
+      status: WORKER_JOB_STATUS.failed,
       lastError: input.lastError,
     });
     return 'failed';
@@ -180,9 +191,9 @@ async function markJobFailureOrRequeue(
 
   const availableAt = new Date(Date.now() + getRetryDelayMs(input.attempts)).toISOString();
   await supabase
-    .from('worker_jobs')
+    .from(WORKER_JOBS_TABLE)
     .update({
-      status: 'queued',
+      status: WORKER_JOB_STATUS.queued,
       available_at: availableAt,
       started_at: null,
       finished_at: null,
@@ -202,7 +213,7 @@ async function processClaimedWorkerJob(
   },
 ): Promise<WorkerJobProcessResult> {
   try {
-    if (input.job.kind === 'story_build') {
+    if (input.job.kind === WORKER_JOB_KIND.storyBuild) {
       const payload = input.job.payload as StoryBuildJobPayload;
       await processBuildRunById(supabase, {
         runId: payload.build_run_id,
@@ -219,7 +230,7 @@ async function processClaimedWorkerJob(
       });
     }
 
-    await markJobResult(supabase, { jobId: input.job.id, status: 'completed' });
+    await markJobResult(supabase, { jobId: input.job.id, status: WORKER_JOB_STATUS.completed });
     return { completed: true as const };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Worker job failed';

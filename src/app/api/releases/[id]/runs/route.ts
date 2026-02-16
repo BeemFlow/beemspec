@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import type { BuildRunStatus } from '@/build-runs/processor';
+import { BUILD_RUN_STATUS, type BuildRunStatus } from '@/build-runs/constants';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
@@ -24,7 +24,8 @@ function parseOffset(url: string): number {
 function parseStatus(url: string): BuildRunStatus | null {
   const raw = new URL(url).searchParams.get('status');
   if (!raw) return null;
-  if (raw === 'queued' || raw === 'running' || raw === 'completed' || raw === 'failed') return raw;
+  const values = Object.values(BUILD_RUN_STATUS);
+  if (values.includes(raw as BuildRunStatus)) return raw as BuildRunStatus;
   return null;
 }
 

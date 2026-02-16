@@ -20,15 +20,9 @@ BeemSpec is being built as the planning source of truth.
 
 Near-term focus is hardening and polishing the Story Map experience for daily dogfooding before building integrations.
 
-## Integration feature flags
-
-- `BEEMSPEC_ENABLE_LINEAR`: enables Linear integration.
-- `BEEMSPEC_ENABLE_OPENCODE`: enables OpenCode plugin/runtime integration.
-
 Linear outbound sync requires an API key:
 
-- `LINEAR_API_KEY` (preferred)
-- `BEEMSPEC_LINEAR_API_KEY` (fallback)
+- `LINEAR_API_KEY`
 
 Story-triggered outbound sync target is loaded from team integration settings (`integration_settings` table).
 
@@ -120,8 +114,7 @@ Quick docs:
 
 Inbound webhook sync requires a webhook signing secret:
 
-- `BEEMSPEC_LINEAR_WEBHOOK_SECRET` (preferred)
-- `LINEAR_WEBHOOK_SECRET` (fallback)
+- `BEEMSPEC_LINEAR_WEBHOOK_SECRET`
 
 Webhook endpoint:
 

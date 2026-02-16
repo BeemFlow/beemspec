@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { dispatchQueuedWorkerJobs } from '@/build-runs/queue';
+import { env } from '@/lib/env';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { runtime } from '@/runtime';
 
 function isAuthorizedByWorkerToken(request: Request): boolean {
-  const token = process.env.BEEMSPEC_WORKER_TOKEN;
+  const token = env.workerToken();
   if (!token) return false;
   return request.headers.get('authorization') === `Bearer ${token}`;
 }

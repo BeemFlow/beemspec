@@ -1,4 +1,3 @@
-import { integrationFlags } from '@/integrations/flags';
 import { createLinearIssueSync } from '@/integrations/linear/issue-sync';
 import type { LinearIssueSync, LinearWebhookIngest } from '@/integrations/linear/types';
 import { createLinearWebhookIngest } from '@/integrations/linear/webhook-ingest';
@@ -6,6 +5,7 @@ import { createOpenCodeSessions } from '@/integrations/opencode/session';
 import type { OpenCodeSessions } from '@/integrations/opencode/types';
 import type { AuthResult } from '@/lib/auth';
 import { requireAuth } from '@/lib/auth';
+import { env } from '@/lib/env';
 
 export interface AuthPort {
   requireAuth(): Promise<AuthResult>;
@@ -28,19 +28,24 @@ export interface TeamsRuntimeDeps {
 }
 
 function createStoryMapRuntimeDeps(overrides: Partial<StoryMapRuntimeDeps> = {}): StoryMapRuntimeDeps {
+  const hasLinearApiKey = Boolean(env.linearApiKey());
+  const hasLinearWebhookSecret = Boolean(env.linearWebhookSecret());
+
   return {
     auth: authPort,
-    linearIssueSync: createLinearIssueSync(integrationFlags.linear),
-    linearWebhookIngest: createLinearWebhookIngest(integrationFlags.linear),
-    openCodeSessions: createOpenCodeSessions(integrationFlags.opencode),
+    linearIssueSync: createLinearIssueSync(hasLinearApiKey),
+    linearWebhookIngest: createLinearWebhookIngest(hasLinearWebhookSecret),
+    openCodeSessions: createOpenCodeSessions(true),
     ...overrides,
   };
 }
 
 function createTeamsRuntimeDeps(overrides: Partial<TeamsRuntimeDeps> = {}): TeamsRuntimeDeps {
+  const hasLinearApiKey = Boolean(env.linearApiKey());
+
   return {
     auth: authPort,
-    linearIssueSync: createLinearIssueSync(integrationFlags.linear),
+    linearIssueSync: createLinearIssueSync(hasLinearApiKey),
     ...overrides,
   };
 }

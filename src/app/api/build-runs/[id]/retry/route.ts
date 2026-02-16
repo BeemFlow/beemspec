@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { BUILD_RUN_ITEM_STATUS, BUILD_RUN_ITEMS_TABLE, BUILD_RUN_TABLE } from '@/build-runs/constants';
 import { requeueBuildRunRetryJob } from '@/build-runs/queue';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -8,15 +9,15 @@ import { runtime } from '@/runtime';
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 async function loadRun(supabase: Supabase, runId: string) {
-  return supabase.from('build_runs').select('id, release_id, story_map_id, total_items').eq('id', runId).single();
+  return supabase.from(BUILD_RUN_TABLE).select('id, release_id, story_map_id, total_items').eq('id', runId).single();
 }
 
 async function loadFailedItemStoryIds(supabase: Supabase, runId: string) {
   const { data, error } = await supabase
-    .from('build_run_items')
+    .from(BUILD_RUN_ITEMS_TABLE)
     .select('story_id')
     .eq('build_run_id', runId)
-    .eq('status', 'failed');
+    .eq('status', BUILD_RUN_ITEM_STATUS.failed);
   return {
     storyIds: (data ?? []).map((item) => item.story_id as string),
     error,

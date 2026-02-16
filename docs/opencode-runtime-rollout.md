@@ -8,8 +8,7 @@ Use this checklist to install and verify the BeemSpec OpenCode plugin in a real 
 - Env vars are set:
   - `BEEMSPEC_BASE_URL` (for plugin -> app API)
   - `BEEMSPEC_OPENCODE_TOKEN` (shared bearer token)
-  - `BEEMSPEC_ENABLE_OPENCODE=true`
-  - `BEEMSPEC_ENABLE_LINEAR=true`
+  - `LINEAR_API_KEY`
 
 ## 2) Install plugin in OpenCode
 

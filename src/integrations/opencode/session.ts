@@ -5,15 +5,16 @@ import type {
   OpenCodeSessionStoryAssignmentInput,
   OpenCodeSessions,
 } from '@/integrations/opencode/types';
+import { env } from '@/lib/env';
 
 type OpenCodeClient = ReturnType<typeof createOpencodeClient>;
 
 function getOpencodeBaseUrl(): string {
-  return process.env.BEEMSPEC_OPENCODE_BASE_URL ?? 'http://127.0.0.1:4096';
+  return env.openCodeBaseUrl();
 }
 
 function getOpencodeSessionUrl(sessionId: string): string {
-  const baseUrl = process.env.BEEMSPEC_OPENCODE_WEB_BASE_URL ?? getOpencodeBaseUrl();
+  const baseUrl = env.openCodeWebBaseUrl() ?? getOpencodeBaseUrl();
   return `${baseUrl.replace(/\/$/, '')}/session/${sessionId}`;
 }
 

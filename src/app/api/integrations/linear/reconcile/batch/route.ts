@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { reconcileStoryById } from '@/app/api/integrations/linear/reconcile/route';
+import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 import { linearReconcileBatchSchema, validateRequest } from '@/lib/validations';
 import { runtime } from '@/runtime';
@@ -9,7 +10,7 @@ function isSuccessResponseStatus(status: number): boolean {
 }
 
 function isAuthorizedByCronToken(request: Request): boolean {
-  const token = process.env.BEEMSPEC_RECONCILE_CRON_TOKEN;
+  const token = env.reconcileCronToken();
   if (!token) return false;
 
   const authHeader = request.headers.get('authorization') ?? '';

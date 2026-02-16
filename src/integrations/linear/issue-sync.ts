@@ -7,6 +7,7 @@ import {
   RatelimitedLinearError,
 } from '@linear/sdk';
 import type { LinearIssueSnapshot, LinearIssueSync, LinearIssueUpsertInput } from '@/integrations/linear/types';
+import { env } from '@/lib/env';
 
 const DEFAULT_MAX_RETRIES = 2;
 const BASE_BACKOFF_MS = 250;
@@ -27,9 +28,7 @@ function sleepMs(ms: number): Promise<void> {
 }
 
 function getConfiguredApiKey(): string | null {
-  const value = process.env.LINEAR_API_KEY ?? process.env.BEEMSPEC_LINEAR_API_KEY;
-  if (!value || value.trim().length === 0) return null;
-  return value.trim();
+  return env.linearApiKey();
 }
 
 function getBackoffMs(attempt: number): number {
@@ -63,7 +62,7 @@ function toSnapshot(issue: Issue): LinearIssueSnapshot {
 }
 
 function createMissingKeyError(): Error {
-  return new Error('Linear issue sync enabled but API key is missing (LINEAR_API_KEY or BEEMSPEC_LINEAR_API_KEY)');
+  return new Error('Linear issue sync enabled but API key is missing (LINEAR_API_KEY)');
 }
 
 async function withRetry<T>(run: () => Promise<T>, maxRetries: number, sleep: SleepFn): Promise<T> {

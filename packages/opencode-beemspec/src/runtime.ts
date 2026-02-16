@@ -4,7 +4,7 @@ import type { OpenCodeSessionContext } from './contracts';
 import { compactedContext, createBeemSpecNetworkTools } from './plugin';
 
 export const BeemSpecPlugin: Plugin = async ({ client }) => {
-  const baseUrl = process.env.BEEMSPEC_BASE_URL ?? process.env.BEEMSPEC_APP_URL;
+  const baseUrl = process.env.BEEMSPEC_BASE_URL;
   const token = process.env.BEEMSPEC_OPENCODE_TOKEN;
   const networkTools = baseUrl ? createBeemSpecNetworkTools({ baseUrl, token }) : null;
 

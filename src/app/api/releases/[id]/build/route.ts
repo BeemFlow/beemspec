@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { BUILD_RUN_STATUS } from '@/build-runs/constants';
 import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/build-runs/queue';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -21,7 +22,7 @@ async function loadActiveRunForRelease(supabase: Supabase, releaseId: string) {
     .from('build_runs')
     .select('id, story_map_id, status')
     .eq('release_id', releaseId)
-    .in('status', ['queued', 'running'])
+    .in('status', [BUILD_RUN_STATUS.queued, BUILD_RUN_STATUS.running])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();

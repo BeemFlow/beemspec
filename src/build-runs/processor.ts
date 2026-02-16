@@ -1,3 +1,10 @@
+import {
+  BUILD_RUN_ITEM_STATUS,
+  BUILD_RUN_ITEMS_TABLE,
+  BUILD_RUN_STATUS,
+  BUILD_RUN_TABLE,
+  type BuildRunItemStatus,
+} from '@/build-runs/constants';
 import { getLinearStorySyncTargetForStoryMap } from '@/integrations/linear/settings';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { syncStoryToLinear } from '@/integrations/linear/story-sync';
@@ -7,10 +14,6 @@ import type { createClient } from '@/lib/supabase/server';
 import type { Story } from '@/types';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
-
-export type BuildRunStatus = 'queued' | 'running' | 'completed' | 'failed';
-
-export type BuildRunItemStatus = 'pending' | 'synced' | 'failed';
 
 type StoryBuildContextFailureReason = 'story_not_found' | 'story_task_not_found' | 'story_activity_not_found';
 
@@ -59,7 +62,7 @@ async function loadExistingBuildRunItem(
   input: { runId: string; storyId: string },
 ): Promise<ExistingBuildRunItemRow | null> {
   const { data, error } = await supabase
-    .from('build_run_items')
+    .from(BUILD_RUN_ITEMS_TABLE)
     .select('status, linear_issue_id, retry_count, last_retry_at')
     .eq('build_run_id', input.runId)
     .eq('story_id', input.storyId)
@@ -77,7 +80,7 @@ async function loadExistingBuildRunItem(
 
 function retryMetadata(existing: ExistingBuildRunItemRow | null): { retryCount: number; lastRetryAt: string | null } {
   if (!existing) return { retryCount: 0, lastRetryAt: null };
-  if (existing.status !== 'failed') {
+  if (existing.status !== BUILD_RUN_ITEM_STATUS.failed) {
     return {
       retryCount: existing.retry_count,
       lastRetryAt: existing.last_retry_at,
@@ -102,7 +105,7 @@ async function insertSyncedRunItem(
   },
 ) {
   return supabase
-    .from('build_run_items')
+    .from(BUILD_RUN_ITEMS_TABLE)
     .upsert(
       {
         build_run_id: input.runId,
@@ -110,7 +113,7 @@ async function insertSyncedRunItem(
         linear_issue_id: input.linearIssueId,
         opencode_session_id: input.sessionId,
         opencode_session_url: input.sessionUrl,
-        status: 'synced',
+        status: BUILD_RUN_ITEM_STATUS.synced,
         error: null,
         retry_count: input.retryCount,
         last_retry_at: input.lastRetryAt,
@@ -133,12 +136,12 @@ async function insertFailedBuildRunItem(
   const retry = retryMetadata(existing);
 
   return supabase
-    .from('build_run_items')
+    .from(BUILD_RUN_ITEMS_TABLE)
     .upsert(
       {
         build_run_id: input.runId,
         story_id: input.storyId,
-        status: 'failed',
+        status: BUILD_RUN_ITEM_STATUS.failed,
         error: input.error,
         retry_count: retry.retryCount,
         last_retry_at: retry.lastRetryAt,
@@ -166,7 +169,7 @@ async function syncAndInsertRunItem(
   const linearIssueIdentifier = link.linearIssueIdentifier ?? link.linearIssueId;
   const existing = await loadExistingBuildRunItem(supabase, input);
 
-  if (existing?.status === 'synced' && existing.linear_issue_id === linearIssueId) {
+  if (existing?.status === BUILD_RUN_ITEM_STATUS.synced && existing.linear_issue_id === linearIssueId) {
     return {
       linearIssue: { id: linearIssueId, identifier: linearIssueIdentifier },
       session: input.runSession,
@@ -205,21 +208,21 @@ async function syncAndInsertRunItem(
 }
 
 async function markBuildRunRunning(supabase: Supabase, runId: string) {
-  return supabase.from('build_runs').update({ status: 'running', error: null }).eq('id', runId);
+  return supabase.from(BUILD_RUN_TABLE).update({ status: BUILD_RUN_STATUS.running, error: null }).eq('id', runId);
 }
 
 async function finishBuildRun(
   supabase: Supabase,
   input: {
     runId: string;
-    status: 'completed' | 'failed';
+    status: typeof BUILD_RUN_STATUS.completed | typeof BUILD_RUN_STATUS.failed;
     completedItems: number;
     failedItems: number;
     error: string | null;
   },
 ) {
   return supabase
-    .from('build_runs')
+    .from(BUILD_RUN_TABLE)
     .update({
       status: input.status,
       completed_items: input.completedItems,
@@ -231,20 +234,20 @@ async function finishBuildRun(
 }
 
 function summarizeBuildRunItemStatuses(items: Array<{ status: string }>) {
-  const completed = items.filter((item) => item.status === 'synced').length;
-  const failed = items.filter((item) => item.status === 'failed').length;
+  const completed = items.filter((item) => item.status === BUILD_RUN_ITEM_STATUS.synced).length;
+  const failed = items.filter((item) => item.status === BUILD_RUN_ITEM_STATUS.failed).length;
   return { completed, failed };
 }
 
 async function summarizeAndFinishBuildRun(supabase: Supabase, runId: string) {
   const { data: items, error: itemsError } = await supabase
-    .from('build_run_items')
+    .from(BUILD_RUN_ITEMS_TABLE)
     .select('status')
     .eq('build_run_id', runId);
   if (itemsError || !items) throw itemsError ?? new Error('Failed to load build run items');
 
   const { completed, failed } = summarizeBuildRunItemStatuses(items as Array<{ status: string }>);
-  const status = failed > 0 ? 'failed' : 'completed';
+  const status = failed > 0 ? BUILD_RUN_STATUS.failed : BUILD_RUN_STATUS.completed;
   await finishBuildRun(supabase, {
     runId,
     status,
@@ -258,7 +261,7 @@ async function summarizeAndFinishBuildRun(supabase: Supabase, runId: string) {
 
 async function loadRunSession(supabase: Supabase, runId: string): Promise<{ id: string; url: string } | null> {
   const { data, error } = await supabase
-    .from('build_runs')
+    .from(BUILD_RUN_TABLE)
     .select('opencode_session_id, opencode_session_url')
     .eq('id', runId)
     .single();
@@ -276,7 +279,7 @@ async function persistRunSession(
   input: { runId: string; sessionId: string; sessionUrl: string },
 ): Promise<void> {
   const { error } = await supabase
-    .from('build_runs')
+    .from(BUILD_RUN_TABLE)
     .update({
       opencode_session_id: input.sessionId,
       opencode_session_url: input.sessionUrl,

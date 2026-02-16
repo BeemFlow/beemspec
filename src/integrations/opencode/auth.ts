@@ -1,5 +1,7 @@
+import { env } from '@/lib/env';
+
 export function isAuthorizedByOpenCodeToken(request: Request): boolean {
-  const token = process.env.BEEMSPEC_OPENCODE_TOKEN;
+  const token = env.openCodeToken();
   if (!token) return false;
 
   const authHeader = request.headers.get('authorization') ?? '';
