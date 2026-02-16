@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { CARD_HEIGHT, CARD_WIDTH } from '@/components/story-map/constants';
-import { cn } from '@/lib/utils';
+import { cn } from '@/components/ui/utils';
 
 type MapCardVariant = 'activity' | 'task' | 'story';
 
