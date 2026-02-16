@@ -2,7 +2,8 @@
 
 import { Check, ChevronDown, LogOut, Plus, Settings, User } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { TeamSettingsDialog } from '@/components/team-settings-dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,9 +23,36 @@ interface AppShellProps {
 
 type TeamDialog = { type: 'closed' } | { type: 'create' } | { type: 'settings' };
 
+type LinearOAuthNotice = { status: 'success' | 'error'; reason?: string } | null;
+
+function parseLinearOAuthNotice(status: string | null, reason: string | null): LinearOAuthNotice {
+  if (status !== 'success' && status !== 'error') return null;
+  return { status, reason: reason ?? undefined };
+}
+
 export function AppShell({ children, userEmail }: AppShellProps) {
   const { teams, currentTeam, setCurrentTeam, reloadTeams } = useTeam();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [dialog, setDialog] = useState<TeamDialog>({ type: 'closed' });
+  const [linearOAuthNotice, setLinearOAuthNotice] = useState<LinearOAuthNotice>(null);
+
+  useEffect(() => {
+    const searchParamString = searchParams.toString();
+    const linearOauth = searchParams.get('linear_oauth');
+    const reason = searchParams.get('reason');
+    const notice = parseLinearOAuthNotice(linearOauth, reason);
+    if (!notice) return;
+
+    setLinearOAuthNotice(notice);
+    setDialog({ type: 'settings' });
+
+    const next = new URLSearchParams(searchParamString);
+    next.delete('linear_oauth');
+    next.delete('reason');
+    const nextUrl = next.toString().length > 0 ? `${pathname}?${next.toString()}` : pathname;
+    window.history.replaceState({}, '', nextUrl);
+  }, [pathname, searchParams]);
 
   async function handleCreateTeam(name: string) {
     const res = await fetch('/api/teams', {
@@ -124,6 +152,8 @@ export function AppShell({ children, userEmail }: AppShellProps) {
         onOpenChange={(open) => !open && setDialog({ type: 'closed' })}
         team={currentTeam}
         onTeamUpdated={reloadTeams}
+        linearOAuthNotice={linearOAuthNotice}
+        onLinearOAuthNoticeHandled={() => setLinearOAuthNotice(null)}
       />
     </div>
   );

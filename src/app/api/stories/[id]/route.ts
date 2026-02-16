@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { loadStoryWithStoryMap } from '@/build-runs/processor';
 import { enqueueStoryLinearSyncJob } from '@/build-runs/queue';
+import { isLinearSyncAvailableForStoryMap } from '@/integrations/linear/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, pickDefined, updateStorySchema, validateRequest } from '@/lib/validations';
@@ -50,13 +51,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return serverErrorResponse('Failed to update story', error);
   }
 
-  if (!runtime.storyMap.linearIssueSync) {
-    return NextResponse.json(data);
-  }
-
   try {
     const context = await loadStoryWithStoryMap(supabase, data.id);
     if (!context.ok) return NextResponse.json(data);
+
+    const linearSyncEnabled = await isLinearSyncAvailableForStoryMap(supabase, {
+      storyMapId: context.data.storyMapId,
+      fallbackLinearIssueSync: runtime.storyMap.linearIssueSync,
+    });
+    if (!linearSyncEnabled) return NextResponse.json(data);
 
     const { data: job } = await enqueueStoryLinearSyncJob(supabase, {
       storyMapId: context.data.storyMapId,

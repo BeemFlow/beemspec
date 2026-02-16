@@ -22,6 +22,18 @@ export const env = {
     return readEnv('LINEAR_API_KEY');
   },
 
+  linearClientId(): string | null {
+    return readEnv('LINEAR_CLIENT_ID');
+  },
+
+  linearClientSecret(): string | null {
+    return readEnv('LINEAR_CLIENT_SECRET');
+  },
+
+  linearOAuthRedirectUri(): string | null {
+    return readEnv('LINEAR_OAUTH_REDIRECT_URI');
+  },
+
   linearWebhookSecret(): string | null {
     return readEnv('BEEMSPEC_LINEAR_WEBHOOK_SECRET');
   },

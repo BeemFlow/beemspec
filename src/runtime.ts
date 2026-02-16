@@ -1,8 +1,8 @@
 import { createLinearIssueSync } from '@/integrations/linear/issue-sync';
 import type { LinearIssueSync, LinearWebhookIngest } from '@/integrations/linear/types';
 import { createLinearWebhookIngest } from '@/integrations/linear/webhook-ingest';
+import type { OpenCodeSessions } from '@/integrations/opencode/session';
 import { createOpenCodeSessions } from '@/integrations/opencode/session';
-import type { OpenCodeSessions } from '@/integrations/opencode/types';
 import type { AuthResult } from '@/lib/auth';
 import { requireAuth } from '@/lib/auth';
 import { env } from '@/lib/env';

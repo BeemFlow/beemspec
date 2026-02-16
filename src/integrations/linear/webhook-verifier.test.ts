@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { createLinearWebhookSignatureVerifier } from './webhook-verifier';
+import { createLinearWebhookSignatureVerifier } from './webhook-ingest';
 
 describe('linear webhook verifier', () => {
   it('verifies matching signature and recent timestamp', () => {

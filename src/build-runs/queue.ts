@@ -7,7 +7,7 @@ import {
 } from '@/build-runs/constants';
 import { processBuildRunById, processStoryLinearSyncById } from '@/build-runs/processor';
 import type { LinearIssueSync } from '@/integrations/linear/types';
-import type { OpenCodeSessions } from '@/integrations/opencode/types';
+import type { OpenCodeSessions } from '@/integrations/opencode/session';
 import type { createClient } from '@/lib/supabase/server';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -222,7 +222,6 @@ async function processClaimedWorkerJob(
         openCodeSessions: input.openCodeSessions,
       });
     } else {
-      if (!input.linearIssueSync) throw new Error('Linear integration is not enabled');
       const payload = input.job.payload as StoryLinearSyncJobPayload;
       await processStoryLinearSyncById(supabase, {
         storyId: payload.story_id,

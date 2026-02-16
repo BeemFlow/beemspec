@@ -6,7 +6,7 @@ import {
 } from '@/integrations/linear/reconcile';
 import { getStoryLinearLinkByLinearIssueId, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import type { LinearWebhookEvent } from '@/integrations/linear/types';
-import { createLinearWebhookSignatureVerifier } from '@/integrations/linear/webhook-verifier';
+import { createLinearWebhookSignatureVerifier } from '@/integrations/linear/webhook-ingest';
 import { serverErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { runtime } from '@/runtime';

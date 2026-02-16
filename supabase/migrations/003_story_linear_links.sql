@@ -124,6 +124,40 @@ CREATE TRIGGER trg_integration_settings_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_integration_settings_updated_at();
 
 -- =============================================================================
+-- Linear OAuth Connections (server-managed credentials)
+-- =============================================================================
+
+CREATE TABLE linear_oauth_connections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  team_id UUID NOT NULL UNIQUE REFERENCES teams(id) ON DELETE CASCADE,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT,
+  token_type TEXT,
+  scope TEXT,
+  expires_at TIMESTAMPTZ,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_linear_oauth_connections_team
+  ON linear_oauth_connections(team_id);
+
+ALTER TABLE linear_oauth_connections ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION update_linear_oauth_connections_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_linear_oauth_connections_updated_at
+  BEFORE UPDATE ON linear_oauth_connections
+  FOR EACH ROW EXECUTE FUNCTION update_linear_oauth_connections_updated_at();
+
+-- =============================================================================
 -- Integration Webhook Receipts (Idempotency)
 -- =============================================================================
 

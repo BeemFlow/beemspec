@@ -19,7 +19,12 @@ Core:
 
 Linear:
 
-- `LINEAR_API_KEY`
+- OAuth (recommended):
+  - `LINEAR_CLIENT_ID`
+  - `LINEAR_CLIENT_SECRET`
+  - `LINEAR_OAUTH_REDIRECT_URI`
+- Optional fallback:
+  - `LINEAR_API_KEY`
 
 OpenCode:
 
@@ -48,6 +53,16 @@ From team settings, set Linear integration target values.
 API equivalent:
 
 - `PUT /api/teams/:id/integrations/linear`
+
+Then connect Linear OAuth for that team:
+
+- `GET /api/integrations/linear/oauth/start?team_id=:id&return_to=/`
+
+You can also do this from Team Settings -> General -> Linear Integration in the app.
+
+OAuth callback endpoint:
+
+- `GET /api/integrations/linear/oauth/callback`
 
 ## 5) Build a release
 

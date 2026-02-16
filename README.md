@@ -20,9 +20,14 @@ BeemSpec is being built as the planning source of truth.
 
 Near-term focus is hardening and polishing the Story Map experience for daily dogfooding before building integrations.
 
-Linear outbound sync requires an API key:
+Linear outbound sync now supports team-scoped OAuth 2.0 (recommended) and API key fallback:
 
-- `LINEAR_API_KEY`
+- OAuth env:
+  - `LINEAR_CLIENT_ID`
+  - `LINEAR_CLIENT_SECRET`
+  - `LINEAR_OAUTH_REDIRECT_URI`
+- Optional fallback:
+  - `LINEAR_API_KEY`
 
 Story-triggered outbound sync target is loaded from team integration settings (`integration_settings` table).
 
@@ -30,6 +35,13 @@ Current management API for team settings:
 
 - `GET /api/teams/:id/integrations/linear`
 - `PUT /api/teams/:id/integrations/linear`
+
+Linear OAuth connect API:
+
+- `GET /api/integrations/linear/oauth/start?team_id=:id&return_to=/:path`
+- `GET /api/integrations/linear/oauth/callback`
+- `GET /api/integrations/linear/oauth/connection?team_id=:id`
+- `DELETE /api/integrations/linear/oauth/connection?team_id=:id`
 
 Inbound sync uses a code-defined latest-write-wins policy (newer `updated_at` wins) to keep both systems convergent.
 
@@ -42,11 +54,6 @@ Batch reconciliation endpoint (for lightweight periodic drift correction):
 
 - `POST /api/integrations/linear/reconcile/batch`
 - body: `{ "limit": 25, "older_than_minutes": 30 }` (both optional)
-
-Ops visibility endpoints:
-
-- `GET /api/integrations/linear/ops/failed-webhooks?limit=50`
-- `GET /api/integrations/linear/ops/reconcile-failures?limit=50`
 
 Batch reconciliation supports machine-trigger auth token:
 

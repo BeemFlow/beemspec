@@ -1,11 +1,21 @@
 import { createOpencodeClient } from '@opencode-ai/sdk';
+import { env } from '@/lib/env';
 import type {
   OpenCodeSessionCreateInput,
+  OpenCodeSessionPort,
   OpenCodeSessionSnapshot,
   OpenCodeSessionStoryAssignmentInput,
-  OpenCodeSessions,
-} from '@/integrations/opencode/types';
-import { env } from '@/lib/env';
+} from '../../../packages/opencode-beemspec/src/contracts';
+
+export type OpenCodeSessions = OpenCodeSessionPort;
+
+export function isAuthorizedByOpenCodeToken(request: Request): boolean {
+  const token = env.openCodeToken();
+  if (!token) return false;
+
+  const authHeader = request.headers.get('authorization') ?? '';
+  return authHeader === `Bearer ${token}`;
+}
 
 type OpenCodeClient = ReturnType<typeof createOpencodeClient>;
 

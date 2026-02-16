@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { isAuthorizedByOpenCodeToken } from '@/integrations/opencode/auth';
+import { isAuthorizedByOpenCodeToken } from '@/integrations/opencode/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { opencodeMarkBlockedSchema, validateRequest } from '@/lib/validations';

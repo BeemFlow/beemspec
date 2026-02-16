@@ -5,11 +5,11 @@ import {
   BUILD_RUN_TABLE,
   type BuildRunItemStatus,
 } from '@/build-runs/constants';
-import { getLinearStorySyncTargetForStoryMap } from '@/integrations/linear/settings';
+import { resolveLinearSyncContextForStoryMap } from '@/integrations/linear/auth';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { syncStoryToLinear } from '@/integrations/linear/story-sync';
 import type { LinearIssueSync } from '@/integrations/linear/types';
-import type { OpenCodeSessions } from '@/integrations/opencode/types';
+import type { OpenCodeSessions } from '@/integrations/opencode/session';
 import type { createClient } from '@/lib/supabase/server';
 import type { Story } from '@/types';
 
@@ -460,7 +460,7 @@ export async function processStoryLinearSyncById(
   supabase: Supabase,
   input: {
     storyId: string;
-    linearIssueSync: LinearIssueSync;
+    linearIssueSync: LinearIssueSync | null;
   },
 ) {
   const context = await loadStoryWithStoryMap(supabase, input.storyId);
@@ -471,15 +471,25 @@ export async function processStoryLinearSyncById(
   }
 
   const { story, storyMapId } = context.data;
-  const target = await getLinearStorySyncTargetForStoryMap(supabase, storyMapId);
-  if (!target) throw new Error('No linear target configured for story map team');
+  const linearSyncContext = await resolveLinearSyncContextForStoryMap(supabase, {
+    storyMapId,
+    fallbackLinearIssueSync: input.linearIssueSync,
+  });
+
+  if (!linearSyncContext.target || !linearSyncContext.targetConfigured) {
+    throw new Error('No linear target configured for story map team');
+  }
+
+  if (!linearSyncContext.linearIssueSync) {
+    throw new Error('Linear integration is not enabled');
+  }
 
   const existingLink = await getStoryLinearLink(supabase, input.storyId);
   const linearIssue = await syncStoryToLinear(
     story,
-    input.linearIssueSync,
+    linearSyncContext.linearIssueSync,
     existingLink?.linearIssueId ?? null,
-    target,
+    linearSyncContext.target,
   );
   if (!linearIssue) throw new Error('Linear sync returned no issue snapshot');
 

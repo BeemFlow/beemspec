@@ -18,6 +18,7 @@ type LinearClientLike = Pick<LinearClient, 'issue' | 'createIssue' | 'updateIssu
 
 export interface LinearIssueSyncOptions {
   apiKey?: string;
+  accessToken?: string;
   maxRetries?: number;
   sleep?: SleepFn;
   client?: LinearClientLike;
@@ -61,8 +62,8 @@ function toSnapshot(issue: Issue): LinearIssueSnapshot {
   };
 }
 
-function createMissingKeyError(): Error {
-  return new Error('Linear issue sync enabled but API key is missing (LINEAR_API_KEY)');
+function createMissingAuthError(): Error {
+  return new Error('Linear issue sync enabled but no auth credentials are configured');
 }
 
 async function withRetry<T>(run: () => Promise<T>, maxRetries: number, sleep: SleepFn): Promise<T> {
@@ -90,14 +91,11 @@ function getIssueFromPayload(payload: IssuePayload, operation: string): Promise<
 export function createLinearIssueSync(enabled: boolean, options: LinearIssueSyncOptions = {}): LinearIssueSync | null {
   if (!enabled) return null;
 
+  const accessToken = options.accessToken ?? null;
   const apiKey = options.apiKey ?? getConfiguredApiKey() ?? '';
-  if (!apiKey && !options.client) throw createMissingKeyError();
+  if (!accessToken && !apiKey && !options.client) throw createMissingAuthError();
 
-  const client =
-    options.client ??
-    new LinearClient({
-      apiKey,
-    });
+  const client = options.client ?? new LinearClient(accessToken ? { accessToken } : { apiKey });
 
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const sleep = options.sleep ?? sleepMs;

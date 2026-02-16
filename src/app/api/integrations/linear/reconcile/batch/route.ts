@@ -18,14 +18,10 @@ function isAuthorizedByCronToken(request: Request): boolean {
 }
 
 export async function POST(request: Request) {
-  if (!isAuthorizedByCronToken(request)) {
+  const usingCronToken = isAuthorizedByCronToken(request);
+  if (!usingCronToken) {
     const auth = await runtime.storyMap.auth.requireAuth();
     if (!auth.success) return auth.response;
-  }
-
-  const linearIssueSync = runtime.storyMap.linearIssueSync;
-  if (!linearIssueSync) {
-    return NextResponse.json({ error: 'Linear integration is not enabled' }, { status: 503 });
   }
 
   const validation = await validateRequest(request, linearReconcileBatchSchema);
@@ -58,7 +54,7 @@ export async function POST(request: Request) {
     try {
       const response = await reconcileStoryById({
         supabase,
-        linearIssueSync,
+        fallbackLinearIssueSync: runtime.storyMap.linearIssueSync,
         storyId,
       });
 

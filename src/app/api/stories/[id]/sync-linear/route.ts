@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { loadStoryWithStoryMap } from '@/build-runs/processor';
 import { enqueueStoryLinearSyncJob } from '@/build-runs/queue';
+import { isLinearSyncAvailableForStoryMap } from '@/integrations/linear/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
@@ -9,9 +10,6 @@ import { runtime } from '@/runtime';
 export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await runtime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
-
-  const linearIssueSync = runtime.storyMap.linearIssueSync;
-  if (!linearIssueSync) return NextResponse.json({ error: 'Linear integration is not enabled' }, { status: 503 });
 
   const { id: storyId } = await params;
   if (!isValidUuid(storyId)) return invalidIdResponse();
@@ -27,6 +25,14 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
       'Failed to resolve story map for story',
       context.error ?? new Error('Activity not found'),
     );
+  }
+
+  const linearSyncEnabled = await isLinearSyncAvailableForStoryMap(supabase, {
+    storyMapId: context.data.storyMapId,
+    fallbackLinearIssueSync: runtime.storyMap.linearIssueSync,
+  });
+  if (!linearSyncEnabled) {
+    return NextResponse.json({ error: 'Linear integration is not enabled' }, { status: 503 });
   }
 
   const { data: job, error: jobError } = await enqueueStoryLinearSyncJob(supabase, {

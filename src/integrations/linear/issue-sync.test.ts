@@ -85,7 +85,20 @@ describe('linear issue sync port', () => {
 
   it('throws clear error when enabled without API key', () => {
     expect(() => createLinearIssueSync(true, { apiKey: '' })).toThrow(
-      'Linear issue sync enabled but API key is missing',
+      'Linear issue sync enabled but no auth credentials are configured',
     );
+  });
+
+  it('supports OAuth access token authentication', async () => {
+    const client = makeClient();
+    const sync = createLinearIssueSync(true, {
+      accessToken: 'linear_oauth_access_token',
+      client,
+    });
+
+    const issue = await sync?.getIssueById('lin_issue_1');
+
+    expect(issue?.id).toBe('lin_issue_1');
+    expect(client.issue).toHaveBeenCalledTimes(1);
   });
 });

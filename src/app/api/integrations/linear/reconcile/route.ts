@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
+import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
 import { buildStoryPatchFromLinearIssue, shouldApplyRemoteUpdate } from '@/integrations/linear/reconcile';
-import { getLinearStorySyncTargetForStory } from '@/integrations/linear/settings';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { syncStoryToLinear } from '@/integrations/linear/story-sync';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
@@ -42,12 +42,10 @@ async function reconcileRemoteToLocal(
 async function reconcileLocalToRemote(
   supabase: Awaited<ReturnType<typeof createClient>>,
   linearIssueSync: NonNullable<typeof runtime.storyMap.linearIssueSync>,
+  target: Parameters<typeof syncStoryToLinear>[3],
   story: Record<string, unknown>,
   link: { linearIssueId: string },
 ): Promise<NextResponse> {
-  const target = await getLinearStorySyncTargetForStory(supabase, story.id as string);
-  if (!target) return ignored('no linear target configured for story team');
-
   const synced = await syncStoryToLinear(story as never, linearIssueSync, link.linearIssueId, target);
   if (!synced) return ignored('sync did not produce a remote issue snapshot');
 
@@ -64,7 +62,7 @@ async function reconcileLocalToRemote(
 
 export async function reconcileStoryById(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
-  linearIssueSync: NonNullable<typeof runtime.storyMap.linearIssueSync>;
+  fallbackLinearIssueSync: typeof runtime.storyMap.linearIssueSync;
   storyId: string;
 }): Promise<NextResponse> {
   const { data: story, error: storyError } = await input.supabase
@@ -77,10 +75,22 @@ export async function reconcileStoryById(input: {
     return serverErrorResponse('Failed to load story', storyError);
   }
 
+  const linearSyncContext = await resolveLinearSyncContextForStory(input.supabase, {
+    storyId: input.storyId,
+    fallbackLinearIssueSync: input.fallbackLinearIssueSync,
+  });
+  if (!linearSyncContext.targetConfigured || !linearSyncContext.target) {
+    return ignored('no linear target configured for story team');
+  }
+
+  if (!linearSyncContext.linearIssueSync) {
+    return ignored('Linear integration is not enabled');
+  }
+
   const link = await getStoryLinearLink(input.supabase, story.id);
   if (!link) return ignored('story is not linked to Linear');
 
-  const remote = await input.linearIssueSync.getIssueById(link.linearIssueId);
+  const remote = await linearSyncContext.linearIssueSync.getIssueById(link.linearIssueId);
   if (!remote) return ignored('linked Linear issue was not found');
 
   const localUpdatedAt = (story.updated_at as string | null) ?? null;
@@ -88,17 +98,18 @@ export async function reconcileStoryById(input: {
     return reconcileRemoteToLocal(input.supabase, story, remote);
   }
 
-  return reconcileLocalToRemote(input.supabase, input.linearIssueSync, story, link);
+  return reconcileLocalToRemote(
+    input.supabase,
+    linearSyncContext.linearIssueSync,
+    linearSyncContext.target,
+    story,
+    link,
+  );
 }
 
 export async function POST(request: Request) {
   const auth = await runtime.storyMap.auth.requireAuth();
   if (!auth.success) return auth.response;
-
-  const linearIssueSync = runtime.storyMap.linearIssueSync;
-  if (!linearIssueSync) {
-    return NextResponse.json({ error: 'Linear integration is not enabled' }, { status: 503 });
-  }
 
   const validation = await validateRequest(request, linearReconcileStorySchema);
   if (!validation.success) return validation.response;
@@ -106,7 +117,7 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   return reconcileStoryById({
     supabase,
-    linearIssueSync,
+    fallbackLinearIssueSync: runtime.storyMap.linearIssueSync,
     storyId: validation.data.story_id,
   });
 }

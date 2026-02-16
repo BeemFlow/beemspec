@@ -16,6 +16,19 @@ function normalizeText(value: string | null | undefined): string | null | undefi
   return trimmed.length > 0 ? trimmed : null;
 }
 
+async function isTeamOwnerForRequest(userId: string, teamId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('team_members')
+    .select('role')
+    .eq('team_id', teamId)
+    .eq('user_id', userId)
+    .maybeSingle<{ role: string }>();
+
+  if (error || !data) return false;
+  return data.role === 'owner';
+}
+
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await runtime.teams.auth.requireAuth();
   if (!auth.success) return auth.response;
@@ -44,6 +57,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const { id: teamId } = await params;
   if (!isValidUuid(teamId)) return invalidIdResponse();
 
+  if (!(await isTeamOwnerForRequest(auth.user.id, teamId))) {
+    return NextResponse.json({ error: 'Only team owners can update Linear settings' }, { status: 403 });
+  }
+
+  const supabase = await createClient();
+
   const validation = await validateRequest(request, updateLinearIntegrationSettingsSchema);
   if (!validation.success) return validation.response;
 
@@ -55,7 +74,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     linear_state_id: normalizeText(validation.data.linear_state_id),
   };
 
-  const supabase = await createClient();
   const { data, error } = await supabase
     .from('integration_settings')
     .upsert(payload, { onConflict: 'team_id' })

@@ -60,6 +60,10 @@ interface StoryMapsTable {
   };
 }
 
+interface TeamIdResult {
+  teamId: string | null;
+}
+
 function normalize(value: string | null | undefined): string | null {
   if (!value) return null;
   const trimmed = value.trim();
@@ -90,21 +94,36 @@ async function getSettingsForTeamId(supabase: SupabaseLike, teamId: string): Pro
   return toLinearTarget(data);
 }
 
-export async function getLinearStorySyncTargetForStoryMap(
-  supabase: SupabaseLike,
-  storyMapId: string,
-): Promise<LinearStorySyncTarget | null> {
+async function getTeamIdForStoryMapInternal(supabase: SupabaseLike, storyMapId: string): Promise<TeamIdResult> {
   try {
     const storyMapsTable = supabase.from('story_maps') as StoryMapsTable;
     const { data, error } = await storyMapsTable.select('team_id').eq('id', storyMapId).single();
     if (error) throw error;
-
-    const teamId = data?.team_id;
-    if (!teamId) return null;
-    return getSettingsForTeamId(supabase, teamId);
+    return { teamId: data?.team_id ?? null };
   } catch {
-    return null;
+    return { teamId: null };
   }
+}
+
+export async function getLinearStorySyncTargetForTeamId(
+  supabase: SupabaseLike,
+  teamId: string,
+): Promise<LinearStorySyncTarget | null> {
+  return getSettingsForTeamId(supabase, teamId);
+}
+
+export async function getTeamIdForStoryMap(supabase: SupabaseLike, storyMapId: string): Promise<string | null> {
+  const result = await getTeamIdForStoryMapInternal(supabase, storyMapId);
+  return result.teamId;
+}
+
+export async function getLinearStorySyncTargetForStoryMap(
+  supabase: SupabaseLike,
+  storyMapId: string,
+): Promise<LinearStorySyncTarget | null> {
+  const result = await getTeamIdForStoryMapInternal(supabase, storyMapId);
+  if (!result.teamId) return null;
+  return getSettingsForTeamId(supabase, result.teamId);
 }
 
 export async function getLinearStorySyncTargetForTask(
@@ -144,6 +163,21 @@ export async function getLinearStorySyncTargetForStory(
     if (!teamId) return null;
 
     return getSettingsForTeamId(supabase, teamId);
+  } catch {
+    return null;
+  }
+}
+
+export async function getTeamIdForStory(supabase: SupabaseLike, storyId: string): Promise<string | null> {
+  try {
+    const storiesTable = supabase.from('stories') as StoriesTable;
+    const { data, error } = await storiesTable
+      .select('tasks!inner(activities!inner(story_maps!inner(team_id)))')
+      .eq('id', storyId)
+      .single();
+    if (error) throw error;
+
+    return data?.tasks?.activities?.story_maps?.team_id ?? null;
   } catch {
     return null;
   }
