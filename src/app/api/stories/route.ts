@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createStorySchema, reorderStoriesSchema } from '@/app/api/story-maps/schemas';
 import { loadStoryWithStoryMap } from '@/build-runs/processor';
 import { isLinearSyncAvailableForStoryMap } from '@/integrations/linear/auth';
 import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
@@ -6,7 +7,7 @@ import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
-import { createStorySchema, reorderStoriesSchema, validateRequest } from '@/lib/validations';
+import { validateRequest } from '@/lib/validations';
 
 export async function PUT(request: Request) {
   const auth = await requireAuth();

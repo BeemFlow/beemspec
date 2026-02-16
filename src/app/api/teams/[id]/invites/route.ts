@@ -1,10 +1,11 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { inviteEmailSchema } from '@/app/api/teams/schemas';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
-import { invalidIdResponse, inviteEmailSchema, isValidUuid, validateRequest } from '@/lib/validations';
+import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { updateActivitySchema } from '@/app/api/story-maps/schemas';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
-import { invalidIdResponse, isValidUuid, pickDefined, updateActivitySchema, validateRequest } from '@/lib/validations';
+import { invalidIdResponse, isValidUuid, pickDefined, validateRequest } from '@/lib/validations';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();

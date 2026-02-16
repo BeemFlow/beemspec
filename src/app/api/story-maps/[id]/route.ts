@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { updateStoryMapSchema } from '@/app/api/story-maps/schemas';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
-import { invalidIdResponse, isValidUuid, pickDefined, updateStoryMapSchema, validateRequest } from '@/lib/validations';
+import { invalidIdResponse, isValidUuid, pickDefined, validateRequest } from '@/lib/validations';
 import type { StoryMapFull } from '@/types';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {

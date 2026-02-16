@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { createPersonaSchema } from '@/app/api/story-maps/schemas';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
-import { createPersonaSchema, validateRequest } from '@/lib/validations';
+import { validateRequest } from '@/lib/validations';
 
 export async function POST(request: Request) {
   const auth = await requireAuth();

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { createTeamSchema } from '@/app/api/teams/schemas';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
-import { createTeamSchema, validateRequest } from '@/lib/validations';
+import { validateRequest } from '@/lib/validations';
 import type { TeamWithRole } from '@/types';
 
 export async function GET() {

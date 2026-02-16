@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
 import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
+import { linearSyncStorySchema } from '@/integrations/linear/schemas';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { syncStoryToLinear } from '@/integrations/linear/story-sync';
 import {
@@ -12,7 +13,7 @@ import type { LinearIssueSync } from '@/integrations/linear/types';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
-import { linearSyncStorySchema, validateRequest } from '@/lib/validations';
+import { validateRequest } from '@/lib/validations';
 
 function ignored(reason: string): NextResponse {
   return NextResponse.json({ success: true, ignored: true, reason });

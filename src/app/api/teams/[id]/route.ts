@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { updateTeamSchema } from '@/app/api/teams/schemas';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
-import { invalidIdResponse, isValidUuid, updateTeamSchema, validateRequest } from '@/lib/validations';
+import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();

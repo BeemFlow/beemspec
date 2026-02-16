@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server';
+import { updateLinearIntegrationSettingsSchema } from '@/integrations/linear/schemas';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
-import {
-  invalidIdResponse,
-  isValidUuid,
-  updateLinearIntegrationSettingsSchema,
-  validateRequest,
-} from '@/lib/validations';
+import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 
 function normalizeText(value: string | null | undefined): string | null | undefined {
   if (value === undefined) return undefined;

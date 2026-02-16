@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
+import { opencodeMarkBlockedSchema } from '@/integrations/opencode/schemas';
 import { isAuthorizedByOpenCodeToken } from '@/integrations/opencode/session';
 import { requireAuth } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
-import { opencodeMarkBlockedSchema, validateRequest } from '@/lib/validations';
+import { validateRequest } from '@/lib/validations';
 
 export async function POST(request: Request) {
   const usingToken = isAuthorizedByOpenCodeToken(request);

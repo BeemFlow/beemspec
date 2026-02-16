@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { syncStoriesByIdList } from '@/app/api/integrations/linear/sync/route';
 import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
+import { linearSyncBatchSchema } from '@/integrations/linear/schemas';
 import { requireAuth } from '@/lib/auth';
 import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
-import { linearSyncBatchSchema, validateRequest } from '@/lib/validations';
+import { validateRequest } from '@/lib/validations';
 
 function isAuthorizedByCronToken(request: Request): boolean {
   const token = env.syncCronToken();
