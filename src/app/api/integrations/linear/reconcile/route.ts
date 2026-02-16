@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
+import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
 import { buildStoryPatchFromLinearIssue, shouldApplyRemoteUpdate } from '@/integrations/linear/reconcile';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { syncStoryToLinear } from '@/integrations/linear/story-sync';
+import type { LinearIssueSync } from '@/integrations/linear/types';
+import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { linearReconcileStorySchema, validateRequest } from '@/lib/validations';
-import { runtime } from '@/runtime';
 
 function ignored(reason: string): NextResponse {
   return NextResponse.json({ success: true, ignored: true, reason });
@@ -41,7 +43,7 @@ async function reconcileRemoteToLocal(
 
 async function reconcileLocalToRemote(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  linearIssueSync: NonNullable<typeof runtime.storyMap.linearIssueSync>,
+  linearIssueSync: NonNullable<LinearIssueSync>,
   target: Parameters<typeof syncStoryToLinear>[3],
   story: Record<string, unknown>,
   link: { linearIssueId: string },
@@ -62,7 +64,7 @@ async function reconcileLocalToRemote(
 
 export async function reconcileStoryById(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
-  fallbackLinearIssueSync: typeof runtime.storyMap.linearIssueSync;
+  fallbackLinearIssueSync: LinearIssueSync | null;
   storyId: string;
 }): Promise<NextResponse> {
   const { data: story, error: storyError } = await input.supabase
@@ -108,7 +110,7 @@ export async function reconcileStoryById(input: {
 }
 
 export async function POST(request: Request) {
-  const auth = await runtime.storyMap.auth.requireAuth();
+  const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
   const validation = await validateRequest(request, linearReconcileStorySchema);
@@ -117,7 +119,7 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   return reconcileStoryById({
     supabase,
-    fallbackLinearIssueSync: runtime.storyMap.linearIssueSync,
+    fallbackLinearIssueSync: getLinearIssueSync(),
     storyId: validation.data.story_id,
   });
 }

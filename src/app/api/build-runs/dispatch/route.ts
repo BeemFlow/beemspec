@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { dispatchQueuedBuildRunJobs } from '@/build-runs/queue';
+import { getOpenCodeSessions } from '@/integrations/opencode/session';
+import { requireAuth } from '@/lib/auth';
 import { env } from '@/lib/env';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
-import { runtime } from '@/runtime';
 
 function isAuthorizedByWorkerToken(request: Request): boolean {
   const token = env.workerToken();
@@ -19,7 +20,7 @@ function parseLimit(request: Request): number {
 
 export async function POST(request: Request) {
   if (!isAuthorizedByWorkerToken(request)) {
-    const auth = await runtime.storyMap.auth.requireAuth();
+    const auth = await requireAuth();
     if (!auth.success) return auth.response;
   }
 
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
   try {
     const summary = await dispatchQueuedBuildRunJobs(supabase, {
       limit: parseLimit(request),
-      openCodeSessions: runtime.storyMap.openCodeSessions,
+      openCodeSessions: getOpenCodeSessions(),
     });
     return NextResponse.json({ ok: true, ...summary });
   } catch (error) {

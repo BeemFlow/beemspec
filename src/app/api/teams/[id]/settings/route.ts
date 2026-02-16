@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/auth';
+import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-import { runtime } from '@/runtime';
 
 async function getTeamRoleForRequest(teamId: string, userId: string): Promise<string | null> {
   const supabase = await createClient();
@@ -19,7 +19,7 @@ async function getTeamRoleForRequest(teamId: string, userId: string): Promise<st
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await runtime.teams.auth.requireAuth();
+  const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
   const { id: teamId } = await params;

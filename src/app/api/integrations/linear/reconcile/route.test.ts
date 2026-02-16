@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { runtime } from '@/runtime';
 import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({
@@ -10,6 +10,10 @@ vi.mock('@/lib/auth', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
+}));
+
+vi.mock('@/integrations/linear/issue-sync', () => ({
+  getLinearIssueSync: vi.fn(),
 }));
 
 const STORY_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
@@ -118,13 +122,14 @@ describe('linear reconcile route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
+    vi.mocked(getLinearIssueSync).mockReturnValue(null);
   });
 
   it('applies remote->local when remote is newer', async () => {
     const { client, storyUpdate } = createReconcileClient('2026-02-14T10:00:00.000Z');
     vi.mocked(createClient).mockResolvedValue(client as never);
 
-    runtime.storyMap.linearIssueSync = {
+    vi.mocked(getLinearIssueSync).mockReturnValue({
       getIssueById: vi.fn().mockResolvedValue({
         id: 'lin_1',
         identifier: 'ENG-1',
@@ -135,7 +140,7 @@ describe('linear reconcile route', () => {
       }),
       createIssue: vi.fn(),
       updateIssue: vi.fn(),
-    };
+    });
 
     const response = await POST(jsonRequest({ story_id: STORY_ID }));
 
@@ -164,7 +169,7 @@ describe('linear reconcile route', () => {
       updatedAt: '2026-02-14T12:00:00.000Z',
     });
 
-    runtime.storyMap.linearIssueSync = {
+    vi.mocked(getLinearIssueSync).mockReturnValue({
       getIssueById: vi.fn().mockResolvedValue({
         id: 'lin_1',
         identifier: 'ENG-1',
@@ -175,7 +180,7 @@ describe('linear reconcile route', () => {
       }),
       createIssue: vi.fn(),
       updateIssue,
-    };
+    });
 
     const response = await POST(jsonRequest({ story_id: STORY_ID }));
 
@@ -196,7 +201,7 @@ describe('linear reconcile route', () => {
       updatedAt: '2026-02-14T11:00:00.000Z',
     });
 
-    runtime.storyMap.linearIssueSync = {
+    vi.mocked(getLinearIssueSync).mockReturnValue({
       getIssueById: vi.fn().mockResolvedValue({
         id: 'lin_1',
         identifier: 'ENG-1',
@@ -207,7 +212,7 @@ describe('linear reconcile route', () => {
       }),
       createIssue: vi.fn(),
       updateIssue,
-    };
+    });
 
     const response = await POST(jsonRequest({ story_id: STORY_ID }));
 

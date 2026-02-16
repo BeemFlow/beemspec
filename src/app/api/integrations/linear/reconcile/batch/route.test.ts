@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { runtime } from '@/runtime';
 import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({
@@ -11,6 +11,10 @@ vi.mock('@/lib/auth', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
+}));
+
+vi.mock('@/integrations/linear/issue-sync', () => ({
+  getLinearIssueSync: vi.fn(),
 }));
 
 vi.mock('@/app/api/integrations/linear/reconcile/route', () => ({
@@ -32,11 +36,11 @@ describe('linear batch reconcile route', () => {
     vi.clearAllMocks();
     delete process.env.BEEMSPEC_RECONCILE_CRON_TOKEN;
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
-    runtime.storyMap.linearIssueSync = {
+    vi.mocked(getLinearIssueSync).mockReturnValue({
       getIssueById: vi.fn(),
       createIssue: vi.fn(),
       updateIssue: vi.fn(),
-    };
+    });
   });
 
   it('reconciles stories selected by stale last_synced_at and returns summary', async () => {

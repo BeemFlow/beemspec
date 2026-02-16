@@ -2,7 +2,7 @@
 
 ## Guiding organization style
 
-- Keep core flow logic in a few direct modules (`build-runs`, `runtime`, `integrations`).
+- Keep core flow logic in a few direct modules (`build-runs`, `integrations`).
 - Keep shared helpers in `lib`.
 - Keep API routes thin and call into those modules.
 
@@ -12,7 +12,6 @@
 - `src/integrations/linear`: Linear API + webhook ingest + sync/reconcile helpers.
 - `src/integrations/opencode`: OpenCode session runtime adapter.
 - `src/app/api`: HTTP boundaries only.
-- `src/runtime.ts`: runtime dependency wiring.
 - `src/lib`: auth, errors, validation, supabase clients, utility helpers.
 - `src/components`: app and UI components.
 

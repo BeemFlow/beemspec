@@ -189,3 +189,7 @@ export function createOpenCodeSessions(enabled: boolean): OpenCodeSessions | nul
     },
   };
 }
+
+export function getOpenCodeSessions(): OpenCodeSessions | null {
+  return createOpenCodeSessions(true);
+}

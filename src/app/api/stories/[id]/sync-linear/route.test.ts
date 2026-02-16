@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadStoryWithStoryMap, processStoryLinearSyncById } from '@/build-runs/processor';
+import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { runtime } from '@/runtime';
 import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
@@ -11,6 +11,7 @@ vi.mock('@/build-runs/processor', () => ({
   loadStoryWithStoryMap: vi.fn(),
   processStoryLinearSyncById: vi.fn(),
 }));
+vi.mock('@/integrations/linear/issue-sync', () => ({ getLinearIssueSync: vi.fn() }));
 
 const STORY_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
@@ -18,6 +19,7 @@ describe('story manual linear sync route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
+    vi.mocked(getLinearIssueSync).mockReturnValue(null);
   });
 
   it('syncs story to linear immediately', async () => {
@@ -27,7 +29,8 @@ describe('story manual linear sync route', () => {
       data: { story: { id: STORY_ID }, storyMapId: 'story_map_1' },
     } as never);
 
-    runtime.storyMap.linearIssueSync = { getIssueById: vi.fn(), createIssue: vi.fn(), updateIssue: vi.fn() };
+    const linearIssueSync = { getIssueById: vi.fn(), createIssue: vi.fn(), updateIssue: vi.fn() };
+    vi.mocked(getLinearIssueSync).mockReturnValue(linearIssueSync);
     vi.mocked(processStoryLinearSyncById).mockResolvedValue({
       id: 'lin_issue_1',
       identifier: 'ENG-101',

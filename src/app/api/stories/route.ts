@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { loadStoryWithStoryMap, processStoryLinearSyncById } from '@/build-runs/processor';
 import { isLinearSyncAvailableForStoryMap } from '@/integrations/linear/auth';
+import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
+import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { createStorySchema, reorderStoriesSchema, validateRequest } from '@/lib/validations';
-import { runtime } from '@/runtime';
 
 export async function PUT(request: Request) {
-  const auth = await runtime.storyMap.auth.requireAuth();
+  const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
   const validation = await validateRequest(request, reorderStoriesSchema);
@@ -27,7 +28,7 @@ export async function PUT(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await runtime.storyMap.auth.requireAuth();
+  const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
   const validation = await validateRequest(request, createStorySchema);
@@ -60,13 +61,13 @@ export async function POST(request: Request) {
 
     const linearSyncEnabled = await isLinearSyncAvailableForStoryMap(supabase, {
       storyMapId: context.data.storyMapId,
-      fallbackLinearIssueSync: runtime.storyMap.linearIssueSync,
+      fallbackLinearIssueSync: getLinearIssueSync(),
     });
     if (!linearSyncEnabled) return NextResponse.json(data);
 
     const linearIssue = await processStoryLinearSyncById(supabase, {
       storyId: data.id,
-      linearIssueSync: runtime.storyMap.linearIssueSync,
+      linearIssueSync: getLinearIssueSync(),
     });
 
     return NextResponse.json({

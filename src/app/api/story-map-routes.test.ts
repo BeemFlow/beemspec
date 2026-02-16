@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadStoryWithStoryMap, processStoryLinearSyncById } from '@/build-runs/processor';
+import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { runtime } from '@/runtime';
 import { DELETE as deleteActivityById, PUT as putActivityById } from './activities/[id]/route';
 import { POST as postActivities, PUT as putActivities } from './activities/route';
 import { DELETE as deleteReleaseById, PUT as putReleaseById } from './releases/[id]/route';
@@ -23,6 +23,10 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/build-runs/processor', () => ({
   loadStoryWithStoryMap: vi.fn(),
   processStoryLinearSyncById: vi.fn(),
+}));
+
+vi.mock('@/integrations/linear/issue-sync', () => ({
+  getLinearIssueSync: vi.fn(),
 }));
 
 const VALID_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
@@ -219,7 +223,7 @@ describe('story map API routes', () => {
       stateId: null,
       updatedAt: '2026-02-16T00:00:00.000Z',
     });
-    runtime.storyMap.linearIssueSync = null;
+    vi.mocked(getLinearIssueSync).mockReturnValue(null);
   });
 
   describe('reorder routes', () => {
@@ -400,11 +404,12 @@ describe('story map API routes', () => {
         status: 'backlog',
       });
       vi.mocked(createClient).mockResolvedValue(client as never);
-      runtime.storyMap.linearIssueSync = {
+      const linearIssueSync = {
         getIssueById: vi.fn(),
         createIssue: vi.fn(),
         updateIssue: vi.fn(),
       };
+      vi.mocked(getLinearIssueSync).mockReturnValue(linearIssueSync);
 
       const response = await postStories(
         jsonRequest({
@@ -419,7 +424,7 @@ describe('story map API routes', () => {
         expect.anything(),
         expect.objectContaining({
           storyId: VALID_ID,
-          linearIssueSync: runtime.storyMap.linearIssueSync,
+          linearIssueSync,
         }),
       );
 
@@ -504,11 +509,12 @@ describe('story map API routes', () => {
       const { client } = createStoryUpdateWithLinkClient(story, 'lin_issue_1');
       vi.mocked(createClient).mockResolvedValue(client as never);
 
-      runtime.storyMap.linearIssueSync = {
+      const linearIssueSync = {
         getIssueById: vi.fn(),
         createIssue: vi.fn(),
         updateIssue: vi.fn(),
       };
+      vi.mocked(getLinearIssueSync).mockReturnValue(linearIssueSync);
 
       const response = await putStoryById(jsonRequest({ title: 'Story edited', status: 'ready' }), {
         params: Promise.resolve({ id: VALID_ID }),
@@ -518,7 +524,7 @@ describe('story map API routes', () => {
         expect.anything(),
         expect.objectContaining({
           storyId: VALID_ID,
-          linearIssueSync: runtime.storyMap.linearIssueSync,
+          linearIssueSync,
         }),
       );
 

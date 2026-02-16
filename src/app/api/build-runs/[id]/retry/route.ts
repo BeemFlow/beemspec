@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { BUILD_RUN_ITEM_STATUS, BUILD_RUN_ITEMS_TABLE, BUILD_RUN_TABLE } from '@/build-runs/constants';
 import { requeueBuildRunRetryJob } from '@/build-runs/queue';
+import { getOpenCodeSessions } from '@/integrations/opencode/session';
+import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-import { runtime } from '@/runtime';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -25,10 +26,10 @@ async function loadFailedItemStoryIds(supabase: Supabase, runId: string) {
 }
 
 export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await runtime.storyMap.auth.requireAuth();
+  const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
-  const openCodeSessions = runtime.storyMap.openCodeSessions;
+  const openCodeSessions = getOpenCodeSessions();
   if (!openCodeSessions) return NextResponse.json({ error: 'OpenCode integration is not enabled' }, { status: 503 });
 
   const { id: runId } = await params;

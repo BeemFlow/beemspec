@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requeueBuildRunRetryJob } from '@/build-runs/queue';
+import { getOpenCodeSessions } from '@/integrations/opencode/session';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { runtime } from '@/runtime';
 import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 vi.mock('@/build-runs/queue', () => ({ requeueBuildRunRetryJob: vi.fn() }));
+vi.mock('@/integrations/opencode/session', () => ({ getOpenCodeSessions: vi.fn() }));
 
 const RUN_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
@@ -15,11 +16,11 @@ describe('build run retry route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
-    runtime.storyMap.openCodeSessions = {
+    vi.mocked(getOpenCodeSessions).mockReturnValue({
       createSession: vi.fn(),
       getSessionById: vi.fn(),
       appendStoryAssignment: vi.fn(),
-    };
+    });
   });
 
   it('queues retry job for failed run items', async () => {

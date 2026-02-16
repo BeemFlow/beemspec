@@ -6,10 +6,9 @@ import {
 } from '@/integrations/linear/reconcile';
 import { getStoryLinearLinkByLinearIssueId, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import type { LinearWebhookEvent } from '@/integrations/linear/types';
-import { createLinearWebhookSignatureVerifier } from '@/integrations/linear/webhook-ingest';
+import { createLinearWebhookSignatureVerifier, getLinearWebhookIngest } from '@/integrations/linear/webhook-ingest';
 import { serverErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { runtime } from '@/runtime';
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object') return null;
@@ -89,7 +88,7 @@ function isSupportedIssueEvent(event: LinearWebhookEvent): boolean {
 }
 
 function parseAndVerifyEvent(request: Request, rawBody: string): LinearWebhookEvent | null {
-  const ingest = runtime.storyMap.linearWebhookIngest;
+  const ingest = getLinearWebhookIngest();
   if (!ingest) return null;
 
   let event: LinearWebhookEvent;
@@ -179,7 +178,7 @@ async function processIssueEvent(
 }
 
 export async function POST(request: Request) {
-  if (!runtime.storyMap.linearWebhookIngest) {
+  if (!getLinearWebhookIngest()) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 

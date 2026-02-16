@@ -124,3 +124,7 @@ export function createLinearIssueSync(enabled: boolean, options: LinearIssueSync
     },
   };
 }
+
+export function getLinearIssueSync(): LinearIssueSync | null {
+  return createLinearIssueSync(Boolean(env.linearApiKey()));
+}

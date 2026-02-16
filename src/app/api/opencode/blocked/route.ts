@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { isAuthorizedByOpenCodeToken } from '@/integrations/opencode/session';
+import { requireAuth } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { opencodeMarkBlockedSchema, validateRequest } from '@/lib/validations';
-import { runtime } from '@/runtime';
 
 export async function POST(request: Request) {
   const usingToken = isAuthorizedByOpenCodeToken(request);
   if (!usingToken) {
-    const auth = await runtime.storyMap.auth.requireAuth();
+    const auth = await requireAuth();
     if (!auth.success) return auth.response;
   }
 

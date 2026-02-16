@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createLinearOAuthAuthorizeUrl } from '@/integrations/linear/auth';
+import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { isValidUuid } from '@/lib/validations';
-import { runtime } from '@/runtime';
 
 const OAUTH_STATE_COOKIE = 'beemspec_linear_oauth_state';
 
@@ -37,7 +37,7 @@ function resolveReturnTo(request: Request): string {
 }
 
 export async function GET(request: Request) {
-  const auth = await runtime.storyMap.auth.requireAuth();
+  const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
   const teamId = new URL(request.url).searchParams.get('team_id');

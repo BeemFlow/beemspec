@@ -90,6 +90,10 @@ export function createLinearWebhookIngest(enabled: boolean): LinearWebhookIngest
   };
 }
 
+export function getLinearWebhookIngest(): LinearWebhookIngest | null {
+  return createLinearWebhookIngest(Boolean(env.linearWebhookSecret()));
+}
+
 export function createLinearWebhookSignatureVerifier(
   options: { secret?: string; maxTimestampDriftMs?: number; now?: () => number } = {},
 ): LinearWebhookSignatureVerifier | null {

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { BuildRunItemStatus, BuildRunStatus } from '@/build-runs/constants';
+import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-import { runtime } from '@/runtime';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -70,7 +70,7 @@ function latestByStory(items: Array<Record<string, unknown>>): Map<string, Story
 }
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await runtime.storyMap.auth.requireAuth();
+  const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
   const { id: releaseId } = await params;

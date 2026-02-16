@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/build-runs/queue';
+import { getOpenCodeSessions } from '@/integrations/opencode/session';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { runtime } from '@/runtime';
 import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
@@ -11,6 +11,7 @@ vi.mock('@/build-runs/queue', () => ({
   createBuildRunWithStoryJob: vi.fn(),
   enqueueBuildRunStoriesAtomically: vi.fn(),
 }));
+vi.mock('@/integrations/opencode/session', () => ({ getOpenCodeSessions: vi.fn() }));
 
 const STORY_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
@@ -18,6 +19,11 @@ describe('story build route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
+    vi.mocked(getOpenCodeSessions).mockReturnValue({
+      createSession: vi.fn(),
+      getSessionById: vi.fn(),
+      appendStoryAssignment: vi.fn(),
+    });
   });
 
   it('queues one story build job', async () => {
@@ -55,11 +61,6 @@ describe('story build route', () => {
 
     vi.mocked(createClient).mockResolvedValue({ from } as never);
 
-    runtime.storyMap.openCodeSessions = {
-      createSession: vi.fn(),
-      getSessionById: vi.fn(),
-      appendStoryAssignment: vi.fn(),
-    };
     vi.mocked(createBuildRunWithStoryJob).mockResolvedValue({
       data: {
         run_id: 'run_1',
@@ -132,11 +133,6 @@ describe('story build route', () => {
 
     vi.mocked(createClient).mockResolvedValue({ from } as never);
 
-    runtime.storyMap.openCodeSessions = {
-      createSession: vi.fn(),
-      getSessionById: vi.fn(),
-      appendStoryAssignment: vi.fn(),
-    };
     vi.mocked(enqueueBuildRunStoriesAtomically).mockResolvedValue({
       data: {
         build_run_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',

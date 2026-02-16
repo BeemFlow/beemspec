@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { loadStoryBuildContext } from '@/build-runs/processor';
 import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/build-runs/queue';
+import { getOpenCodeSessions } from '@/integrations/opencode/session';
+import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-
-import { runtime } from '@/runtime';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -29,10 +29,10 @@ function responseForStoryContextFailure(
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: route handles create-or-append build run flow
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await runtime.storyMap.auth.requireAuth();
+  const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
-  const openCodeSessions = runtime.storyMap.openCodeSessions;
+  const openCodeSessions = getOpenCodeSessions();
   if (!openCodeSessions) return NextResponse.json({ error: 'OpenCode integration is not enabled' }, { status: 503 });
 
   const { id: storyId } = await params;

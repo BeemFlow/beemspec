@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { isAuthorizedByOpenCodeToken } from '@/integrations/opencode/session';
+import { requireAuth } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-import { runtime } from '@/runtime';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: storyId } = await params;
@@ -11,7 +11,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const usingToken = isAuthorizedByOpenCodeToken(request);
   if (!usingToken) {
-    const auth = await runtime.storyMap.auth.requireAuth();
+    const auth = await requireAuth();
     if (!auth.success) return auth.response;
   }
 
