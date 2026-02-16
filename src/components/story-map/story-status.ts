@@ -1,9 +1,5 @@
 import type { StoryStatus } from '@/types';
 
-// =============================================================================
-// Story Status
-// =============================================================================
-
 export const STATUS_LABELS: Record<StoryStatus, string> = {
   backlog: 'Backlog',
   ready: 'Ready',
