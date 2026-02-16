@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { createBuildRun, enqueueStoryBuildJob } from '@/orchestration/release-build';
+import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 import { POST } from './route';
 
@@ -11,8 +11,8 @@ vi.mock('@/orchestration/release-build', async () => {
   const actual = await vi.importActual<typeof import('@/orchestration/release-build')>('@/orchestration/release-build');
   return {
     ...actual,
-    createBuildRun: vi.fn(),
-    enqueueStoryBuildJob: vi.fn(),
+    createBuildRunWithStoryJob: vi.fn(),
+    enqueueBuildRunStoriesAtomically: vi.fn(),
   };
 });
 
@@ -64,9 +64,13 @@ describe('story build route', () => {
       getSessionById: vi.fn(),
       appendStoryAssignment: vi.fn(),
     };
-    vi.mocked(createBuildRun).mockResolvedValue({ data: { id: 'run_1' }, error: null } as never);
-    vi.mocked(enqueueStoryBuildJob).mockResolvedValue({
-      data: { id: 'job_1', status: 'queued' },
+    vi.mocked(createBuildRunWithStoryJob).mockResolvedValue({
+      data: {
+        run_id: 'run_1',
+        job_id: 'job_1',
+        queued_story_ids: [STORY_ID],
+        queued_items: 1,
+      },
       error: null,
     } as never);
 
@@ -122,20 +126,11 @@ describe('story build route', () => {
     const targetRunEq = vi.fn().mockReturnValue({ single: targetRunSingle });
     const targetRunSelect = vi.fn().mockReturnValue({ eq: targetRunEq });
 
-    const itemMaybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-    const itemEqStory = vi.fn().mockReturnValue({ maybeSingle: itemMaybeSingle });
-    const itemEqRun = vi.fn().mockReturnValue({ eq: itemEqStory });
-    const itemSelect = vi.fn().mockReturnValue({ eq: itemEqRun });
-
-    const runUpdateEq = vi.fn().mockResolvedValue({ error: null });
-    const runUpdate = vi.fn().mockReturnValue({ eq: runUpdateEq });
-
     const from = vi.fn((table: string) => {
       if (table === 'stories') return { select: storySelect };
       if (table === 'tasks') return { select: taskSelect };
       if (table === 'activities') return { select: activitySelect };
-      if (table === 'build_runs') return { select: targetRunSelect, update: runUpdate };
-      if (table === 'build_run_items') return { select: itemSelect };
+      if (table === 'build_runs') return { select: targetRunSelect };
       return {};
     });
 
@@ -146,8 +141,14 @@ describe('story build route', () => {
       getSessionById: vi.fn(),
       appendStoryAssignment: vi.fn(),
     };
-    vi.mocked(enqueueStoryBuildJob).mockResolvedValue({
-      data: { id: 'job_2', status: 'queued' },
+    vi.mocked(enqueueBuildRunStoriesAtomically).mockResolvedValue({
+      data: {
+        build_run_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        job_id: 'job_2',
+        queued_story_ids: [STORY_ID],
+        queued_items: 1,
+        appended_items: 1,
+      },
       error: null,
     } as never);
 
@@ -160,12 +161,15 @@ describe('story build route', () => {
       },
     );
 
-    expect(createBuildRun).not.toHaveBeenCalled();
-    expect(enqueueStoryBuildJob).toHaveBeenCalledWith(
+    expect(createBuildRunWithStoryJob).not.toHaveBeenCalled();
+    expect(enqueueBuildRunStoriesAtomically).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ buildRunId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', storyIds: [STORY_ID] }),
+      expect.objectContaining({
+        buildRunId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        storyIds: [STORY_ID],
+        queueExisting: true,
+      }),
     );
-    expect(runUpdate).toHaveBeenCalledWith(expect.objectContaining({ total_items: 4, status: 'queued' }));
 
     await expect(response.json()).resolves.toMatchObject({
       run_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',

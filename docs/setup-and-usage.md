@@ -41,7 +41,7 @@ Optional release worker dispatch auth:
 
 Apply all migrations in `supabase/migrations`.
 
-Note: build-run retry/session metadata is now consolidated directly in `004_build_runs.sql`.
+Note: integrations, build-run schema, orchestration queue schema, and atomic queue functions are consolidated in `003_story_linear_links.sql`.
 
 ## 4) Configure team integration
 

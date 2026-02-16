@@ -88,9 +88,7 @@ export async function insertFailedBuildRunItem(
   },
 ) {
   const existing = await loadExistingBuildRunItem(supabase, input);
-  const retry = existing
-    ? { retryCount: existing.retry_count + 1, lastRetryAt: new Date().toISOString() }
-    : { retryCount: 0, lastRetryAt: null };
+  const retry = retryMetadata(existing);
 
   return supabase
     .from('build_run_items')

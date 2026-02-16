@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-import { enqueueStoryBuildJob } from '@/orchestration/release-build';
+import { requeueBuildRunRetryJob } from '@/orchestration/release-build';
 import { runtime } from '@/runtime';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -52,24 +52,22 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     });
   }
 
-  await supabase.from('build_runs').update({ status: 'queued', error: null }).eq('id', runId);
-
-  const { data: job, error: jobError } = await enqueueStoryBuildJob(supabase, {
-    releaseId: run.release_id,
+  const { data: requeueResult, error: requeueError } = await requeueBuildRunRetryJob(supabase, {
     buildRunId: runId,
+    releaseId: run.release_id,
     storyMapId: run.story_map_id,
     storyIds,
   });
-  if (jobError || !job) {
-    return serverErrorResponse('Failed to enqueue build run retry job', jobError ?? new Error('Job not created'));
+  if (requeueError || !requeueResult || !requeueResult.job_id) {
+    return serverErrorResponse('Failed to enqueue build run retry job', requeueError ?? new Error('Job not created'));
   }
 
   return NextResponse.json(
     {
       run_id: runId,
       build_run_id: runId,
-      job_id: job.id,
-      retried_items: storyIds.length,
+      job_id: requeueResult.job_id,
+      retried_items: requeueResult.queued_items,
       status: 'queued',
     },
     { status: 202 },

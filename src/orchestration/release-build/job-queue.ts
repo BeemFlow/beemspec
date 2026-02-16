@@ -14,6 +14,85 @@ import type {
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 const BASE_RETRY_DELAY_MS = 5000;
 
+export interface EnqueueBuildRunStoriesResult {
+  build_run_id: string;
+  job_id: string | null;
+  queued_story_ids: string[];
+  queued_items: number;
+  appended_items: number;
+}
+
+export interface CreateBuildRunWithStoryJobResult {
+  run_id: string;
+  job_id: string | null;
+  queued_story_ids: string[];
+  queued_items: number;
+}
+
+export interface RequeueBuildRunRetryJobResult {
+  job_id: string | null;
+  queued_items: number;
+}
+
+export async function enqueueBuildRunStoriesAtomically(
+  supabase: Supabase,
+  input: {
+    storyMapId: string;
+    buildRunId: string;
+    releaseId: string | null;
+    storyIds: string[];
+    queueExisting?: boolean;
+  },
+) {
+  return supabase
+    .rpc('enqueue_build_run_story_job', {
+      p_build_run_id: input.buildRunId,
+      p_release_id: input.releaseId,
+      p_story_map_id: input.storyMapId,
+      p_story_ids: input.storyIds,
+      p_queue_existing: input.queueExisting ?? false,
+    })
+    .single<EnqueueBuildRunStoriesResult>();
+}
+
+export async function createBuildRunWithStoryJob(
+  supabase: Supabase,
+  input: {
+    releaseId: string | null;
+    storyMapId: string;
+    userId: string;
+    storyIds: string[];
+  },
+) {
+  return supabase
+    .rpc('create_build_run_with_story_job', {
+      p_release_id: input.releaseId,
+      p_story_map_id: input.storyMapId,
+      p_triggered_by: input.userId,
+      p_story_ids: input.storyIds,
+    })
+    .single<CreateBuildRunWithStoryJobResult>();
+}
+
+export async function requeueBuildRunRetryJob(
+  supabase: Supabase,
+  input: {
+    buildRunId: string;
+    releaseId: string | null;
+    storyMapId: string;
+    storyIds: string[];
+  },
+) {
+  return supabase
+    .rpc('requeue_build_run_retry_job', {
+      p_build_run_id: input.buildRunId,
+      p_release_id: input.releaseId,
+      p_story_map_id: input.storyMapId,
+      p_story_ids: input.storyIds,
+    })
+    .single<RequeueBuildRunRetryJobResult>();
+}
+
 export async function enqueueStoryBuildJob(
   supabase: Supabase,
   input: {
