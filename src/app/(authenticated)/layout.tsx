@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
+import { TeamProvider } from '@/app/(authenticated)/team-context';
 import { AppShell } from '@/components/app-shell';
-import { TeamProvider } from '@/lib/contexts/team-context';
 import { createClient } from '@/lib/supabase/server';
 import type { TeamWithRole } from '@/types';
 
