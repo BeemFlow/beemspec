@@ -235,6 +235,7 @@ export const linearSyncStorySchema = z.object({
 
 export const linearSyncBatchSchema = z
   .object({
+    story_ids: z.array(uuid).min(1).max(200).optional(),
     limit: z.number().int().min(1).max(200).optional(),
     older_than_minutes: z
       .number()

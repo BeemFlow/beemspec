@@ -18,10 +18,10 @@ vi.mock('@/integrations/linear/issue-sync', () => ({
 }));
 
 vi.mock('@/app/api/integrations/linear/sync/route', () => ({
-  syncStoryById: vi.fn(),
+  syncStoriesByIdList: vi.fn(),
 }));
 
-import { syncStoryById } from '@/app/api/integrations/linear/sync/route';
+import { syncStoriesByIdList } from '@/app/api/integrations/linear/sync/route';
 
 function jsonRequest(body: unknown): Request {
   return new Request('http://localhost/api/integrations/linear/sync/batch', {
@@ -54,13 +54,22 @@ describe('linear batch sync route', () => {
     const from = vi.fn().mockReturnValue({ select });
     vi.mocked(createClient).mockResolvedValue({ from } as never);
 
-    vi.mocked(syncStoryById)
-      .mockResolvedValueOnce(NextResponse.json({ success: true }, { status: 200 }))
-      .mockResolvedValueOnce(NextResponse.json({ error: 'failed' }, { status: 500 }));
+    vi.mocked(syncStoriesByIdList).mockResolvedValue({
+      considered: 2,
+      succeeded: 1,
+      failed: 1,
+      responses: [],
+    });
 
     const response = await POST(jsonRequest({ limit: 10, older_than_minutes: 60 }));
 
-    expect(syncStoryById).toHaveBeenCalledTimes(2);
+    expect(syncStoriesByIdList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        supabase: expect.anything(),
+        fallbackLinearIssueSync: expect.anything(),
+        storyIds: ['story_1', 'story_2'],
+      }),
+    );
     await expect(response.json()).resolves.toMatchObject({
       success: true,
       considered: 2,
@@ -82,6 +91,12 @@ describe('linear batch sync route', () => {
     const select = vi.fn().mockReturnValue({ lt });
     const from = vi.fn().mockReturnValue({ select });
     vi.mocked(createClient).mockResolvedValue({ from } as never);
+    vi.mocked(syncStoriesByIdList).mockResolvedValue({
+      considered: 0,
+      succeeded: 0,
+      failed: 0,
+      responses: [],
+    });
 
     const request = new Request('http://localhost/api/integrations/linear/sync/batch', {
       method: 'POST',
@@ -95,5 +110,29 @@ describe('linear batch sync route', () => {
     const response = await POST(request);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ success: true, considered: 0 });
+  });
+
+  it('uses provided story_ids instead of stale-link selection', async () => {
+    const from = vi.fn();
+    vi.mocked(createClient).mockResolvedValue({ from } as never);
+    vi.mocked(syncStoriesByIdList).mockResolvedValue({
+      considered: 1,
+      succeeded: 1,
+      failed: 0,
+      responses: [],
+    });
+
+    const response = await POST(
+      jsonRequest({ story_ids: ['d7f34189-5d27-4dc0-b2c5-23d11796add4', 'd7f34189-5d27-4dc0-b2c5-23d11796add4'] }),
+    );
+
+    expect(from).not.toHaveBeenCalled();
+    expect(syncStoriesByIdList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storyIds: ['d7f34189-5d27-4dc0-b2c5-23d11796add4'],
+      }),
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true, considered: 1, succeeded: 1, failed: 0 });
   });
 });

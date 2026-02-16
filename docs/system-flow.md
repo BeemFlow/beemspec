@@ -39,7 +39,7 @@ If `build_run_id` is provided, BeemSpec appends the story to that existing build
 - Retry failed items: `POST /api/build-runs/:id/retry`
 - Manual per-story sync: `POST /api/stories/:id/sync-linear` (direct sync)
 - Mark blocked: `POST /api/opencode/blocked`
-- Batch sync backfill (optional machine token): `POST /api/integrations/linear/sync/batch`
+- Batch sync backfill (optional machine token): `POST /api/integrations/linear/sync/batch` (stale-link query or explicit `story_ids`)
 
 Queue dispatch notes:
 

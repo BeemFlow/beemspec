@@ -1,14 +1,10 @@
 import { NextResponse } from 'next/server';
-import { syncStoryById } from '@/app/api/integrations/linear/sync/route';
+import { syncStoriesByIdList } from '@/app/api/integrations/linear/sync/route';
 import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
 import { requireAuth } from '@/lib/auth';
 import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 import { linearSyncBatchSchema, validateRequest } from '@/lib/validations';
-
-function isSuccessResponseStatus(status: number): boolean {
-  return status >= 200 && status < 300;
-}
 
 function isAuthorizedByCronToken(request: Request): boolean {
   const token = env.syncCronToken();
@@ -35,44 +31,35 @@ export async function POST(request: Request) {
   const cutoffIso = new Date(Date.now() - olderThanMinutes * 60 * 1000).toISOString();
 
   const supabase = await createClient();
-  const { data: links, error } = await supabase
-    .from('story_linear_links')
-    .select('story_id')
-    .lt('last_synced_at', cutoffIso)
-    .order('last_synced_at', { ascending: true })
-    .limit(limit);
+  let storyIds: string[];
 
-  if (error) {
-    return NextResponse.json({ error: 'Failed to load stories for reconciliation' }, { status: 500 });
-  }
+  if (validation.data.story_ids && validation.data.story_ids.length > 0) {
+    storyIds = [...new Set(validation.data.story_ids)];
+  } else {
+    const { data: links, error } = await supabase
+      .from('story_linear_links')
+      .select('story_id')
+      .lt('last_synced_at', cutoffIso)
+      .order('last_synced_at', { ascending: true })
+      .limit(limit);
 
-  const storyIds = (links ?? []).map((row) => row.story_id as string).filter(Boolean);
-  const summary = {
-    considered: storyIds.length,
-    succeeded: 0,
-    failed: 0,
-  };
-
-  for (const storyId of storyIds) {
-    try {
-      const response = await syncStoryById({
-        supabase,
-        fallbackLinearIssueSync: linearIssueSync,
-        storyId,
-      });
-
-      if (isSuccessResponseStatus(response.status)) {
-        summary.succeeded += 1;
-      } else {
-        summary.failed += 1;
-      }
-    } catch {
-      summary.failed += 1;
+    if (error) {
+      return NextResponse.json({ error: 'Failed to load stories for sync' }, { status: 500 });
     }
+
+    storyIds = (links ?? []).map((row) => row.story_id as string).filter(Boolean);
   }
+
+  const summary = await syncStoriesByIdList({
+    supabase,
+    fallbackLinearIssueSync: linearIssueSync,
+    storyIds,
+  });
 
   return NextResponse.json({
     success: true,
-    ...summary,
+    considered: summary.considered,
+    succeeded: summary.succeeded,
+    failed: summary.failed,
   });
 }

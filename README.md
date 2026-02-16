@@ -53,7 +53,8 @@ Manual sync backfill endpoint:
 Batch sync backfill endpoint (for lightweight periodic drift correction):
 
 - `POST /api/integrations/linear/sync/batch`
-- body: `{ "limit": 25, "older_than_minutes": 30 }` (both optional)
+- body: `{ "limit": 25, "older_than_minutes": 30 }` (both optional for stale-link selection)
+- optional targeted body: `{ "story_ids": ["<uuid>", "<uuid>"] }` (sync exactly these stories)
 
 Batch sync supports machine-trigger auth token:
 

@@ -14,6 +14,10 @@ function ignored(reason: string): NextResponse {
   return NextResponse.json({ success: true, ignored: true, reason });
 }
 
+function isSuccessResponseStatus(status: number): boolean {
+  return status >= 200 && status < 300;
+}
+
 async function syncRemoteToLocal(
   supabase: Awaited<ReturnType<typeof createClient>>,
   story: { id: string },
@@ -27,7 +31,7 @@ async function syncRemoteToLocal(
   });
   const { error: updateError } = await supabase.from('stories').update(patch).eq('id', story.id);
   if (updateError) {
-    return serverErrorResponse('Failed to apply remote reconciliation update', updateError);
+    return serverErrorResponse('Failed to apply remote sync update', updateError);
   }
 
   await upsertStoryLinearLink(supabase, {
@@ -103,6 +107,51 @@ export async function syncStoryById(input: {
   return syncLocalToRemote(input.supabase, linearSyncContext.linearIssueSync, linearSyncContext.target, story, link);
 }
 
+export async function syncStoriesByIdList(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  fallbackLinearIssueSync: LinearIssueSync | null;
+  storyIds: string[];
+}): Promise<{
+  considered: number;
+  succeeded: number;
+  failed: number;
+  responses: Array<{ storyId: string; response: NextResponse }>;
+}> {
+  const responses: Array<{ storyId: string; response: NextResponse }> = [];
+  let succeeded = 0;
+  let failed = 0;
+
+  for (const storyId of input.storyIds) {
+    try {
+      const response = await syncStoryById({
+        supabase: input.supabase,
+        fallbackLinearIssueSync: input.fallbackLinearIssueSync,
+        storyId,
+      });
+      responses.push({ storyId, response });
+
+      if (isSuccessResponseStatus(response.status)) {
+        succeeded += 1;
+      } else {
+        failed += 1;
+      }
+    } catch (error) {
+      failed += 1;
+      responses.push({
+        storyId,
+        response: serverErrorResponse('Failed to sync story', error),
+      });
+    }
+  }
+
+  return {
+    considered: input.storyIds.length,
+    succeeded,
+    failed,
+    responses,
+  };
+}
+
 export async function POST(request: Request) {
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
@@ -111,9 +160,16 @@ export async function POST(request: Request) {
   if (!validation.success) return validation.response;
 
   const supabase = await createClient();
-  return syncStoryById({
+  const summary = await syncStoriesByIdList({
     supabase,
     fallbackLinearIssueSync: getLinearIssueSync(),
-    storyId: validation.data.story_id,
+    storyIds: [validation.data.story_id],
   });
+
+  const single = summary.responses[0];
+  if (!single) {
+    return serverErrorResponse('Failed to sync story', new Error('No sync response returned'));
+  }
+
+  return single.response;
 }
