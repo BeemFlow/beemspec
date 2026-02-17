@@ -272,7 +272,10 @@ export function createOpenCodeSessions(enabled: boolean): OpenCodeSessions | nul
       const dirConstraint = workingDirectory
         ? `\nCRITICAL: Your working directory is ${workingDirectory}. ALL file operations must stay inside this directory. Do NOT navigate to or modify any other project.`
         : '';
-      await client.session.prompt({
+      // Use promptAsync so the agent runs server-side and the web UI can
+      // tail the SSE event stream. The synchronous `prompt` consumes the
+      // response stream over our HTTP connection, starving the web UI.
+      await client.session.promptAsync({
         path: { id: sessionId },
         body: {
           parts: [
