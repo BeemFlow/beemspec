@@ -438,6 +438,38 @@ export function BuildRunsPanel({ releases, onError }: Props) {
           'Failed to load build run detail',
         );
         setSelectedRun(payload);
+        // Keep list and story-state panes in sync when detail endpoint lazily
+        // transitions a run from running -> completed/failed.
+        setRuns((current) =>
+          current.map((run) =>
+            run.id === payload.id
+              ? {
+                  ...run,
+                  status: payload.status,
+                  total_items: payload.total_items,
+                  completed_items: payload.completed_items,
+                  failed_items: payload.failed_items,
+                  error: payload.error,
+                  opencode_session_url: payload.opencode_session_url,
+                  finished_at: payload.finished_at,
+                }
+              : run,
+          ),
+        );
+        setStoryStates((current) =>
+          current.map((state) =>
+            state.latest_run?.run_id === payload.id
+              ? {
+                  ...state,
+                  latest_run: {
+                    ...state.latest_run,
+                    run_status: payload.status,
+                    opencode_session_url: payload.opencode_session_url,
+                  },
+                }
+              : state,
+          ),
+        );
       } catch (err) {
         const message = errorMessage(err);
         setRunError(message);
