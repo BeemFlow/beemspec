@@ -6,9 +6,8 @@ It provides:
 
 - OpenCode hook adapters for `experimental.session.compacting` and `experimental.chat.system.transform`
 - lifecycle event handling (`session.created`, `session.updated`, `session.idle`, `session.error`)
-- custom tools:
-  - `beemspec_story`
-  - `beemspec_blocked`
+
+It does not inject custom tools. BeemSpec tools are served by the app's HTTP MCP endpoint (`/api/mcp`).
 
 ## Usage
 
@@ -17,7 +16,17 @@ Add to `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-beemspec"]
+  "plugin": ["opencode-beemspec"],
+  "mcp": {
+    "beemspec": {
+      "type": "remote",
+      "url": "http://127.0.0.1:3000/api/mcp",
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer {env:BEEMSPEC_OPENCODE_TOKEN}"
+      }
+    }
+  }
 }
 ```
 
@@ -28,7 +37,8 @@ import BeemSpecPlugin from 'opencode-beemspec/runtime'
 export default BeemSpecPlugin
 ```
 
-Required env for network-backed tools:
+Required env for MCP auth (optional but recommended):
 
-- `BEEMSPEC_BASE_URL` (for example `http://127.0.0.1:3000`)
-- `BEEMSPEC_OPENCODE_TOKEN` (shared bearer token with BeemSpec API)
+- `BEEMSPEC_OPENCODE_TOKEN` (shared bearer token with BeemSpec MCP endpoint)
+
+The OpenCode plugin is intentionally hook-only. Tool execution flows through MCP (`beemspec_story`, `beemspec_blocked`).

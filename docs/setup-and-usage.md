@@ -104,7 +104,7 @@ APIs:
 - `POST /api/stories/:id/sync-linear`
 - `POST /api/opencode/blocked`
 
-## 8) OpenCode plugin usage
+## 8) OpenCode + MCP usage
 
 Package: `packages/opencode-beemspec`
 
@@ -112,10 +112,18 @@ For OpenCode runtime, load:
 
 - `opencode-beemspec/runtime`
 
-Tool-backed endpoints used by plugin:
+Add remote MCP server config in OpenCode:
 
-- `GET /api/opencode/story/:id`
-- `POST /api/opencode/blocked`
+- server name: `beemspec`
+- url: `http://127.0.0.1:3000/api/mcp`
+- tools exposed by MCP server: `beemspec_story`, `beemspec_blocked`
+- optional auth header: `Authorization: Bearer $BEEMSPEC_OPENCODE_TOKEN`
+
+MCP endpoint served by this app:
+
+- `POST /api/mcp`
+- `GET /api/mcp`
+- `DELETE /api/mcp`
 
 ## 9) Durable queue dispatch
 

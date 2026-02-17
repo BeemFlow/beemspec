@@ -98,12 +98,17 @@ OpenCode runtime session integration uses the official SDK (`@opencode-ai/sdk`) 
 - `BEEMSPEC_OPENCODE_BASE_URL` (defaults to `http://127.0.0.1:4096`)
 - optional `BEEMSPEC_OPENCODE_WEB_BASE_URL` for deep-link URL generation
 
-OpenCode plugin tool endpoints (token or authenticated user):
+OpenCode MCP endpoint:
 
-- `GET /api/opencode/story/:id`
+- `POST /api/mcp`
+- `GET /api/mcp`
+- `DELETE /api/mcp`
+
+Related OpenCode utility route:
+
 - `POST /api/opencode/blocked`
 
-Shared token for plugin-to-app calls:
+Shared token for MCP server to app calls:
 
 - `BEEMSPEC_OPENCODE_TOKEN`
 
@@ -111,7 +116,7 @@ Optional worker token for dispatch endpoint:
 
 - `BEEMSPEC_WORKER_TOKEN`
 
-OpenCode plugin package is implemented at `packages/opencode-beemspec` with hook + custom-tool support.
+OpenCode integration package is implemented at `packages/opencode-beemspec` for hook support. MCP tools are served from this Next app using the official MCP SDK.
 
 Quick docs:
 

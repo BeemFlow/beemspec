@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "BeemSpec OpenCode plugin hooks and tools",
+  "description": "BeemSpec OpenCode plugin hooks",
   "main": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",

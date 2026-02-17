@@ -1,41 +1,63 @@
 import type { Plugin } from '@opencode-ai/plugin';
-import { tool } from '@opencode-ai/plugin';
 import type { OpenCodeSessionContext } from './contracts';
-import { compactedContext, createBeemSpecNetworkTools } from './plugin';
+import { compactedContext } from './plugin';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isSessionContext(value: unknown): value is OpenCodeSessionContext {
+  if (!isRecord(value)) return false;
+
+  return (
+    typeof value.releaseId === 'string' &&
+    typeof value.storyId === 'string' &&
+    typeof value.storyTitle === 'string' &&
+    typeof value.requirements === 'string' &&
+    typeof value.acceptanceCriteria === 'string' &&
+    (typeof value.technicalGuidelines === 'string' || value.technicalGuidelines === null)
+  );
+}
+
+function shouldCaptureStoryContext(toolName: string): boolean {
+  return toolName === 'beemspec_story';
+}
+
+function parseSessionContextFromToolOutput(output: string): OpenCodeSessionContext | null {
+  const parse = (text: string): OpenCodeSessionContext | null => {
+    try {
+      const parsed = JSON.parse(text);
+      return isSessionContext(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const direct = parse(output);
+  if (direct) return direct;
+
+  const objectMatch = output.match(/\{[\s\S]*\}/);
+  if (!objectMatch) return null;
+
+  try {
+    const parsed = JSON.parse(objectMatch[0]);
+    return isSessionContext(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 export const BeemSpecPlugin: Plugin = async ({ client }) => {
-  const baseUrl = process.env.BEEMSPEC_BASE_URL;
-  const token = process.env.BEEMSPEC_OPENCODE_TOKEN;
-  const networkTools = baseUrl ? createBeemSpecNetworkTools({ baseUrl, token }) : null;
-
   const sessionContextBySessionId = new Map<string, OpenCodeSessionContext>();
 
   return {
-    tool: {
-      beemspec_story: tool({
-        description: 'Load BeemSpec story context for the current task',
-        args: {
-          storyId: tool.schema.string().uuid(),
-        },
-        async execute(args, context) {
-          if (!networkTools) throw new Error('BEEMSPEC_BASE_URL is required for beemspec_story tool');
-          const storyContext = await networkTools.loadStoryById({ storyId: args.storyId });
-          sessionContextBySessionId.set(context.sessionID, storyContext);
-          return JSON.stringify(storyContext, null, 2);
-        },
-      }),
-      beemspec_blocked: tool({
-        description: 'Mark a BeemSpec story as blocked with a reason',
-        args: {
-          storyId: tool.schema.string().uuid(),
-          reason: tool.schema.string().min(1),
-        },
-        async execute(args) {
-          if (!networkTools) throw new Error('BEEMSPEC_BASE_URL is required for beemspec_blocked tool');
-          await networkTools.markStoryBlocked({ storyId: args.storyId, reason: args.reason });
-          return JSON.stringify({ ok: true });
-        },
-      }),
+    'tool.execute.after': async (input, output) => {
+      if (!shouldCaptureStoryContext(input.tool)) return;
+
+      const sessionContext = parseSessionContextFromToolOutput(output.output);
+      if (!sessionContext) return;
+
+      sessionContextBySessionId.set(input.sessionID, sessionContext);
     },
     event: async ({ event }) => {
       if (
