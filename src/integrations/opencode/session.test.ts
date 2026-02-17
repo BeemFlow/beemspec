@@ -71,18 +71,24 @@ describe('opencode session service', () => {
     const service = createOpenCodeSessions(true);
     if (!service) throw new Error('Expected session service');
 
-    get.mockResolvedValue({ data: { id: 'session_2', time: { created: 1700000000000 } } });
-
-    // Mock fetch for the messages endpoint — last assistant message has finish: 'stop'
+    // 1) session details endpoint
+    // 2) messages endpoint — last assistant message has finish: 'stop'
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ id: 'session_2', time: { created: 1700000000000 } }), { status: 200 }),
+      )
       .mockResolvedValueOnce(
         new Response(JSON.stringify([{ info: { role: 'assistant', finish: 'stop' } }]), { status: 200 }),
       );
 
     const session = await service.getSessionById('session_2');
 
-    expect(get).toHaveBeenCalledWith({ path: { id: 'session_2' } });
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('/session/session_2'),
+      expect.objectContaining({ cache: 'no-store' }),
+    );
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining('/session/session_2/message'),
       expect.objectContaining({ cache: 'no-store' }),

@@ -25,8 +25,28 @@ export async function refreshRunStatusFromOpenCode(
   const sessions = createOpenCodeSessions(true);
   if (!sessions) return run;
 
-  const session = await sessions.getSessionById(run.opencode_session_id);
-  if (!session || session.state === 'active') return run;
+  let session: Awaited<ReturnType<OpenCodeSessions['getSessionById']>>;
+  try {
+    session = await sessions.getSessionById(run.opencode_session_id);
+  } catch (error) {
+    console.error('Failed to refresh OpenCode session status', error);
+    return run;
+  }
+
+  if (!session) {
+    await supabase
+      .from(BUILD_RUN_TABLE)
+      .update({
+        status: BUILD_RUN_STATUS.failed,
+        finished_at: new Date().toISOString(),
+        error: 'OpenCode session was deleted before completion.',
+      })
+      .eq('id', run.id);
+
+    return { ...run, status: BUILD_RUN_STATUS.failed };
+  }
+
+  if (session.state === 'active') return run;
 
   const newStatus = session.state === 'failed' ? BUILD_RUN_STATUS.failed : BUILD_RUN_STATUS.completed;
   await supabase

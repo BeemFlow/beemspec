@@ -242,20 +242,29 @@ export function createOpenCodeSessions(enabled: boolean): OpenCodeSessions | nul
       return createAndSeedSession(client, input);
     },
     async getSessionById(sessionId: string): Promise<OpenCodeSessionSnapshot | null> {
-      const client = getClient();
-      try {
-        const result = await client.session.get({ path: { id: sessionId } });
-        const session = readData<{ id: string; time?: { created?: number } }>(result);
-        const state = await detectSessionState(sessionId);
-        return {
-          id: session.id,
-          url: getOpencodeSessionUrl(session.id),
-          state,
-          createdAt: session.time?.created ? new Date(session.time.created).toISOString() : new Date().toISOString(),
-        };
-      } catch {
-        return null;
+      const baseUrl = getOpencodeBaseUrl();
+      const authorization = getOpencodeAuthorizationHeader();
+      const headers: Record<string, string> = {};
+      if (authorization) headers.authorization = authorization;
+
+      const res = await fetch(`${baseUrl}/session/${encodeURIComponent(sessionId)}`, {
+        cache: 'no-store',
+        headers,
+      });
+
+      if (res.status === 404) return null;
+      if (!res.ok) {
+        throw new Error(`OpenCode session lookup failed (${res.status})`);
       }
+
+      const session = (await res.json()) as { id: string; time?: { created?: number } };
+      const state = await detectSessionState(sessionId);
+      return {
+        id: session.id,
+        url: getOpencodeSessionUrl(session.id),
+        state,
+        createdAt: session.time?.created ? new Date(session.time.created).toISOString() : new Date().toISOString(),
+      };
     },
     async appendStoryAssignment(input: OpenCodeSessionStoryAssignmentInput): Promise<void> {
       const client = getClient();

@@ -1,3 +1,4 @@
+import { homedir } from 'node:os';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { env } from '@/lib/env';
@@ -10,6 +11,13 @@ interface OpenCodeProject {
 interface OpenCodeSession {
   id: string;
   directory?: string;
+}
+
+function isSelectableDirectory(path?: string): path is string {
+  if (!path || path === '/') return false;
+  const home = homedir();
+  if (path === home) return false;
+  return true;
 }
 
 export async function GET() {
@@ -30,7 +38,7 @@ export async function GET() {
     if (projectsRes.ok) {
       const projects: OpenCodeProject[] = await projectsRes.json();
       for (const p of Array.isArray(projects) ? projects : []) {
-        if (p.worktree && p.worktree !== '/') {
+        if (isSelectableDirectory(p.worktree)) {
           directories.set(p.worktree, p.id);
         }
       }
@@ -39,7 +47,7 @@ export async function GET() {
     if (sessionsRes.ok) {
       const sessions: OpenCodeSession[] = await sessionsRes.json();
       for (const s of Array.isArray(sessions) ? sessions : []) {
-        if (s.directory && s.directory !== '/' && !directories.has(s.directory)) {
+        if (isSelectableDirectory(s.directory) && !directories.has(s.directory)) {
           directories.set(s.directory, s.id);
         }
       }
