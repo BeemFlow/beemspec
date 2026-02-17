@@ -55,23 +55,6 @@ interface BuildRunsResponse {
   runs: BuildRunSummary[];
 }
 
-interface ReleaseStoryState {
-  story_id: string;
-  story_title: string;
-  story_status: string;
-  latest_run: {
-    run_id: string;
-    run_status: string;
-    item_status: string;
-    item_error: string | null;
-    opencode_session_url: string | null;
-  } | null;
-}
-
-interface ReleaseStoryStatesResponse {
-  story_states: ReleaseStoryState[];
-}
-
 interface BuildReleaseResponse {
   run_id: string;
 }
@@ -350,8 +333,6 @@ export function BuildRunsPanel({ releases, onError }: Props) {
   const [hasNextPage, setHasNextPage] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [selectedRun, setSelectedRun] = useState<BuildRunDetail | null>(null);
-  const [storyStates, setStoryStates] = useState<ReleaseStoryState[]>([]);
-  const [storyStatesLoading, setStoryStatesLoading] = useState(false);
   const [runLoading, setRunLoading] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
   const [buildingReleaseId, setBuildingReleaseId] = useState<string | null>(null);
@@ -438,8 +419,8 @@ export function BuildRunsPanel({ releases, onError }: Props) {
           'Failed to load build run detail',
         );
         setSelectedRun(payload);
-        // Keep list and story-state panes in sync when detail endpoint lazily
-        // transitions a run from running -> completed/failed.
+        // Keep list pane in sync when detail endpoint lazily transitions
+        // a run from running -> completed/failed.
         setRuns((current) =>
           current.map((run) =>
             run.id === payload.id
@@ -456,45 +437,12 @@ export function BuildRunsPanel({ releases, onError }: Props) {
               : run,
           ),
         );
-        setStoryStates((current) =>
-          current.map((state) =>
-            state.latest_run?.run_id === payload.id
-              ? {
-                  ...state,
-                  latest_run: {
-                    ...state.latest_run,
-                    run_status: payload.status,
-                    opencode_session_url: payload.opencode_session_url,
-                  },
-                }
-              : state,
-          ),
-        );
       } catch (err) {
         const message = errorMessage(err);
         setRunError(message);
         onError(message);
       } finally {
         setRunLoading(false);
-      }
-    },
-    [onError],
-  );
-
-  const loadStoryStates = useCallback(
-    async (releaseId: string) => {
-      setStoryStatesLoading(true);
-      try {
-        const payload = await fetchJson<ReleaseStoryStatesResponse>(
-          `/api/releases/${releaseId}/story-states`,
-          undefined,
-          'Failed to load release story states',
-        );
-        setStoryStates(payload.story_states ?? []);
-      } catch (err) {
-        onError(errorMessage(err));
-      } finally {
-        setStoryStatesLoading(false);
       }
     },
     [onError],
@@ -510,8 +458,7 @@ export function BuildRunsPanel({ releases, onError }: Props) {
 
     setOffset(0);
     void loadRuns(selectedReleaseId, { nextOffset: 0, nextFilter: statusFilter });
-    void loadStoryStates(selectedReleaseId);
-  }, [selectedReleaseId, statusFilter, loadRuns, loadStoryStates]);
+  }, [selectedReleaseId, statusFilter, loadRuns]);
 
   useEffect(() => {
     if (!selectedRunId) {
@@ -559,14 +506,13 @@ export function BuildRunsPanel({ releases, onError }: Props) {
       await Promise.all([
         loadRuns(selectedReleaseId, { preferredRunId: result.run_id, nextOffset: 0 }),
         loadRunDetail(result.run_id),
-        loadStoryStates(selectedReleaseId),
       ]);
     } catch (err) {
       onError(errorMessage(err));
     } finally {
       setRetryingRunId(null);
     }
-  }, [loadRunDetail, loadRuns, loadStoryStates, onError, selectedReleaseId, selectedRun]);
+  }, [loadRunDetail, loadRuns, onError, selectedReleaseId, selectedRun]);
 
   const handleResyncStory = useCallback(
     async (storyId: string) => {
@@ -580,14 +526,13 @@ export function BuildRunsPanel({ releases, onError }: Props) {
           'Failed to manually sync story to Linear',
         );
         await Promise.all([loadRunDetail(selectedRunId), loadRuns(selectedReleaseId, { nextOffset: offset })]);
-        await loadStoryStates(selectedReleaseId);
       } catch (err) {
         onError(errorMessage(err));
       } finally {
         setSyncingStoryId(null);
       }
     },
-    [loadRunDetail, loadRuns, loadStoryStates, offset, onError, selectedReleaseId, selectedRunId],
+    [loadRunDetail, loadRuns, offset, onError, selectedReleaseId, selectedRunId],
   );
 
   const handleMarkBlocked = useCallback(
@@ -608,14 +553,13 @@ export function BuildRunsPanel({ releases, onError }: Props) {
           'Failed to mark story blocked',
         );
         await Promise.all([loadRunDetail(selectedRunId), loadRuns(selectedReleaseId, { nextOffset: offset })]);
-        await loadStoryStates(selectedReleaseId);
       } catch (err) {
         onError(errorMessage(err));
       } finally {
         setBlockingStoryId(null);
       }
     },
-    [loadRunDetail, loadRuns, loadStoryStates, offset, onError, selectedReleaseId, selectedRunId],
+    [loadRunDetail, loadRuns, offset, onError, selectedReleaseId, selectedRunId],
   );
 
   const handleBuildStory = useCallback(
@@ -638,7 +582,6 @@ export function BuildRunsPanel({ releases, onError }: Props) {
         await Promise.all([
           loadRuns(selectedReleaseId, { preferredRunId: result.run_id, nextOffset: 0 }),
           loadRunDetail(result.run_id),
-          loadStoryStates(selectedReleaseId),
         ]);
       } catch (err) {
         onError(errorMessage(err));
@@ -646,7 +589,7 @@ export function BuildRunsPanel({ releases, onError }: Props) {
         setBuildingStoryId(null);
       }
     },
-    [loadRunDetail, loadRuns, loadStoryStates, onError, selectedProject, selectedReleaseId, selectedRunId],
+    [loadRunDetail, loadRuns, onError, selectedProject, selectedReleaseId, selectedRunId],
   );
 
   if (sortedReleases.length === 0) return null;
@@ -761,34 +704,6 @@ export function BuildRunsPanel({ releases, onError }: Props) {
             onMarkBlocked={handleMarkBlocked}
             onBuildStory={handleBuildStory}
           />
-        </div>
-
-        <div className="space-y-2 rounded-md border p-3">
-          <div className="text-xs font-medium text-muted-foreground">Latest story execution state</div>
-          {storyStatesLoading && <p className="text-sm text-muted-foreground">Loading story states...</p>}
-          {!storyStatesLoading && storyStates.length === 0 && (
-            <p className="text-sm text-muted-foreground">No stories in this release.</p>
-          )}
-          {!storyStatesLoading && storyStates.length > 0 && (
-            <div className="max-h-56 space-y-1 overflow-auto pr-1">
-              {storyStates.map((state) => (
-                <div key={state.story_id} className="rounded border px-2 py-1 text-xs">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="font-medium">{state.story_title}</div>
-                    <Badge variant={state.latest_run?.item_status === 'failed' ? 'destructive' : 'outline'}>
-                      {state.latest_run?.item_status ?? 'not_run'}
-                    </Badge>
-                  </div>
-                  <div className="mt-1 text-[11px] text-muted-foreground">
-                    story status {state.story_status}, run {state.latest_run?.run_status ?? 'none'}
-                  </div>
-                  {state.latest_run?.item_error && (
-                    <div className="mt-1 text-destructive">{state.latest_run.item_error}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
