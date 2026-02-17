@@ -220,7 +220,21 @@ export function createOpenCodeSessions(enabled: boolean): OpenCodeSessions | nul
           parts: [
             {
               type: 'text',
-              text: `You have been assigned ${storyCount} ${noun} above. Please begin implementing them now. Work through each story, fulfilling the requirements and acceptance criteria. Follow any technical guidelines provided.`,
+              text: [
+                `You have been assigned ${storyCount} ${noun} above.`,
+                '',
+                'IMPORTANT: Implement them now. Do NOT stop after exploring the codebase.',
+                'Do NOT present a plan and wait for confirmation.',
+                'Do NOT ask clarifying questions — use your best judgment.',
+                '',
+                'Your workflow should be:',
+                '1. Read the relevant source files to understand the codebase',
+                '2. Write the code changes to fulfill the requirements and acceptance criteria',
+                '3. Run any existing tests or linters if available',
+                '4. Verify your implementation is complete',
+                '',
+                'Complete the full implementation in this session. Follow any technical guidelines provided in the context above.',
+              ].join('\n'),
             },
           ],
         },
