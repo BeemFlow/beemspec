@@ -6,11 +6,36 @@ import {
   type BuildRunItemStatus,
 } from '@/build-runs/constants';
 import { getStoryLinearLink } from '@/integrations/linear/story-links';
-import type { OpenCodeSessions } from '@/integrations/opencode/session';
+import { createOpenCodeSessions, type OpenCodeSessions } from '@/integrations/opencode/session';
 import type { createClient } from '@/lib/supabase/server';
 import type { Story } from '@/types';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+// ---------------------------------------------------------------------------
+// Lazy session-state refresh — transitions stale "running" runs
+// ---------------------------------------------------------------------------
+
+export async function refreshRunStatusFromOpenCode(
+  supabase: Supabase,
+  run: { id: string; status: string; opencode_session_id?: string | null },
+): Promise<{ id: string; status: string }> {
+  if (run.status !== BUILD_RUN_STATUS.running || !run.opencode_session_id) return run;
+
+  const sessions = createOpenCodeSessions(true);
+  if (!sessions) return run;
+
+  const session = await sessions.getSessionById(run.opencode_session_id);
+  if (!session || session.state === 'active') return run;
+
+  const newStatus = session.state === 'failed' ? BUILD_RUN_STATUS.failed : BUILD_RUN_STATUS.completed;
+  await supabase
+    .from(BUILD_RUN_TABLE)
+    .update({ status: newStatus, finished_at: new Date().toISOString() })
+    .eq('id', run.id);
+
+  return { ...run, status: newStatus };
+}
 
 type StoryBuildContextFailureReason = 'story_not_found' | 'story_task_not_found' | 'story_activity_not_found';
 
@@ -478,7 +503,7 @@ export async function processBuildRunById(
   // (non-blocking) and leave the run in "running" — the agent is working.
   // Only auto-finish the run if all items failed or there's no session.
   if (runSession && input.openCodeSessions && completedItems > 0) {
-    input.openCodeSessions.startSession(runSession.id, completedItems).catch((err) => {
+    input.openCodeSessions.startSession(runSession.id, completedItems, input.workingDirectory).catch((err) => {
       console.error('Failed to send start prompt to OpenCode session', err);
     });
 

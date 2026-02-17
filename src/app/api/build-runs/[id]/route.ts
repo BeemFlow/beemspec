@@ -1,31 +1,9 @@
 import { NextResponse } from 'next/server';
-import { BUILD_RUN_STATUS, BUILD_RUN_TABLE } from '@/build-runs/constants';
-import { createOpenCodeSessions } from '@/integrations/opencode/session';
+import { refreshRunStatusFromOpenCode } from '@/build-runs/processor';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-
-type Supabase = Awaited<ReturnType<typeof createClient>>;
-type BuildRun = Record<string, unknown>;
-
-async function refreshRunStatusFromOpenCode(supabase: Supabase, run: BuildRun): Promise<BuildRun> {
-  if (run.status !== BUILD_RUN_STATUS.running || !run.opencode_session_id) return run;
-
-  const sessions = createOpenCodeSessions(true);
-  if (!sessions) return run;
-
-  const session = await sessions.getSessionById(run.opencode_session_id as string);
-  if (!session || session.state === 'active') return run;
-
-  const newStatus = session.state === 'failed' ? BUILD_RUN_STATUS.failed : BUILD_RUN_STATUS.completed;
-  await supabase
-    .from(BUILD_RUN_TABLE)
-    .update({ status: newStatus, finished_at: new Date().toISOString() })
-    .eq('id', run.id as string);
-
-  return { ...run, status: newStatus, finished_at: new Date().toISOString() };
-}
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
@@ -48,7 +26,12 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     return serverErrorResponse('Failed to load build run', runError);
   }
 
-  const run = await refreshRunStatusFromOpenCode(supabase, rawRun as BuildRun);
+  const run = await refreshRunStatusFromOpenCode(supabase, {
+    id: rawRun.id as string,
+    status: rawRun.status as string,
+    opencode_session_id: rawRun.opencode_session_id as string | null,
+  });
+  const runData = { ...rawRun, status: run.status };
 
   const { data: items, error: itemsError } = await supabase
     .from('build_run_items')
@@ -67,7 +50,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
   if (storyIds.length === 0) {
     return NextResponse.json({
-      ...run,
+      ...runData,
       items: itemRows,
     });
   }
@@ -86,7 +69,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   );
 
   return NextResponse.json({
-    ...run,
+    ...runData,
     items: itemRows.map((item) => ({
       ...item,
       linear_issue_identifier: issueIdentifierByStoryId.get(item.story_id as string) ?? null,

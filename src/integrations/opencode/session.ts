@@ -68,16 +68,30 @@ function buildSessionTitle(input: OpenCodeSessionCreateInput): string {
   return `Release ${input.releaseId}`;
 }
 
+function workingDirectoryBlock(dir?: string | null): string[] {
+  if (!dir) return [];
+  return [
+    '',
+    '## Working Directory',
+    `**${dir}**`,
+    '',
+    'CRITICAL: All file operations MUST happen inside this directory.',
+    'Do NOT read, write, or modify files outside this directory.',
+    'Do NOT change to a different project directory.',
+  ];
+}
+
 function buildSessionContextPrompt(input: OpenCodeSessionCreateInput): string {
   const hasStoryContext = Boolean(input.storyId && input.storyTitle && input.requirements && input.acceptanceCriteria);
 
   if (hasStoryContext) {
     return [
-      '# BeemSpec Story Context',
+      '# Story Context',
       `Release ID: ${input.releaseId ?? 'none'}`,
       `Story ID: ${input.storyId}`,
       `Story Title: ${input.storyTitle}`,
       ...(input.linearIssueIdentifier ? [`Linear Issue: ${input.linearIssueIdentifier}`] : []),
+      ...workingDirectoryBlock(input.workingDirectory),
       '',
       '## Requirements',
       input.requirements as string,
@@ -100,9 +114,10 @@ function buildSessionContextPrompt(input: OpenCodeSessionCreateInput): string {
       : ['- No stories provided'];
 
   return [
-    '# BeemSpec Build Run Context',
+    '# Build Run Context',
     `Release ID: ${input.releaseId ?? 'none'}`,
     `Run ID: ${input.runId ?? 'unknown'}`,
+    ...workingDirectoryBlock(input.workingDirectory),
     '',
     '## Assigned Stories',
     ...storyLines,
@@ -114,7 +129,7 @@ function buildSessionContextPrompt(input: OpenCodeSessionCreateInput): string {
 
 function buildStoryAssignmentPrompt(input: OpenCodeSessionStoryAssignmentInput): string {
   return [
-    '# BeemSpec Story Assignment',
+    '# Story Assignment',
     `Run ID: ${input.runId}`,
     `Story ID: ${input.storyId}`,
     `Story Title: ${input.storyTitle}`,
@@ -211,9 +226,12 @@ export function createOpenCodeSessions(enabled: boolean): OpenCodeSessions | nul
         },
       });
     },
-    async startSession(sessionId: string, storyCount: number): Promise<void> {
+    async startSession(sessionId: string, storyCount: number, workingDirectory?: string | null): Promise<void> {
       const client = getClient();
       const noun = storyCount === 1 ? 'story' : 'stories';
+      const dirConstraint = workingDirectory
+        ? `\nCRITICAL: Your working directory is ${workingDirectory}. ALL file operations must stay inside this directory. Do NOT navigate to or modify any other project.`
+        : '';
       await client.session.prompt({
         path: { id: sessionId },
         body: {
@@ -226,6 +244,7 @@ export function createOpenCodeSessions(enabled: boolean): OpenCodeSessions | nul
                 'IMPORTANT: Implement them now. Do NOT stop after exploring the codebase.',
                 'Do NOT present a plan and wait for confirmation.',
                 'Do NOT ask clarifying questions — use your best judgment.',
+                dirConstraint,
                 '',
                 'Your workflow should be:',
                 '1. Read the relevant source files to understand the codebase',

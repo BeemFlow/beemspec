@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { appendBuildRunItems, createBuildRunWithItems, processBuildRunById } from '@/build-runs/processor';
+import {
+  appendBuildRunItems,
+  createBuildRunWithItems,
+  processBuildRunById,
+  refreshRunStatusFromOpenCode,
+} from '@/build-runs/processor';
 import { createOpenCodeSessions } from '@/integrations/opencode/session';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
@@ -11,6 +16,7 @@ vi.mock('@/build-runs/processor', () => ({
   createBuildRunWithItems: vi.fn(),
   appendBuildRunItems: vi.fn(),
   processBuildRunById: vi.fn(),
+  refreshRunStatusFromOpenCode: vi.fn(),
 }));
 vi.mock('@/integrations/opencode/session', () => ({ createOpenCodeSessions: vi.fn() }));
 
@@ -26,6 +32,8 @@ describe('release run route', () => {
       appendStoryAssignment: vi.fn(),
       startSession: vi.fn(),
     });
+    // Default: pass through the run unchanged (still active)
+    vi.mocked(refreshRunStatusFromOpenCode).mockImplementation((_supabase, run) => Promise.resolve(run));
   });
 
   it('creates run and processes inline', async () => {

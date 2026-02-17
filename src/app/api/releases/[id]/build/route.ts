@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { BUILD_RUN_STATUS } from '@/build-runs/constants';
-import { appendBuildRunItems, createBuildRunWithItems, processBuildRunById } from '@/build-runs/processor';
+import {
+  appendBuildRunItems,
+  createBuildRunWithItems,
+  processBuildRunById,
+  refreshRunStatusFromOpenCode,
+} from '@/build-runs/processor';
 import { createOpenCodeSessions } from '@/integrations/opencode/session';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
@@ -21,7 +26,7 @@ async function loadStoryIdsInRelease(supabase: Supabase, releaseId: string) {
 async function loadActiveRunForRelease(supabase: Supabase, releaseId: string) {
   return supabase
     .from('build_runs')
-    .select('id, story_map_id, release_id, status')
+    .select('id, story_map_id, release_id, status, opencode_session_id')
     .eq('release_id', releaseId)
     .in('status', [BUILD_RUN_STATUS.queued, BUILD_RUN_STATUS.running])
     .order('created_at', { ascending: false })
@@ -55,10 +60,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (storiesError) return serverErrorResponse('Failed to load release stories', storiesError);
   const storyIds = (stories ?? []).map((story) => story.id as string);
 
-  const { data: activeRun, error: activeRunError } = await loadActiveRunForRelease(supabase, releaseId);
+  const { data: candidateRun, error: activeRunError } = await loadActiveRunForRelease(supabase, releaseId);
   if (activeRunError) return serverErrorResponse('Failed to load active build run', activeRunError);
 
-  if (activeRun) {
+  // Check if the "active" run has actually finished (lazy session-state refresh).
+  // If the agent is done, transition the run so we create a fresh one below.
+  const activeRun = candidateRun
+    ? await refreshRunStatusFromOpenCode(supabase, {
+        id: candidateRun.id as string,
+        status: candidateRun.status as string,
+        opencode_session_id: candidateRun.opencode_session_id as string | null,
+      })
+    : null;
+
+  const isStillActive =
+    activeRun && (activeRun.status === BUILD_RUN_STATUS.queued || activeRun.status === BUILD_RUN_STATUS.running);
+
+  if (isStillActive) {
     const { data: appendResult, error: appendError } = await appendBuildRunItems(supabase, {
       buildRunId: activeRun.id as string,
       storyIds,

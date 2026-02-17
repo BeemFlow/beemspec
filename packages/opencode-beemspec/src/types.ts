@@ -47,7 +47,7 @@ export interface OpenCodeSessionService {
   createSession(input: OpenCodeSessionCreateInput): Promise<OpenCodeSessionSnapshot>;
   getSessionById(sessionId: string): Promise<OpenCodeSessionSnapshot | null>;
   appendStoryAssignment(input: OpenCodeSessionStoryAssignmentInput): Promise<void>;
-  startSession(sessionId: string, storyCount: number): Promise<void>;
+  startSession(sessionId: string, storyCount: number, workingDirectory?: string | null): Promise<void>;
 }
 
 export interface SessionContextResponse {
