@@ -49,10 +49,49 @@ function readData<T>(value: unknown): T {
   return value as T;
 }
 
-function toSessionState(status: unknown): OpenCodeSessionSnapshot['state'] {
-  if (status === 'error') return 'failed';
-  if (status === 'idle' || status === 'completed') return 'completed';
-  return 'active';
+interface OpenCodeMessage {
+  info?: {
+    role?: string;
+    finish?: string;
+    time?: { completed?: number };
+  };
+}
+
+/**
+ * Determine session state by inspecting the last assistant message's `finish` field.
+ * OpenCode sessions don't have a lifecycle state on the session object itself.
+ * - `finish: 'stop'` → agent stopped (completed)
+ * - `finish: 'tool-calls'` → agent is mid-turn (active)
+ * - No assistant messages → hasn't started yet (active)
+ */
+async function detectSessionState(sessionId: string): Promise<OpenCodeSessionSnapshot['state']> {
+  const baseUrl = getOpencodeBaseUrl();
+  const authorization = getOpencodeAuthorizationHeader();
+  const headers: Record<string, string> = {};
+  if (authorization) headers.authorization = authorization;
+
+  try {
+    const res = await fetch(`${baseUrl}/session/${encodeURIComponent(sessionId)}/message`, {
+      cache: 'no-store',
+      headers,
+    });
+    if (!res.ok) return 'active';
+
+    const messages: OpenCodeMessage[] = await res.json();
+    if (!Array.isArray(messages) || messages.length === 0) return 'active';
+
+    // Walk backwards to find the last assistant message
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.info?.role === 'assistant') {
+        return msg.info.finish === 'stop' ? 'completed' : 'active';
+      }
+    }
+
+    return 'active';
+  } catch {
+    return 'active';
+  }
 }
 
 function buildSessionTitle(input: OpenCodeSessionCreateInput): string {
@@ -158,7 +197,7 @@ async function createAndSeedSession(
     ...(directory ? { query: { directory } } : {}),
   });
 
-  const session = readData<{ id: string; createdAt?: string; status?: string }>(created);
+  const session = readData<{ id: string; time?: { created?: number } }>(created);
   await client.session.prompt({
     path: { id: session.id },
     body: {
@@ -170,8 +209,8 @@ async function createAndSeedSession(
   return {
     id: session.id,
     url: getOpencodeSessionUrl(session.id, directory),
-    state: toSessionState(session.status),
-    createdAt: session.createdAt ?? new Date().toISOString(),
+    state: 'active' as const, // Just created — always active
+    createdAt: session.time?.created ? new Date(session.time.created).toISOString() : new Date().toISOString(),
   };
 }
 
@@ -205,12 +244,13 @@ export function createOpenCodeSessions(enabled: boolean): OpenCodeSessions | nul
       const client = getClient();
       try {
         const result = await client.session.get({ path: { id: sessionId } });
-        const session = readData<{ id: string; createdAt?: string; status?: string }>(result);
+        const session = readData<{ id: string; time?: { created?: number } }>(result);
+        const state = await detectSessionState(sessionId);
         return {
           id: session.id,
           url: getOpencodeSessionUrl(session.id),
-          state: toSessionState(session.status),
-          createdAt: session.createdAt ?? new Date().toISOString(),
+          state,
+          createdAt: session.time?.created ? new Date(session.time.created).toISOString() : new Date().toISOString(),
         };
       } catch {
         return null;

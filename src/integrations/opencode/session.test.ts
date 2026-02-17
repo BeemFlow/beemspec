@@ -67,15 +67,29 @@ describe('opencode session service', () => {
     expect(session).toMatchObject({ id: 'session_1', state: 'active' });
   });
 
-  it('reads existing session by id', async () => {
+  it('reads existing session by id and detects completed state from messages', async () => {
     const service = createOpenCodeSessions(true);
     if (!service) throw new Error('Expected session service');
 
-    get.mockResolvedValue({ data: { id: 'session_2', status: 'idle', createdAt: '2026-02-15T00:00:00.000Z' } });
+    get.mockResolvedValue({ data: { id: 'session_2', time: { created: 1700000000000 } } });
+
+    // Mock fetch for the messages endpoint — last assistant message has finish: 'stop'
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([{ info: { role: 'assistant', finish: 'stop' } }]), { status: 200 }),
+      );
+
     const session = await service.getSessionById('session_2');
 
     expect(get).toHaveBeenCalledWith({ path: { id: 'session_2' } });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining('/session/session_2/message'),
+      expect.objectContaining({ cache: 'no-store' }),
+    );
     expect(session).toMatchObject({ id: 'session_2', state: 'completed' });
+
+    fetchSpy.mockRestore();
   });
 
   it('appends story assignment prompt to existing session', async () => {
