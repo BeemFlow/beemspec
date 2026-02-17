@@ -31,6 +31,7 @@ export interface OpenCodeSessionStoryAssignmentInput {
   storyId: string;
   storyTitle: string;
   linearIssueIdentifier: string | null;
+  workingDirectory?: string | null;
   requirements: string;
   acceptanceCriteria: string;
   technicalGuidelines: string | null;

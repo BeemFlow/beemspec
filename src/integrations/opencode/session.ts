@@ -173,6 +173,7 @@ function buildStoryAssignmentPrompt(input: OpenCodeSessionStoryAssignmentInput):
     `Story ID: ${input.storyId}`,
     `Story Title: ${input.storyTitle}`,
     ...(input.linearIssueIdentifier ? [`Linear Issue: ${input.linearIssueIdentifier}`] : []),
+    ...workingDirectoryBlock(input.workingDirectory),
     '',
     '## Requirements',
     input.requirements,
@@ -260,6 +261,7 @@ export function createOpenCodeSessions(enabled: boolean): OpenCodeSessions | nul
       const client = getClient();
       await client.session.prompt({
         path: { id: input.sessionId },
+        ...(input.workingDirectory ? { query: { directory: input.workingDirectory } } : {}),
         body: {
           noReply: true,
           parts: [{ type: 'text', text: buildStoryAssignmentPrompt(input) }],
@@ -277,6 +279,7 @@ export function createOpenCodeSessions(enabled: boolean): OpenCodeSessions | nul
       // response stream over our HTTP connection, starving the web UI.
       await client.session.promptAsync({
         path: { id: sessionId },
+        ...(workingDirectory ? { query: { directory: workingDirectory } } : {}),
         body: {
           parts: [
             {

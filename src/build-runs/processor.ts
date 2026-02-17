@@ -223,6 +223,7 @@ async function syncAndInsertRunItem(
     story: Story;
     runSession: { id: string; url: string } | null;
     openCodeSessions: OpenCodeSessions | null;
+    workingDirectory?: string | null;
   },
 ) {
   const link = await getStoryLinearLink(supabase, input.story.id);
@@ -246,6 +247,7 @@ async function syncAndInsertRunItem(
       storyId: input.story.id,
       storyTitle: input.story.title,
       linearIssueIdentifier,
+      workingDirectory: input.workingDirectory,
       requirements: input.story.requirements,
       acceptanceCriteria: input.story.acceptance_criteria,
       technicalGuidelines: input.story.technical_guidelines,
@@ -431,6 +433,7 @@ async function processRunItems(
     stories: Story[];
     runSession: { id: string; url: string } | null;
     openCodeSessions: OpenCodeSessions | null;
+    workingDirectory?: string | null;
   },
 ) {
   let completedItems = 0;
@@ -444,6 +447,7 @@ async function processRunItems(
         story,
         runSession: input.runSession,
         openCodeSessions: input.openCodeSessions,
+        workingDirectory: input.workingDirectory,
       });
 
       completedItems += 1;
@@ -497,6 +501,7 @@ export async function processBuildRunById(
     stories: (stories ?? []) as Story[],
     runSession,
     openCodeSessions: input.openCodeSessions,
+    workingDirectory: input.workingDirectory,
   });
 
   // If stories were dispatched to an OpenCode session, fire the start prompt
