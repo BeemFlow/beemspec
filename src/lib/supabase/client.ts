@@ -3,7 +3,7 @@ import { env } from '@/lib/env';
 
 export function createClient() {
   const supabaseUrl = env.supabaseUrl();
-  const supabaseKey = env.supabaseAnonKey();
+  const supabaseKey = env.supabasePublishableKey();
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error('Missing Supabase environment variables');

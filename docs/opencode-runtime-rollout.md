@@ -7,6 +7,9 @@ Use this checklist to install and verify the BeemSpec OpenCode + MCP integration
 - BeemSpec app is running and reachable.
 - Env vars are set:
   - `BEEMSPEC_OPENCODE_TOKEN` (shared bearer token)
+  - Optional if OpenCode server uses HTTP basic auth:
+    - `BEEMSPEC_OPENCODE_SERVER_USERNAME` (defaults to `opencode`)
+    - `BEEMSPEC_OPENCODE_SERVER_PASSWORD`
   - `LINEAR_API_KEY`
 
 ## 2) Configure OpenCode plugin + MCP server

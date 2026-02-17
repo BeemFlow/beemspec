@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createOpenCodeSessions } from './session';
+import { createOpenCodeSessions, resetOpenCodeClientForTests } from './session';
 
-const create = vi.fn();
-const prompt = vi.fn();
-const get = vi.fn();
+const { createOpencodeClientMock, create, prompt, get } = vi.hoisted(() => ({
+  createOpencodeClientMock: vi.fn(),
+  create: vi.fn(),
+  prompt: vi.fn(),
+  get: vi.fn(),
+}));
 
 vi.mock('@opencode-ai/sdk', () => ({
-  createOpencodeClient: vi.fn(() => ({
+  createOpencodeClient: createOpencodeClientMock.mockImplementation(() => ({
     session: {
       create,
       prompt,
@@ -17,9 +20,14 @@ vi.mock('@opencode-ai/sdk', () => ({
 
 describe('opencode session port', () => {
   beforeEach(() => {
+    resetOpenCodeClientForTests();
     vi.clearAllMocks();
     delete process.env.BEEMSPEC_OPENCODE_BASE_URL;
     delete process.env.BEEMSPEC_OPENCODE_WEB_BASE_URL;
+    delete process.env.BEEMSPEC_OPENCODE_SERVER_USERNAME;
+    delete process.env.BEEMSPEC_OPENCODE_SERVER_PASSWORD;
+    delete process.env.OPENCODE_SERVER_USERNAME;
+    delete process.env.OPENCODE_SERVER_PASSWORD;
   });
 
   it('returns null when disabled', () => {
@@ -45,6 +53,10 @@ describe('opencode session port', () => {
     });
 
     expect(create).toHaveBeenCalledWith({ body: { title: 'ENG-1 Authentication flow' } });
+    expect(createOpencodeClientMock).toHaveBeenCalledWith({
+      baseUrl: 'http://127.0.0.1:4096',
+      headers: undefined,
+    });
     expect(prompt).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: 'session_1' },
@@ -88,5 +100,33 @@ describe('opencode session port', () => {
         body: expect.objectContaining({ noReply: true }),
       }),
     );
+  });
+
+  it('uses basic auth header when OpenCode server password is configured', async () => {
+    process.env.BEEMSPEC_OPENCODE_BASE_URL = 'http://127.0.0.1:5000';
+    process.env.BEEMSPEC_OPENCODE_SERVER_USERNAME = 'automation';
+    process.env.BEEMSPEC_OPENCODE_SERVER_PASSWORD = 'secret';
+
+    const port = createOpenCodeSessions(true);
+    if (!port) throw new Error('Expected session port');
+
+    create.mockResolvedValue({ data: { id: 'session_4', status: 'active', createdAt: '2026-02-15T00:00:00.000Z' } });
+    prompt.mockResolvedValue({ data: {} });
+
+    await port.createSession({
+      releaseId: 'release_1',
+      storyId: 'story_1',
+      storyTitle: 'Authentication flow',
+      linearIssueId: 'lin_1',
+      linearIssueIdentifier: 'ENG-1',
+      requirements: 'User can sign in',
+      acceptanceCriteria: 'Given credentials then login works',
+      technicalGuidelines: null,
+    });
+
+    expect(createOpencodeClientMock).toHaveBeenCalledWith({
+      baseUrl: 'http://127.0.0.1:5000',
+      headers: { authorization: 'Basic YXV0b21hdGlvbjpzZWNyZXQ=' },
+    });
   });
 });

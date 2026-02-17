@@ -2,12 +2,12 @@ import { createOpencodeClient } from '@opencode-ai/sdk';
 import { env } from '@/lib/env';
 import type {
   OpenCodeSessionCreateInput,
-  OpenCodeSessionPort,
+  OpenCodeSessionService,
   OpenCodeSessionSnapshot,
   OpenCodeSessionStoryAssignmentInput,
 } from '../../../packages/opencode-beemspec/src/contracts';
 
-export type OpenCodeSessions = OpenCodeSessionPort;
+export type OpenCodeSessions = OpenCodeSessionService;
 
 export function isAuthorizedByOpenCodeToken(request: Request): boolean {
   const token = env.openCodeToken();
@@ -21,6 +21,15 @@ type OpenCodeClient = ReturnType<typeof createOpencodeClient>;
 
 function getOpencodeBaseUrl(): string {
   return env.openCodeBaseUrl();
+}
+
+function getOpencodeAuthorizationHeader(): string | null {
+  const password = env.openCodeServerPassword();
+  if (!password) return null;
+
+  const username = env.openCodeServerUsername() ?? 'opencode';
+  const encoded = Buffer.from(`${username}:${password}`).toString('base64');
+  return `Basic ${encoded}`;
 }
 
 function getOpencodeSessionUrl(sessionId: string): string {
@@ -148,9 +157,19 @@ async function createAndSeedSession(
 
 let cachedClient: OpenCodeClient | null = null;
 
+export function resetOpenCodeClientForTests(): void {
+  cachedClient = null;
+}
+
 function getClient(): OpenCodeClient {
   if (cachedClient) return cachedClient;
-  cachedClient = createOpencodeClient({ baseUrl: getOpencodeBaseUrl() });
+
+  const authorization = getOpencodeAuthorizationHeader();
+  cachedClient = createOpencodeClient({
+    baseUrl: getOpencodeBaseUrl(),
+    headers: authorization ? { authorization } : undefined,
+  });
+
   return cachedClient;
 }
 

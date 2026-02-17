@@ -14,7 +14,7 @@ npm run dev
 Core:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SECRET_KEY`
 
 Linear:
@@ -30,7 +30,11 @@ OpenCode:
 
 - `BEEMSPEC_OPENCODE_BASE_URL` (default `http://127.0.0.1:4096`)
 - `BEEMSPEC_OPENCODE_WEB_BASE_URL` (optional deep-link host)
-- `BEEMSPEC_OPENCODE_TOKEN` (shared token for plugin -> BeemSpec API)
+- `BEEMSPEC_OPENCODE_TOKEN` (shared token for OpenCode MCP client -> BeemSpec API)
+- Optional OpenCode HTTP basic auth (for password-protected OpenCode servers):
+  - `BEEMSPEC_OPENCODE_SERVER_USERNAME` (defaults to `opencode` if password is set)
+  - `BEEMSPEC_OPENCODE_SERVER_PASSWORD`
+  - fallback envs are also supported: `OPENCODE_SERVER_USERNAME`, `OPENCODE_SERVER_PASSWORD`
 
 Optional batch sync auth:
 

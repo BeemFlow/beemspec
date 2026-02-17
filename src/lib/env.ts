@@ -10,8 +10,8 @@ export const env = {
     return readEnv('NEXT_PUBLIC_SUPABASE_URL');
   },
 
-  supabaseAnonKey(): string | null {
-    return readEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  supabasePublishableKey(): string | null {
+    return readEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
   },
 
   supabaseSecretKey(): string | null {
@@ -44,6 +44,14 @@ export const env = {
 
   openCodeBaseUrl(): string {
     return readEnv('BEEMSPEC_OPENCODE_BASE_URL') ?? 'http://127.0.0.1:4096';
+  },
+
+  openCodeServerUsername(): string | null {
+    return readEnv('BEEMSPEC_OPENCODE_SERVER_USERNAME') ?? readEnv('OPENCODE_SERVER_USERNAME');
+  },
+
+  openCodeServerPassword(): string | null {
+    return readEnv('BEEMSPEC_OPENCODE_SERVER_PASSWORD') ?? readEnv('OPENCODE_SERVER_PASSWORD');
   },
 
   openCodeWebBaseUrl(): string | null {

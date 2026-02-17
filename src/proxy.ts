@@ -6,7 +6,7 @@ export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabaseUrl = env.supabaseUrl();
-  const supabaseKey = env.supabaseAnonKey();
+  const supabaseKey = env.supabasePublishableKey();
 
   if (!supabaseUrl || !supabaseKey) {
     return supabaseResponse;

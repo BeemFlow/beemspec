@@ -74,7 +74,7 @@ export interface OpenCodeSessionSnapshot {
   createdAt: string;
 }
 
-export interface OpenCodeSessionPort {
+export interface OpenCodeSessionService {
   createSession(input: OpenCodeSessionCreateInput): Promise<OpenCodeSessionSnapshot>;
   getSessionById(sessionId: string): Promise<OpenCodeSessionSnapshot | null>;
   appendStoryAssignment(input: OpenCodeSessionStoryAssignmentInput): Promise<void>;

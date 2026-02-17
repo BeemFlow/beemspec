@@ -97,6 +97,9 @@ OpenCode runtime session integration uses the official SDK (`@opencode-ai/sdk`) 
 
 - `BEEMSPEC_OPENCODE_BASE_URL` (defaults to `http://127.0.0.1:4096`)
 - optional `BEEMSPEC_OPENCODE_WEB_BASE_URL` for deep-link URL generation
+- optional HTTP basic auth for password-protected OpenCode servers:
+  - `BEEMSPEC_OPENCODE_SERVER_USERNAME` (defaults to `opencode` when password is set)
+  - `BEEMSPEC_OPENCODE_SERVER_PASSWORD`
 
 OpenCode MCP endpoint:
 
