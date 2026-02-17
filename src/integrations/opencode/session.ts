@@ -5,7 +5,7 @@ import type {
   OpenCodeSessionService,
   OpenCodeSessionSnapshot,
   OpenCodeSessionStoryAssignmentInput,
-} from '../../../packages/opencode-beemspec/src/contracts';
+} from '../../../packages/opencode-beemspec/src/types';
 
 export type OpenCodeSessions = OpenCodeSessionService;
 

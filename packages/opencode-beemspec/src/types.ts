@@ -33,7 +33,7 @@ export interface OpenCodeLifecycleEvent {
   payload: unknown;
 }
 
-export interface OpenCodePluginPort {
+export interface OpenCodePluginHooks {
   onCompacting(input: OpenCodeCompactionInput): Promise<OpenCodeCompactionOutput>;
   onSystemTransform(input: OpenCodeSystemPromptTransformInput): Promise<OpenCodeSystemPromptTransformOutput>;
   onEvent(event: OpenCodeLifecycleEvent): Promise<void>;

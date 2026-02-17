@@ -1,6 +1,6 @@
 import type { Plugin } from '@opencode-ai/plugin';
-import type { OpenCodeSessionContext } from './contracts';
 import { compactedContext } from './plugin';
+import type { OpenCodeSessionContext } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

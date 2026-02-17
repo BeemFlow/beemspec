@@ -1,4 +1,4 @@
-import type { OpenCodeSessionContext } from './contracts';
+import type { OpenCodeSessionContext } from './types';
 
 function compactedContext(context: OpenCodeSessionContext): string[] {
   return [

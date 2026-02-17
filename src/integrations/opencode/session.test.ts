@@ -18,7 +18,7 @@ vi.mock('@opencode-ai/sdk', () => ({
   })),
 }));
 
-describe('opencode session port', () => {
+describe('opencode session service', () => {
   beforeEach(() => {
     resetOpenCodeClientForTests();
     vi.clearAllMocks();
@@ -35,13 +35,13 @@ describe('opencode session port', () => {
   });
 
   it('creates session and injects story context via SDK', async () => {
-    const port = createOpenCodeSessions(true);
-    if (!port) throw new Error('Expected session port');
+    const service = createOpenCodeSessions(true);
+    if (!service) throw new Error('Expected session service');
 
     create.mockResolvedValue({ data: { id: 'session_1', status: 'active', createdAt: '2026-02-15T00:00:00.000Z' } });
     prompt.mockResolvedValue({ data: {} });
 
-    const session = await port.createSession({
+    const session = await service.createSession({
       releaseId: 'release_1',
       storyId: 'story_1',
       storyTitle: 'Authentication flow',
@@ -67,23 +67,23 @@ describe('opencode session port', () => {
   });
 
   it('reads existing session by id', async () => {
-    const port = createOpenCodeSessions(true);
-    if (!port) throw new Error('Expected session port');
+    const service = createOpenCodeSessions(true);
+    if (!service) throw new Error('Expected session service');
 
     get.mockResolvedValue({ data: { id: 'session_2', status: 'idle', createdAt: '2026-02-15T00:00:00.000Z' } });
-    const session = await port.getSessionById('session_2');
+    const session = await service.getSessionById('session_2');
 
     expect(get).toHaveBeenCalledWith({ path: { id: 'session_2' } });
     expect(session).toMatchObject({ id: 'session_2', state: 'completed' });
   });
 
   it('appends story assignment prompt to existing session', async () => {
-    const port = createOpenCodeSessions(true);
-    if (!port) throw new Error('Expected session port');
+    const service = createOpenCodeSessions(true);
+    if (!service) throw new Error('Expected session service');
 
     prompt.mockResolvedValue({ data: {} });
 
-    await port.appendStoryAssignment({
+    await service.appendStoryAssignment({
       sessionId: 'session_3',
       runId: 'run_1',
       storyId: 'story_1',
@@ -107,13 +107,13 @@ describe('opencode session port', () => {
     process.env.BEEMSPEC_OPENCODE_SERVER_USERNAME = 'automation';
     process.env.BEEMSPEC_OPENCODE_SERVER_PASSWORD = 'secret';
 
-    const port = createOpenCodeSessions(true);
-    if (!port) throw new Error('Expected session port');
+    const service = createOpenCodeSessions(true);
+    if (!service) throw new Error('Expected session service');
 
     create.mockResolvedValue({ data: { id: 'session_4', status: 'active', createdAt: '2026-02-15T00:00:00.000Z' } });
     prompt.mockResolvedValue({ data: {} });
 
-    await port.createSession({
+    await service.createSession({
       releaseId: 'release_1',
       storyId: 'story_1',
       storyTitle: 'Authentication flow',
