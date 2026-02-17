@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
+import { markStoryBlocked } from '@/build-runs/processor';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 interface McpRuntime {
@@ -81,39 +82,12 @@ function createMcpServer(): McpServer {
     },
     async ({ storyId, reason }) => {
       const supabase = createAdminClient();
-      const blockedReason = `Blocked: ${reason}`;
+      const result = await markStoryBlocked(supabase, { storyId, reason });
 
-      const { data: latestItem, error: latestItemError } = await supabase
-        .from('build_run_items')
-        .select('id')
-        .eq('story_id', storyId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (latestItemError) {
+      if (!result.ok) {
         return {
           isError: true,
-          content: [{ type: 'text', text: 'Failed to locate build run item' }],
-        };
-      }
-
-      if (!latestItem) {
-        return {
-          isError: true,
-          content: [{ type: 'text', text: 'No build run item found for story' }],
-        };
-      }
-
-      const { error: updateError } = await supabase
-        .from('build_run_items')
-        .update({ status: 'failed', error: blockedReason, last_retry_at: new Date().toISOString() })
-        .eq('id', latestItem.id);
-
-      if (updateError) {
-        return {
-          isError: true,
-          content: [{ type: 'text', text: 'Failed to mark story blocked' }],
+          content: [{ type: 'text', text: result.error }],
         };
       }
 

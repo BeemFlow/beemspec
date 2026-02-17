@@ -43,7 +43,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   let query = supabase
     .from('build_runs')
     .select(
-      'id, release_id, status, total_items, completed_items, failed_items, error, opencode_session_id, opencode_session_url, started_at, finished_at, created_at',
+      'id, release_id, status, total_items, completed_items, failed_items, error, opencode_session_id, opencode_session_url, finished_at, created_at',
     )
     .eq('release_id', releaseId)
     .order('created_at', { ascending: false })

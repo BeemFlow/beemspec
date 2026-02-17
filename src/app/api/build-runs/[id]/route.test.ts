@@ -14,7 +14,7 @@ describe('build run detail route', () => {
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
   });
 
-  it('returns run detail including session and retry metadata', async () => {
+  it('returns run detail including retry metadata', async () => {
     const runSingle = vi.fn().mockResolvedValue({
       data: { id: RUN_ID, status: 'failed', total_items: 2, completed_items: 1, failed_items: 1 },
       error: null,
@@ -28,8 +28,6 @@ describe('build run detail route', () => {
           id: 'item_1',
           story_id: 'story_1',
           linear_issue_id: 'lin_1',
-          opencode_session_id: 'session_1',
-          opencode_session_url: 'https://opencode.ai/sessions/session_1',
           status: 'failed',
           retry_count: 2,
           last_retry_at: '2026-02-14T11:10:00.000Z',
@@ -63,8 +61,6 @@ describe('build run detail route', () => {
       status: 'failed',
       items: [
         expect.objectContaining({
-          opencode_session_id: 'session_1',
-          opencode_session_url: 'https://opencode.ai/sessions/session_1',
           linear_issue_identifier: 'ENG-1',
           retry_count: 2,
           last_retry_at: '2026-02-14T11:10:00.000Z',

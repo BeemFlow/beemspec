@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { BUILD_RUN_ITEM_STATUS, BUILD_RUN_ITEMS_TABLE, BUILD_RUN_TABLE } from '@/build-runs/constants';
-import { requeueBuildRunRetryJob } from '@/build-runs/queue';
-import { getOpenCodeSessions } from '@/integrations/opencode/session';
+import { processBuildRunById } from '@/build-runs/processor';
+import { createOpenCodeSessions } from '@/integrations/opencode/session';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -29,7 +29,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
-  const openCodeSessions = getOpenCodeSessions();
+  const openCodeSessions = createOpenCodeSessions(true);
   if (!openCodeSessions) return NextResponse.json({ error: 'OpenCode integration is not enabled' }, { status: 503 });
 
   const { id: runId } = await params;
@@ -54,24 +54,21 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     });
   }
 
-  const { data: requeueResult, error: requeueError } = await requeueBuildRunRetryJob(supabase, {
-    buildRunId: runId,
-    releaseId: run.release_id,
-    storyMapId: run.story_map_id,
-    storyIds,
-  });
-  if (requeueError || !requeueResult || !requeueResult.job_id) {
-    return serverErrorResponse('Failed to enqueue build run retry job', requeueError ?? new Error('Job not created'));
+  try {
+    await processBuildRunById(supabase, {
+      runId,
+      releaseId: run.release_id,
+      storyIds,
+      openCodeSessions,
+    });
+  } catch (error) {
+    return serverErrorResponse('Failed to process retry', error);
   }
 
-  return NextResponse.json(
-    {
-      run_id: runId,
-      build_run_id: runId,
-      job_id: requeueResult.job_id,
-      retried_items: requeueResult.queued_items,
-      status: 'queued',
-    },
-    { status: 202 },
-  );
+  return NextResponse.json({
+    run_id: runId,
+    build_run_id: runId,
+    retried_items: storyIds.length,
+    status: 'completed',
+  });
 }

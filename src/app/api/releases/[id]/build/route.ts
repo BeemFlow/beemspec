@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { BUILD_RUN_STATUS } from '@/build-runs/constants';
-import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/build-runs/queue';
-import { getOpenCodeSessions } from '@/integrations/opencode/session';
+import { appendBuildRunItems, createBuildRunWithItems, processBuildRunById } from '@/build-runs/processor';
+import { createOpenCodeSessions } from '@/integrations/opencode/session';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -21,7 +21,7 @@ async function loadStoryIdsInRelease(supabase: Supabase, releaseId: string) {
 async function loadActiveRunForRelease(supabase: Supabase, releaseId: string) {
   return supabase
     .from('build_runs')
-    .select('id, story_map_id, status')
+    .select('id, story_map_id, release_id, status')
     .eq('release_id', releaseId)
     .in('status', [BUILD_RUN_STATUS.queued, BUILD_RUN_STATUS.running])
     .order('created_at', { ascending: false })
@@ -34,7 +34,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
-  const openCodeSessions = getOpenCodeSessions();
+  const openCodeSessions = createOpenCodeSessions(true);
   if (!openCodeSessions) return NextResponse.json({ error: 'OpenCode integration is not enabled' }, { status: 503 });
 
   const { id: releaseId } = await params;
@@ -56,46 +56,39 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
   if (activeRunError) return serverErrorResponse('Failed to load active build run', activeRunError);
 
   if (activeRun) {
-    const { data: enqueueResult, error: enqueueError } = await enqueueBuildRunStoriesAtomically(supabase, {
-      releaseId,
+    const { data: appendResult, error: appendError } = await appendBuildRunItems(supabase, {
       buildRunId: activeRun.id as string,
-      storyMapId: activeRun.story_map_id as string,
       storyIds,
-      queueExisting: false,
     });
-    if (enqueueError || !enqueueResult) {
-      return serverErrorResponse('Failed to append release stories to active build run', enqueueError);
+    if (appendError || !appendResult) {
+      return serverErrorResponse('Failed to append release stories to active build run', appendError);
     }
 
-    if (enqueueResult.queued_items === 0) {
-      return NextResponse.json(
-        {
-          run_id: activeRun.id,
-          build_run_id: activeRun.id,
-          status: activeRun.status,
-          appended_items: enqueueResult.appended_items,
-        },
-        { status: 202 },
-      );
-    }
-
-    if (!enqueueResult.job_id) {
-      return serverErrorResponse('Failed to enqueue build run job', new Error('Job not created'));
+    if (appendResult.appended_items > 0) {
+      try {
+        await processBuildRunById(supabase, {
+          runId: activeRun.id as string,
+          releaseId,
+          storyIds,
+          openCodeSessions,
+        });
+      } catch (error) {
+        return serverErrorResponse('Failed to process build run', error);
+      }
     }
 
     return NextResponse.json(
       {
         run_id: activeRun.id,
         build_run_id: activeRun.id,
-        job_id: enqueueResult.job_id,
-        status: 'queued',
-        appended_items: enqueueResult.appended_items,
+        status: 'completed',
+        appended_items: appendResult.appended_items,
       },
-      { status: 202 },
+      { status: 200 },
     );
   }
 
-  const { data: runResult, error: runCreateError } = await createBuildRunWithStoryJob(supabase, {
+  const { data: runResult, error: runCreateError } = await createBuildRunWithItems(supabase, {
     releaseId,
     storyMapId: release.story_map_id,
     userId: auth.user.id,
@@ -105,28 +98,34 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     return serverErrorResponse('Failed to create build run', runCreateError ?? new Error('Run not created'));
   }
 
-  if (runResult.queued_items === 0) {
+  if (runResult.total_items === 0) {
     return NextResponse.json(
       {
         run_id: runResult.run_id,
         build_run_id: runResult.run_id,
         status: 'completed',
       },
-      { status: 202 },
+      { status: 200 },
     );
   }
 
-  if (!runResult.job_id) {
-    return serverErrorResponse('Failed to enqueue build run job', new Error('Job not created'));
+  try {
+    await processBuildRunById(supabase, {
+      runId: runResult.run_id,
+      releaseId,
+      storyIds: runResult.created_story_ids,
+      openCodeSessions,
+    });
+  } catch (error) {
+    return serverErrorResponse('Failed to process build run', error);
   }
 
   return NextResponse.json(
     {
       run_id: runResult.run_id,
       build_run_id: runResult.run_id,
-      job_id: runResult.job_id,
-      status: 'queued',
+      status: 'completed',
     },
-    { status: 202 },
+    { status: 200 },
   );
 }

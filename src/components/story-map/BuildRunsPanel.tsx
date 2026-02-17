@@ -19,7 +19,7 @@ interface BuildRunSummary {
   completed_items: number;
   failed_items: number;
   error: string | null;
-  started_at: string;
+  opencode_session_url: string | null;
   finished_at: string | null;
   created_at: string;
 }
@@ -29,8 +29,6 @@ interface BuildRunItem {
   story_id: string;
   linear_issue_id: string | null;
   linear_issue_identifier: string | null;
-  opencode_session_id: string | null;
-  opencode_session_url: string | null;
   status: 'pending' | 'synced' | 'failed';
   error: string | null;
   retry_count: number;
@@ -121,8 +119,8 @@ function RecentRunsSection({
                 <Badge variant={statusBadgeVariant(run.status)}>{run.status}</Badge>
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
-                {run.completed_items}/{run.total_items} synced, {run.failed_items} failed, started{' '}
-                {formatTime(run.started_at)}
+                {run.completed_items}/{run.total_items} synced, {run.failed_items} failed, created{' '}
+                {formatTime(run.created_at)}
               </div>
             </button>
           );
@@ -233,14 +231,14 @@ function RunDetailSection({
                     Linear issue {item.linear_issue_identifier}
                   </a>
                 )}
-                {item.opencode_session_url && (
+                {selectedRun.opencode_session_url && (
                   <a
                     className="mt-1 block text-[11px] text-primary underline-offset-2 hover:underline"
-                    href={item.opencode_session_url}
+                    href={selectedRun.opencode_session_url}
                     target="_blank"
                     rel="noreferrer"
                   >
-                    OpenCode session {shortId(item.opencode_session_id ?? '')}
+                    OpenCode session
                   </a>
                 )}
                 {item.retry_count > 0 && (

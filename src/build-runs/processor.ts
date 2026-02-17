@@ -14,20 +14,6 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 type StoryBuildContextFailureReason = 'story_not_found' | 'story_task_not_found' | 'story_activity_not_found';
 
-export type StoryBuildContextResult =
-  | {
-      ok: true;
-      data: {
-        story: Story;
-        storyMapId: string;
-      };
-    }
-  | {
-      ok: false;
-      reason: StoryBuildContextFailureReason;
-      error?: unknown;
-    };
-
 export type StoryWithMapResult =
   | {
       ok: true;
@@ -48,6 +34,59 @@ interface ExistingBuildRunItemRow {
   retry_count: number;
   last_retry_at: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Run & item creation (replaces queue RPCs)
+// ---------------------------------------------------------------------------
+
+export interface CreateBuildRunResult {
+  run_id: string;
+  created_story_ids: string[];
+  total_items: number;
+}
+
+export interface AppendBuildRunItemsResult {
+  appended_items: number;
+  total_items: number;
+}
+
+export async function createBuildRunWithItems(
+  supabase: Supabase,
+  input: {
+    releaseId: string | null;
+    storyMapId: string;
+    userId: string;
+    storyIds: string[];
+  },
+) {
+  return supabase
+    .rpc('create_build_run_with_items', {
+      p_release_id: input.releaseId,
+      p_story_map_id: input.storyMapId,
+      p_triggered_by: input.userId,
+      p_story_ids: input.storyIds,
+    })
+    .single<CreateBuildRunResult>();
+}
+
+export async function appendBuildRunItems(
+  supabase: Supabase,
+  input: {
+    buildRunId: string;
+    storyIds: string[];
+  },
+) {
+  return supabase
+    .rpc('append_build_run_items', {
+      p_build_run_id: input.buildRunId,
+      p_story_ids: input.storyIds,
+    })
+    .single<AppendBuildRunItemsResult>();
+}
+
+// ---------------------------------------------------------------------------
+// Item-level helpers
+// ---------------------------------------------------------------------------
 
 function toErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
@@ -95,8 +134,6 @@ async function insertSyncedRunItem(
     runId: string;
     storyId: string;
     linearIssueId: string;
-    sessionId: string | null;
-    sessionUrl: string | null;
     retryCount: number;
     lastRetryAt: string | null;
   },
@@ -108,8 +145,6 @@ async function insertSyncedRunItem(
         build_run_id: input.runId,
         story_id: input.storyId,
         linear_issue_id: input.linearIssueId,
-        opencode_session_id: input.sessionId,
-        opencode_session_url: input.sessionUrl,
         status: BUILD_RUN_ITEM_STATUS.synced,
         error: null,
         retry_count: input.retryCount,
@@ -148,6 +183,10 @@ async function insertFailedBuildRunItem(
     .select('id')
     .single();
 }
+
+// ---------------------------------------------------------------------------
+// Per-story sync
+// ---------------------------------------------------------------------------
 
 async function syncAndInsertRunItem(
   supabase: Supabase,
@@ -192,8 +231,6 @@ async function syncAndInsertRunItem(
     runId: input.runId,
     storyId: input.storyId,
     linearIssueId,
-    sessionId: input.runSession?.id ?? null,
-    sessionUrl: input.runSession?.url ?? null,
     retryCount: retry.retryCount,
     lastRetryAt: retry.lastRetryAt,
   });
@@ -203,6 +240,10 @@ async function syncAndInsertRunItem(
     session: input.runSession,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Run lifecycle
+// ---------------------------------------------------------------------------
 
 async function markBuildRunRunning(supabase: Supabase, runId: string) {
   return supabase.from(BUILD_RUN_TABLE).update({ status: BUILD_RUN_STATUS.running, error: null }).eq('id', runId);
@@ -255,6 +296,10 @@ async function summarizeAndFinishBuildRun(supabase: Supabase, runId: string) {
 
   return { status, completed, failed };
 }
+
+// ---------------------------------------------------------------------------
+// Session management
+// ---------------------------------------------------------------------------
 
 async function loadRunSession(supabase: Supabase, runId: string): Promise<{ id: string; url: string } | null> {
   const { data, error } = await supabase
@@ -333,6 +378,10 @@ async function ensureRunSession(
 
   return { id: created.id, url: created.url };
 }
+
+// ---------------------------------------------------------------------------
+// Main processing entry point
+// ---------------------------------------------------------------------------
 
 async function processRunItems(
   supabase: Supabase,
@@ -416,6 +465,42 @@ export async function processBuildRunById(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Story context loading (used by story build route)
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Mark story blocked (shared by MCP tool + REST route)
+// ---------------------------------------------------------------------------
+
+export type MarkStoryBlockedResult = { ok: true } | { ok: false; error: string; status: number };
+
+export async function markStoryBlocked(
+  supabase: Supabase,
+  input: { storyId: string; reason: string },
+): Promise<MarkStoryBlockedResult> {
+  const blockedReason = `Blocked: ${input.reason}`;
+
+  const { data: latestItem, error: latestItemError } = await supabase
+    .from(BUILD_RUN_ITEMS_TABLE)
+    .select('id')
+    .eq('story_id', input.storyId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestItemError) return { ok: false, error: 'Failed to locate build run item', status: 500 };
+  if (!latestItem) return { ok: false, error: 'No build run item found for story', status: 404 };
+
+  const { error: updateError } = await supabase
+    .from(BUILD_RUN_ITEMS_TABLE)
+    .update({ status: 'failed', error: blockedReason, last_retry_at: new Date().toISOString() })
+    .eq('id', latestItem.id);
+
+  if (updateError) return { ok: false, error: 'Failed to mark story blocked', status: 500 };
+  return { ok: true };
+}
+
 export async function loadStoryWithStoryMap(supabase: Supabase, storyId: string): Promise<StoryWithMapResult> {
   const { data: story, error: storyError } = await supabase.from('stories').select('*').eq('id', storyId).single();
   if (storyError || !story) return { ok: false, reason: 'story_not_found', error: storyError };
@@ -440,15 +525,5 @@ export async function loadStoryWithStoryMap(supabase: Supabase, storyId: string)
       story: story as Story,
       storyMapId: activity.story_map_id as string,
     },
-  };
-}
-
-export async function loadStoryBuildContext(supabase: Supabase, storyId: string): Promise<StoryBuildContextResult> {
-  const context = await loadStoryWithStoryMap(supabase, storyId);
-  if (!context.ok) return context;
-
-  return {
-    ok: true,
-    data: context.data,
   };
 }

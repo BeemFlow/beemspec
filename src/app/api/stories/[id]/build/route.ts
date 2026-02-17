@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
-import { loadStoryBuildContext } from '@/build-runs/processor';
-import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/build-runs/queue';
-import { getOpenCodeSessions } from '@/integrations/opencode/session';
+import {
+  appendBuildRunItems,
+  createBuildRunWithItems,
+  loadStoryWithStoryMap,
+  processBuildRunById,
+} from '@/build-runs/processor';
+import { createOpenCodeSessions } from '@/integrations/opencode/session';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -18,7 +22,7 @@ async function loadBuildRunById(supabase: Supabase, buildRunId: string) {
 }
 
 function responseForStoryContextFailure(
-  loaded: Extract<Awaited<ReturnType<typeof loadStoryBuildContext>>, { ok: false }>,
+  loaded: Extract<Awaited<ReturnType<typeof loadStoryWithStoryMap>>, { ok: false }>,
 ) {
   if (loaded.reason === 'story_not_found') return NextResponse.json({ error: 'Story not found' }, { status: 404 });
   if (loaded.reason === 'story_task_not_found') {
@@ -32,14 +36,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
-  const openCodeSessions = getOpenCodeSessions();
+  const openCodeSessions = createOpenCodeSessions(true);
   if (!openCodeSessions) return NextResponse.json({ error: 'OpenCode integration is not enabled' }, { status: 503 });
 
   const { id: storyId } = await params;
   if (!isValidUuid(storyId)) return invalidIdResponse();
 
   const supabase = await createClient();
-  const loaded = await loadStoryBuildContext(supabase, storyId);
+  const loaded = await loadStoryWithStoryMap(supabase, storyId);
   if (!loaded.ok) return responseForStoryContextFailure(loaded);
 
   const { story, storyMapId } = loaded.data;
@@ -62,54 +66,68 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Story release does not match target build run release' }, { status: 400 });
     }
 
-    const { data: enqueueResult, error: enqueueError } = await enqueueBuildRunStoriesAtomically(supabase, {
-      releaseId: (targetRun.release_id as string | null) ?? null,
+    const { data: appendResult, error: appendError } = await appendBuildRunItems(supabase, {
       buildRunId: targetBuildRunId,
-      storyMapId,
       storyIds: [storyId],
-      queueExisting: true,
     });
-    if (enqueueError || !enqueueResult || !enqueueResult.job_id) {
+    if (appendError || !appendResult) {
       return serverErrorResponse(
         'Failed to append story to target build run',
-        enqueueError ?? new Error('Job not created'),
+        appendError ?? new Error('Append failed'),
       );
+    }
+
+    try {
+      await processBuildRunById(supabase, {
+        runId: targetBuildRunId,
+        releaseId: (targetRun.release_id as string | null) ?? null,
+        storyIds: [storyId],
+        openCodeSessions,
+      });
+    } catch (error) {
+      return serverErrorResponse('Failed to process build run', error);
     }
 
     return NextResponse.json(
       {
         run_id: targetBuildRunId,
         build_run_id: targetBuildRunId,
-        job_id: enqueueResult.job_id,
         story_id: storyId,
-        status: 'queued',
-        appended_item: enqueueResult.appended_items > 0,
+        status: 'completed',
+        appended_item: appendResult.appended_items > 0,
       },
-      { status: 202 },
+      { status: 200 },
     );
   }
 
-  const { data: runResult, error: runCreateError } = await createBuildRunWithStoryJob(supabase, {
+  const { data: runResult, error: runCreateError } = await createBuildRunWithItems(supabase, {
     releaseId: story.release_id,
     storyMapId,
     userId: auth.user.id,
     storyIds: [storyId],
   });
-  if (runCreateError || !runResult || !runResult.job_id) {
-    return serverErrorResponse(
-      'Failed to create story build run',
-      runCreateError ?? new Error('Run or job not created'),
-    );
+  if (runCreateError || !runResult) {
+    return serverErrorResponse('Failed to create story build run', runCreateError ?? new Error('Run not created'));
+  }
+
+  try {
+    await processBuildRunById(supabase, {
+      runId: runResult.run_id,
+      releaseId: story.release_id,
+      storyIds: [storyId],
+      openCodeSessions,
+    });
+  } catch (error) {
+    return serverErrorResponse('Failed to process build run', error);
   }
 
   return NextResponse.json(
     {
       run_id: runResult.run_id,
       build_run_id: runResult.run_id,
-      job_id: runResult.job_id,
       story_id: storyId,
-      status: 'queued',
+      status: 'completed',
     },
-    { status: 202 },
+    { status: 200 },
   );
 }

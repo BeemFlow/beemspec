@@ -14,7 +14,6 @@ interface StoryStateRow {
   item_status: BuildRunItemStatus;
   item_error: string | null;
   linear_issue_id: string | null;
-  opencode_session_id: string | null;
   opencode_session_url: string | null;
   retry_count: number;
   last_retry_at: string | null;
@@ -33,7 +32,7 @@ async function loadBuildRunItems(supabase: Supabase, releaseId: string) {
   return supabase
     .from('build_run_items')
     .select(
-      'story_id, build_run_id, status, error, linear_issue_id, opencode_session_id, opencode_session_url, retry_count, last_retry_at, created_at, run:build_runs!inner(id, release_id, status)',
+      'story_id, build_run_id, status, error, linear_issue_id, retry_count, last_retry_at, created_at, run:build_runs!inner(id, release_id, status, opencode_session_url)',
     )
     .eq('run.release_id', releaseId)
     .order('created_at', { ascending: false });
@@ -46,7 +45,7 @@ function latestByStory(items: Array<Record<string, unknown>>): Map<string, Story
     const storyId = item.story_id as string;
     if (!storyId || map.has(storyId)) continue;
 
-    const run = item.run as { id?: string; status?: string } | null;
+    const run = item.run as { id?: string; status?: string; opencode_session_url?: string } | null;
     const runStatus = run?.status;
     map.set(storyId, {
       story_id: storyId,
@@ -58,8 +57,7 @@ function latestByStory(items: Array<Record<string, unknown>>): Map<string, Story
       item_status: item.status as BuildRunItemStatus,
       item_error: (item.error as string | null) ?? null,
       linear_issue_id: (item.linear_issue_id as string | null) ?? null,
-      opencode_session_id: (item.opencode_session_id as string | null) ?? null,
-      opencode_session_url: (item.opencode_session_url as string | null) ?? null,
+      opencode_session_url: (run?.opencode_session_url as string | null) ?? null,
       retry_count: (item.retry_count as number) ?? 0,
       last_retry_at: (item.last_retry_at as string | null) ?? null,
       created_at: item.created_at as string,

@@ -15,7 +15,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { data: run, error: runError } = await supabase
     .from('build_runs')
     .select(
-      'id, release_id, status, total_items, completed_items, failed_items, error, opencode_session_id, opencode_session_url, started_at, finished_at, created_at',
+      'id, release_id, status, total_items, completed_items, failed_items, error, opencode_session_id, opencode_session_url, finished_at, created_at',
     )
     .eq('id', runId)
     .single();
@@ -28,7 +28,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { data: items, error: itemsError } = await supabase
     .from('build_run_items')
     .select(
-      'id, story_id, linear_issue_id, opencode_session_id, opencode_session_url, status, error, retry_count, last_retry_at, created_at, updated_at, story:stories(title, status)',
+      'id, story_id, linear_issue_id, status, error, retry_count, last_retry_at, created_at, updated_at, story:stories(title, status)',
     )
     .eq('build_run_id', runId)
     .order('created_at', { ascending: true });

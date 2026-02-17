@@ -1,17 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/build-runs/queue';
-import { getOpenCodeSessions } from '@/integrations/opencode/session';
+import { appendBuildRunItems, createBuildRunWithItems, processBuildRunById } from '@/build-runs/processor';
+import { createOpenCodeSessions } from '@/integrations/opencode/session';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
-vi.mock('@/build-runs/queue', () => ({
-  createBuildRunWithStoryJob: vi.fn(),
-  enqueueBuildRunStoriesAtomically: vi.fn(),
+vi.mock('@/build-runs/processor', () => ({
+  createBuildRunWithItems: vi.fn(),
+  appendBuildRunItems: vi.fn(),
+  processBuildRunById: vi.fn(),
 }));
-vi.mock('@/integrations/opencode/session', () => ({ getOpenCodeSessions: vi.fn() }));
+vi.mock('@/integrations/opencode/session', () => ({ createOpenCodeSessions: vi.fn() }));
 
 const RELEASE_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
@@ -19,14 +20,14 @@ describe('release run route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
-    vi.mocked(getOpenCodeSessions).mockReturnValue({
+    vi.mocked(createOpenCodeSessions).mockReturnValue({
       createSession: vi.fn(),
       getSessionById: vi.fn(),
       appendStoryAssignment: vi.fn(),
     });
   });
 
-  it('creates queued run and enqueues worker job', async () => {
+  it('creates run and processes inline', async () => {
     const releaseSingle = vi
       .fn()
       .mockResolvedValue({ data: { id: RELEASE_ID, story_map_id: 'story_map_1' }, error: null });
@@ -53,29 +54,35 @@ describe('release run route', () => {
     });
 
     vi.mocked(createClient).mockResolvedValue({ from } as never);
-    vi.mocked(createBuildRunWithStoryJob).mockResolvedValue({
+    vi.mocked(createBuildRunWithItems).mockResolvedValue({
       data: {
         run_id: 'run_1',
-        job_id: 'job_1',
-        queued_story_ids: ['s1', 's2'],
-        queued_items: 2,
+        created_story_ids: ['s1', 's2'],
+        total_items: 2,
       },
       error: null,
     } as never);
+    vi.mocked(processBuildRunById).mockResolvedValue({
+      status: 'completed',
+      totalItems: 2,
+      completedItems: 2,
+      failedItems: 0,
+    });
 
     const response = await POST(new Request('http://localhost/api/test', { method: 'POST' }), {
       params: Promise.resolve({ id: RELEASE_ID }),
     });
 
-    expect(createBuildRunWithStoryJob).toHaveBeenCalledWith(
+    expect(createBuildRunWithItems).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ releaseId: RELEASE_ID, storyIds: ['s1', 's2'] }),
     );
-    expect(response.status).toBe(202);
-    await expect(response.json()).resolves.toMatchObject({ run_id: 'run_1', job_id: 'job_1', status: 'queued' });
+    expect(processBuildRunById).toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ run_id: 'run_1', status: 'completed' });
   });
 
-  it('reuses active run and enqueues only appended stories', async () => {
+  it('appends to active run and processes inline', async () => {
     const releaseSingle = vi
       .fn()
       .mockResolvedValue({ data: { id: RELEASE_ID, story_map_id: 'story_map_1' }, error: null });
@@ -105,36 +112,39 @@ describe('release run route', () => {
     });
 
     vi.mocked(createClient).mockResolvedValue({ from } as never);
-    vi.mocked(enqueueBuildRunStoriesAtomically).mockResolvedValue({
+    vi.mocked(appendBuildRunItems).mockResolvedValue({
       data: {
-        build_run_id: 'run_existing',
-        job_id: 'job_append_1',
-        queued_story_ids: ['s2'],
-        queued_items: 1,
         appended_items: 1,
+        total_items: 2,
       },
       error: null,
     } as never);
+    vi.mocked(processBuildRunById).mockResolvedValue({
+      status: 'completed',
+      totalItems: 2,
+      completedItems: 2,
+      failedItems: 0,
+    });
 
     const response = await POST(new Request('http://localhost/api/test', { method: 'POST' }), {
       params: Promise.resolve({ id: RELEASE_ID }),
     });
 
-    expect(createBuildRunWithStoryJob).not.toHaveBeenCalled();
-    expect(enqueueBuildRunStoriesAtomically).toHaveBeenCalledWith(
+    expect(createBuildRunWithItems).not.toHaveBeenCalled();
+    expect(appendBuildRunItems).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ buildRunId: 'run_existing', storyIds: ['s1', 's2'], queueExisting: false }),
+      expect.objectContaining({ buildRunId: 'run_existing', storyIds: ['s1', 's2'] }),
     );
+    expect(processBuildRunById).toHaveBeenCalled();
     await expect(response.json()).resolves.toMatchObject({
       run_id: 'run_existing',
-      job_id: 'job_append_1',
-      status: 'queued',
+      status: 'completed',
       appended_items: 1,
     });
   });
 
   it('returns 503 when opencode integration disabled', async () => {
-    vi.mocked(getOpenCodeSessions).mockReturnValue(null);
+    vi.mocked(createOpenCodeSessions).mockReturnValue(null);
 
     const response = await POST(new Request('http://localhost/api/test', { method: 'POST' }), {
       params: Promise.resolve({ id: RELEASE_ID }),
@@ -143,7 +153,7 @@ describe('release run route', () => {
     expect(response.status).toBe(503);
   });
 
-  it('returns completed run when release has no stories', async () => {
+  it('returns completed when release has no stories', async () => {
     const releaseSingle = vi
       .fn()
       .mockResolvedValue({ data: { id: RELEASE_ID, story_map_id: 'story_map_1' }, error: null });
@@ -168,12 +178,11 @@ describe('release run route', () => {
     });
 
     vi.mocked(createClient).mockResolvedValue({ from } as never);
-    vi.mocked(createBuildRunWithStoryJob).mockResolvedValue({
+    vi.mocked(createBuildRunWithItems).mockResolvedValue({
       data: {
         run_id: 'run_empty',
-        job_id: null,
-        queued_story_ids: [],
-        queued_items: 0,
+        created_story_ids: [],
+        total_items: 0,
       },
       error: null,
     } as never);
@@ -182,7 +191,8 @@ describe('release run route', () => {
       params: Promise.resolve({ id: RELEASE_ID }),
     });
 
-    expect(response.status).toBe(202);
+    expect(response.status).toBe(200);
+    expect(processBuildRunById).not.toHaveBeenCalled();
     await expect(response.json()).resolves.toMatchObject({ run_id: 'run_empty', status: 'completed' });
   });
 });

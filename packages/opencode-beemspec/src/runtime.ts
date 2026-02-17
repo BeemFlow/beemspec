@@ -1,96 +1,45 @@
 import type { Plugin } from '@opencode-ai/plugin';
-import { compactedContext } from './plugin';
-import type { OpenCodeSessionContext } from './types';
+import { compactedContextForStories } from './plugin';
+import type { SessionContextResponse } from './types';
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+function getApiUrl(): string | null {
+  const value = process.env.BEEMSPEC_API_URL ?? process.env.BEEMSPEC_OPENCODE_BASE_URL;
+  return value?.trim() || null;
 }
 
-function isSessionContext(value: unknown): value is OpenCodeSessionContext {
-  if (!isRecord(value)) return false;
-
-  return (
-    typeof value.releaseId === 'string' &&
-    typeof value.storyId === 'string' &&
-    typeof value.storyTitle === 'string' &&
-    typeof value.requirements === 'string' &&
-    typeof value.acceptanceCriteria === 'string' &&
-    (typeof value.technicalGuidelines === 'string' || value.technicalGuidelines === null)
-  );
+function getApiToken(): string | null {
+  const value = process.env.BEEMSPEC_OPENCODE_TOKEN;
+  return value?.trim() || null;
 }
 
-function shouldCaptureStoryContext(toolName: string): boolean {
-  return toolName === 'beemspec_story';
-}
+async function fetchSessionContext(sessionId: string): Promise<SessionContextResponse | null> {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) return null;
 
-function parseSessionContextFromToolOutput(output: string): OpenCodeSessionContext | null {
-  const parse = (text: string): OpenCodeSessionContext | null => {
-    try {
-      const parsed = JSON.parse(text);
-      return isSessionContext(parsed) ? parsed : null;
-    } catch {
-      return null;
-    }
-  };
-
-  const direct = parse(output);
-  if (direct) return direct;
-
-  const objectMatch = output.match(/\{[\s\S]*\}/);
-  if (!objectMatch) return null;
+  const token = getApiToken();
+  const headers: Record<string, string> = { accept: 'application/json' };
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
 
   try {
-    const parsed = JSON.parse(objectMatch[0]);
-    return isSessionContext(parsed) ? parsed : null;
+    const response = await fetch(
+      `${apiUrl.replace(/\/$/, '')}/api/opencode/sessions/${encodeURIComponent(sessionId)}/context`,
+      { method: 'GET', headers },
+    );
+    if (!response.ok) return null;
+    return (await response.json()) as SessionContextResponse;
   } catch {
     return null;
   }
 }
 
-export const BeemSpecPlugin: Plugin = async ({ client }) => {
-  const sessionContextBySessionId = new Map<string, OpenCodeSessionContext>();
-
+export const BeemSpecPlugin: Plugin = async () => {
   return {
-    'tool.execute.after': async (input, output) => {
-      if (!shouldCaptureStoryContext(input.tool)) return;
-
-      const sessionContext = parseSessionContextFromToolOutput(output.output);
-      if (!sessionContext) return;
-
-      sessionContextBySessionId.set(input.sessionID, sessionContext);
-    },
-    event: async ({ event }) => {
-      if (
-        event.type !== 'session.created' &&
-        event.type !== 'session.updated' &&
-        event.type !== 'session.idle' &&
-        event.type !== 'session.error'
-      ) {
-        return;
-      }
-
-      await client.app.log({
-        body: {
-          service: 'opencode-beemspec',
-          level: event.type === 'session.error' ? 'error' : 'info',
-          message: `session lifecycle event: ${event.type}`,
-          extra: event.properties,
-        },
-      });
-    },
     'experimental.session.compacting': async (input, output) => {
-      const sessionContext = sessionContextBySessionId.get(input.sessionID);
-      if (!sessionContext) return;
-      output.context.push(...compactedContext(sessionContext));
-    },
-    'experimental.chat.system.transform': async (input, output) => {
-      const sessionContext = input.sessionID ? sessionContextBySessionId.get(input.sessionID) : null;
-      if (!sessionContext) return;
-      output.system = [
-        ...output.system,
-        'BeemSpec source-of-truth context is active for this session.',
-        `Current story: ${sessionContext.storyTitle} (${sessionContext.storyId})`,
-      ];
+      const context = await fetchSessionContext(input.sessionID);
+      if (!context || context.stories.length === 0) return;
+      output.context.push(...compactedContextForStories(context.stories));
     },
   };
 };

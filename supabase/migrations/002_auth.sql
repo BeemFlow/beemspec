@@ -1,59 +1,13 @@
 -- =============================================================================
--- BeemSpec Auth & Teams Schema
+-- BeemSpec Auth: RLS, Policies, Auth Functions
+-- Depends on: 001_schema.sql
 -- =============================================================================
 
--- =============================================================================
--- Teams & Membership Tables
--- =============================================================================
-
--- Teams (organizations/workspaces)
-CREATE TABLE teams (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Team membership with roles (owner = full control, member = content CRUD)
-CREATE TABLE team_members (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'member')),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(team_id, user_id)
-);
-
--- Indexes
-CREATE INDEX idx_team_members_team ON team_members(team_id);
-CREATE INDEX idx_team_members_user ON team_members(user_id);
-
--- Team invites (for inviting users to join teams)
-CREATE TABLE team_invites (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  email TEXT NOT NULL,
-  invited_by UUID NOT NULL REFERENCES auth.users(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  accepted_at TIMESTAMPTZ,
-  UNIQUE(team_id, email)
-);
-
-CREATE INDEX idx_team_invites_team ON team_invites(team_id);
-CREATE INDEX idx_team_invites_email ON team_invites(email);
-
--- =============================================================================
--- Add team_id to story_maps
--- =============================================================================
-
-ALTER TABLE story_maps ADD COLUMN team_id UUID REFERENCES teams(id) ON DELETE CASCADE;
-CREATE INDEX idx_story_maps_team ON story_maps(team_id);
 
 -- =============================================================================
 -- RLS Helper Functions
 -- =============================================================================
 
--- Check if user is member of a team
 CREATE OR REPLACE FUNCTION is_team_member(check_team_id UUID)
 RETURNS BOOLEAN
 LANGUAGE SQL STABLE SECURITY DEFINER
@@ -65,7 +19,6 @@ AS $$
   )
 $$;
 
--- Check if user is owner of a team
 CREATE OR REPLACE FUNCTION is_team_owner(check_team_id UUID)
 RETURNS BOOLEAN
 LANGUAGE SQL STABLE SECURITY DEFINER
@@ -77,6 +30,7 @@ AS $$
     AND role = 'owner'
   )
 $$;
+
 
 -- =============================================================================
 -- Enable RLS on all tables
@@ -94,9 +48,16 @@ ALTER TABLE stories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE story_personas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activity_personas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE task_personas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE story_linear_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE integration_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE linear_oauth_connections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE integration_webhook_receipts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE build_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE build_run_items ENABLE ROW LEVEL SECURITY;
+
 
 -- =============================================================================
--- Teams Policies
+-- RLS Policies: Teams
 -- =============================================================================
 
 CREATE POLICY "Team members can view their teams"
@@ -117,8 +78,9 @@ CREATE POLICY "Team owners can delete teams"
   ON teams FOR DELETE
   USING (is_team_owner(id));
 
+
 -- =============================================================================
--- Team Members Policies
+-- RLS Policies: Team Members
 -- =============================================================================
 
 CREATE POLICY "Team members can view membership"
@@ -131,11 +93,9 @@ CREATE POLICY "Team owners can add members or users can join via invite"
   WITH CHECK (
     is_team_owner(team_id)
     OR (
-      -- Allow owner to add themselves when creating a team
       user_id = (SELECT auth.uid()) AND role = 'owner'
     )
     OR (
-      -- Allow users to join via valid pending invite
       user_id = (SELECT auth.uid())
       AND role = 'member'
       AND EXISTS (
@@ -156,8 +116,9 @@ CREATE POLICY "Team owners can remove members or self-remove"
   ON team_members FOR DELETE
   USING (is_team_owner(team_id) OR user_id = (SELECT auth.uid()));
 
+
 -- =============================================================================
--- Team Invites Policies
+-- RLS Policies: Team Invites
 -- =============================================================================
 
 CREATE POLICY "Team members can view invites"
@@ -178,8 +139,9 @@ CREATE POLICY "Team owners can delete invites"
   ON team_invites FOR DELETE
   USING (is_team_owner(team_id));
 
+
 -- =============================================================================
--- Story Maps Policies
+-- RLS Policies: Story Maps
 -- =============================================================================
 
 CREATE POLICY "Team members can view story maps"
@@ -200,8 +162,9 @@ CREATE POLICY "Team members can delete story maps"
   ON story_maps FOR DELETE
   USING (is_team_member(team_id));
 
+
 -- =============================================================================
--- Personas Policies
+-- RLS Policies: Personas
 -- =============================================================================
 
 CREATE POLICY "Team members can view personas"
@@ -242,8 +205,9 @@ CREATE POLICY "Team members can delete personas"
     AND is_team_member(sm.team_id)
   ));
 
+
 -- =============================================================================
--- Activities Policies
+-- RLS Policies: Activities
 -- =============================================================================
 
 CREATE POLICY "Team members can view activities"
@@ -284,8 +248,9 @@ CREATE POLICY "Team members can delete activities"
     AND is_team_member(sm.team_id)
   ));
 
+
 -- =============================================================================
--- Tasks Policies
+-- RLS Policies: Tasks
 -- =============================================================================
 
 CREATE POLICY "Team members can view tasks"
@@ -331,8 +296,9 @@ CREATE POLICY "Team members can delete tasks"
     AND is_team_member(sm.team_id)
   ));
 
+
 -- =============================================================================
--- Releases Policies
+-- RLS Policies: Releases
 -- =============================================================================
 
 CREATE POLICY "Team members can view releases"
@@ -373,8 +339,9 @@ CREATE POLICY "Team members can delete releases"
     AND is_team_member(sm.team_id)
   ));
 
+
 -- =============================================================================
--- Stories Policies
+-- RLS Policies: Stories
 -- =============================================================================
 
 CREATE POLICY "Team members can view stories"
@@ -425,8 +392,9 @@ CREATE POLICY "Team members can delete stories"
     AND is_team_member(sm.team_id)
   ));
 
+
 -- =============================================================================
--- Junction Tables Policies
+-- RLS Policies: Junction Tables
 -- =============================================================================
 
 -- Story Personas
@@ -525,6 +493,157 @@ CREATE POLICY "Team members can delete task personas"
     AND is_team_member(sm.team_id)
   ));
 
+
+-- =============================================================================
+-- RLS Policies: Story Linear Links
+-- =============================================================================
+
+CREATE POLICY "Team members can view story linear links"
+  ON story_linear_links FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM stories s
+    JOIN tasks t ON t.id = s.task_id
+    JOIN activities a ON a.id = t.activity_id
+    JOIN story_maps sm ON sm.id = a.story_map_id
+    WHERE s.id = story_id
+    AND is_team_member(sm.team_id)
+  ));
+
+CREATE POLICY "Team members can create story linear links"
+  ON story_linear_links FOR INSERT
+  TO authenticated
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM stories s
+    JOIN tasks t ON t.id = s.task_id
+    JOIN activities a ON a.id = t.activity_id
+    JOIN story_maps sm ON sm.id = a.story_map_id
+    WHERE s.id = story_id
+    AND is_team_member(sm.team_id)
+  ));
+
+CREATE POLICY "Team members can update story linear links"
+  ON story_linear_links FOR UPDATE
+  USING (EXISTS (
+    SELECT 1 FROM stories s
+    JOIN tasks t ON t.id = s.task_id
+    JOIN activities a ON a.id = t.activity_id
+    JOIN story_maps sm ON sm.id = a.story_map_id
+    WHERE s.id = story_id
+    AND is_team_member(sm.team_id)
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM stories s
+    JOIN tasks t ON t.id = s.task_id
+    JOIN activities a ON a.id = t.activity_id
+    JOIN story_maps sm ON sm.id = a.story_map_id
+    WHERE s.id = story_id
+    AND is_team_member(sm.team_id)
+  ));
+
+CREATE POLICY "Team members can delete story linear links"
+  ON story_linear_links FOR DELETE
+  USING (EXISTS (
+    SELECT 1 FROM stories s
+    JOIN tasks t ON t.id = s.task_id
+    JOIN activities a ON a.id = t.activity_id
+    JOIN story_maps sm ON sm.id = a.story_map_id
+    WHERE s.id = story_id
+    AND is_team_member(sm.team_id)
+  ));
+
+
+-- =============================================================================
+-- RLS Policies: Integration Settings
+-- =============================================================================
+
+CREATE POLICY "Team members can view integration settings"
+  ON integration_settings FOR SELECT
+  USING (is_team_member(team_id));
+
+CREATE POLICY "Team owners can create integration settings"
+  ON integration_settings FOR INSERT
+  TO authenticated
+  WITH CHECK (is_team_owner(team_id));
+
+CREATE POLICY "Team owners can update integration settings"
+  ON integration_settings FOR UPDATE
+  USING (is_team_owner(team_id))
+  WITH CHECK (is_team_owner(team_id));
+
+CREATE POLICY "Team owners can delete integration settings"
+  ON integration_settings FOR DELETE
+  USING (is_team_owner(team_id));
+
+
+-- =============================================================================
+-- RLS Policies: Build Runs
+-- =============================================================================
+
+CREATE POLICY "Team members can view build runs"
+  ON build_runs FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM story_maps sm
+    WHERE sm.id = story_map_id
+      AND is_team_member(sm.team_id)
+  ));
+
+CREATE POLICY "Team members can create build runs"
+  ON build_runs FOR INSERT
+  TO authenticated
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM story_maps sm
+    WHERE sm.id = story_map_id
+      AND is_team_member(sm.team_id)
+  ));
+
+CREATE POLICY "Team members can update build runs"
+  ON build_runs FOR UPDATE
+  USING (EXISTS (
+    SELECT 1 FROM story_maps sm
+    WHERE sm.id = story_map_id
+      AND is_team_member(sm.team_id)
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM story_maps sm
+    WHERE sm.id = story_map_id
+      AND is_team_member(sm.team_id)
+  ));
+
+CREATE POLICY "Team members can view build run items"
+  ON build_run_items FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM build_runs rr
+    JOIN story_maps sm ON sm.id = rr.story_map_id
+    WHERE rr.id = build_run_id
+      AND is_team_member(sm.team_id)
+  ));
+
+CREATE POLICY "Team members can create build run items"
+  ON build_run_items FOR INSERT
+  TO authenticated
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM build_runs rr
+    JOIN story_maps sm ON sm.id = rr.story_map_id
+    WHERE rr.id = build_run_id
+      AND is_team_member(sm.team_id)
+  ));
+
+CREATE POLICY "Team members can update build run items"
+  ON build_run_items FOR UPDATE
+  USING (EXISTS (
+    SELECT 1 FROM build_runs rr
+    JOIN story_maps sm ON sm.id = rr.story_map_id
+    WHERE rr.id = build_run_id
+      AND is_team_member(sm.team_id)
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM build_runs rr
+    JOIN story_maps sm ON sm.id = rr.story_map_id
+    WHERE rr.id = build_run_id
+      AND is_team_member(sm.team_id)
+  ));
+
+
 -- =============================================================================
 -- Auto-create Personal Team on Signup
 -- =============================================================================
@@ -538,18 +657,15 @@ DECLARE
   new_team_id UUID;
   user_name TEXT;
 BEGIN
-  -- Get user name from metadata or email
   user_name := COALESCE(
     NEW.raw_user_meta_data->>'full_name',
     split_part(NEW.email, '@', 1)
   );
 
-  -- Create personal team
   INSERT INTO public.teams (name)
   VALUES (user_name || '''s Team')
   RETURNING id INTO new_team_id;
 
-  -- Add user as owner
   INSERT INTO public.team_members (team_id, user_id, role)
   VALUES (new_team_id, NEW.id, 'owner');
 
@@ -557,32 +673,15 @@ BEGIN
 END;
 $$;
 
--- Trigger on auth.users insert
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
--- =============================================================================
--- Update timestamps trigger for teams
--- =============================================================================
-
-CREATE OR REPLACE FUNCTION update_teams_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_teams_updated_at
-  BEFORE UPDATE ON teams
-  FOR EACH ROW EXECUTE FUNCTION update_teams_updated_at();
 
 -- =============================================================================
 -- Member Management Functions (SECURITY DEFINER for auth.users access)
 -- =============================================================================
 
--- Get team members with emails
 CREATE OR REPLACE FUNCTION get_team_members(p_team_id UUID)
 RETURNS TABLE (
   id UUID,
@@ -595,7 +694,6 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = ''
 AS $$
 BEGIN
-  -- Verify caller is team member
   IF NOT EXISTS (
     SELECT 1 FROM public.team_members
     WHERE team_id = p_team_id
@@ -618,7 +716,6 @@ BEGIN
 END;
 $$;
 
--- Remove team member
 CREATE OR REPLACE FUNCTION remove_team_member(p_team_id UUID, p_user_id UUID)
 RETURNS JSON
 LANGUAGE plpgsql
@@ -630,7 +727,6 @@ DECLARE
 BEGIN
   v_caller_id := (SELECT auth.uid());
 
-  -- Get target user's role
   SELECT role INTO v_target_role
   FROM public.team_members
   WHERE team_id = p_team_id AND user_id = p_user_id;
@@ -639,12 +735,10 @@ BEGIN
     RETURN json_build_object('error', 'Member not found');
   END IF;
 
-  -- Owners cannot be removed
   IF v_target_role = 'owner' THEN
     RETURN json_build_object('error', 'Cannot remove team owner');
   END IF;
 
-  -- Only owners or self can remove
   IF NOT EXISTS (
     SELECT 1 FROM public.team_members
     WHERE team_id = p_team_id

@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
-import { opencodeMarkBlockedSchema } from '@/integrations/opencode/schemas';
+import { z } from 'zod';
+import { markStoryBlocked } from '@/build-runs/processor';
 import { isAuthorizedByOpenCodeToken } from '@/integrations/opencode/session';
 import { requireAuth } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { validateRequest } from '@/lib/validations';
+
+const markBlockedSchema = z.object({
+  story_id: z.string().uuid(),
+  reason: z.string().min(1).max(2000),
+});
 
 export async function POST(request: Request) {
   const usingToken = isAuthorizedByOpenCodeToken(request);
@@ -13,29 +19,18 @@ export async function POST(request: Request) {
     if (!auth.success) return auth.response;
   }
 
-  const validation = await validateRequest(request, opencodeMarkBlockedSchema);
+  const validation = await validateRequest(request, markBlockedSchema);
   if (!validation.success) return validation.response;
 
   const supabase = usingToken ? createAdminClient() : await createClient();
-  const reason = `Blocked: ${validation.data.reason}`;
+  const result = await markStoryBlocked(supabase, {
+    storyId: validation.data.story_id,
+    reason: validation.data.reason,
+  });
 
-  const { data: latestItem, error: latestItemError } = await supabase
-    .from('build_run_items')
-    .select('id')
-    .eq('story_id', validation.data.story_id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (latestItemError) return NextResponse.json({ error: 'Failed to locate build run item' }, { status: 500 });
-  if (!latestItem) return NextResponse.json({ error: 'No build run item found for story' }, { status: 404 });
-
-  const { error: updateError } = await supabase
-    .from('build_run_items')
-    .update({ status: 'failed', error: reason, last_retry_at: new Date().toISOString() })
-    .eq('id', latestItem.id);
-
-  if (updateError) return NextResponse.json({ error: 'Failed to mark story blocked' }, { status: 500 });
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
+  }
 
   return NextResponse.json({ ok: true });
 }

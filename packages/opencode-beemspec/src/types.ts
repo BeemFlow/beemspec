@@ -7,38 +7,6 @@ export interface OpenCodeSessionContext {
   technicalGuidelines: string | null;
 }
 
-export interface OpenCodeCompactionInput {
-  sessionId: string;
-  context: OpenCodeSessionContext;
-}
-
-export interface OpenCodeCompactionOutput {
-  context: string[];
-  prompt?: string;
-}
-
-export interface OpenCodeSystemPromptTransformInput {
-  sessionId: string;
-  system: string[];
-  context: OpenCodeSessionContext;
-}
-
-export interface OpenCodeSystemPromptTransformOutput {
-  system: string[];
-}
-
-export interface OpenCodeLifecycleEvent {
-  type: 'session.created' | 'session.updated' | 'session.idle' | 'session.error';
-  sessionId: string;
-  payload: unknown;
-}
-
-export interface OpenCodePluginHooks {
-  onCompacting(input: OpenCodeCompactionInput): Promise<OpenCodeCompactionOutput>;
-  onSystemTransform(input: OpenCodeSystemPromptTransformInput): Promise<OpenCodeSystemPromptTransformOutput>;
-  onEvent(event: OpenCodeLifecycleEvent): Promise<void>;
-}
-
 export interface OpenCodeSessionCreateInput {
   releaseId?: string;
   runId?: string;
@@ -80,11 +48,9 @@ export interface OpenCodeSessionService {
   appendStoryAssignment(input: OpenCodeSessionStoryAssignmentInput): Promise<void>;
 }
 
-export interface BeemSpecStoryToolInput {
-  storyId: string;
-}
-
-export interface BeemSpecBlockedToolInput {
-  storyId: string;
-  reason: string;
+export interface SessionContextResponse {
+  sessionId: string;
+  releaseId: string | null;
+  runId: string | null;
+  stories: OpenCodeSessionContext[];
 }

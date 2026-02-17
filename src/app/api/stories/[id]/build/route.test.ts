@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createBuildRunWithStoryJob, enqueueBuildRunStoriesAtomically } from '@/build-runs/queue';
-import { getOpenCodeSessions } from '@/integrations/opencode/session';
+import { appendBuildRunItems, createBuildRunWithItems, processBuildRunById } from '@/build-runs/processor';
+import { createOpenCodeSessions } from '@/integrations/opencode/session';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
-vi.mock('@/build-runs/queue', () => ({
-  createBuildRunWithStoryJob: vi.fn(),
-  enqueueBuildRunStoriesAtomically: vi.fn(),
+vi.mock('@/build-runs/processor', () => ({
+  createBuildRunWithItems: vi.fn(),
+  appendBuildRunItems: vi.fn(),
+  processBuildRunById: vi.fn(),
+  loadStoryWithStoryMap: vi.fn(),
 }));
-vi.mock('@/integrations/opencode/session', () => ({ getOpenCodeSessions: vi.fn() }));
+vi.mock('@/integrations/opencode/session', () => ({ createOpenCodeSessions: vi.fn() }));
 
 const STORY_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
@@ -19,96 +21,77 @@ describe('story build route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
-    vi.mocked(getOpenCodeSessions).mockReturnValue({
+    vi.mocked(createOpenCodeSessions).mockReturnValue({
       createSession: vi.fn(),
       getSessionById: vi.fn(),
       appendStoryAssignment: vi.fn(),
     });
   });
 
-  it('queues one story build job', async () => {
-    const storySingle = vi.fn().mockResolvedValue({
+  it('creates run for one story and processes inline', async () => {
+    const { loadStoryWithStoryMap } = await import('@/build-runs/processor');
+    vi.mocked(loadStoryWithStoryMap).mockResolvedValue({
+      ok: true,
       data: {
-        id: STORY_ID,
-        release_id: 'release_1',
-        task_id: 'task_1',
-        title: 'Story 1',
-        requirements: 'Req',
-        acceptance_criteria: 'AC',
-        technical_guidelines: null,
-        status: 'ready',
-        updated_at: '2026-02-14T11:00:00.000Z',
+        story: {
+          id: STORY_ID,
+          release_id: 'release_1',
+          task_id: 'task_1',
+          title: 'Story 1',
+          requirements: 'Req',
+          acceptance_criteria: 'AC',
+          technical_guidelines: null,
+        } as never,
+        storyMapId: 'story_map_1',
       },
-      error: null,
     });
-    const storyEq = vi.fn().mockReturnValue({ single: storySingle });
-    const storySelect = vi.fn().mockReturnValue({ eq: storyEq });
 
-    const taskSingle = vi.fn().mockResolvedValue({ data: { activity_id: 'activity_1' }, error: null });
-    const taskEq = vi.fn().mockReturnValue({ single: taskSingle });
-    const taskSelect = vi.fn().mockReturnValue({ eq: taskEq });
-
-    const activitySingle = vi.fn().mockResolvedValue({ data: { story_map_id: 'story_map_1' }, error: null });
-    const activityEq = vi.fn().mockReturnValue({ single: activitySingle });
-    const activitySelect = vi.fn().mockReturnValue({ eq: activityEq });
-
-    const tableMap: Record<string, unknown> = {
-      stories: { select: storySelect },
-      tasks: { select: taskSelect },
-      activities: { select: activitySelect },
-    };
-    const from = vi.fn((table: string) => tableMap[table] ?? {});
-
-    vi.mocked(createClient).mockResolvedValue({ from } as never);
-
-    vi.mocked(createBuildRunWithStoryJob).mockResolvedValue({
+    vi.mocked(createClient).mockResolvedValue({ from: vi.fn() } as never);
+    vi.mocked(createBuildRunWithItems).mockResolvedValue({
       data: {
         run_id: 'run_1',
-        job_id: 'job_1',
-        queued_story_ids: [STORY_ID],
-        queued_items: 1,
+        created_story_ids: [STORY_ID],
+        total_items: 1,
       },
       error: null,
     } as never);
+    vi.mocked(processBuildRunById).mockResolvedValue({
+      status: 'completed',
+      totalItems: 1,
+      completedItems: 1,
+      failedItems: 0,
+    });
 
     const response = await POST(new Request('http://localhost/api/test', { method: 'POST' }), {
       params: Promise.resolve({ id: STORY_ID }),
     });
 
-    expect(response.status).toBe(202);
+    expect(response.status).toBe(200);
+    expect(processBuildRunById).toHaveBeenCalled();
     await expect(response.json()).resolves.toMatchObject({
       run_id: 'run_1',
-      job_id: 'job_1',
       story_id: STORY_ID,
-      status: 'queued',
+      status: 'completed',
     });
   });
 
-  it('appends story to an existing build run when build_run_id is provided', async () => {
-    const storySingle = vi.fn().mockResolvedValue({
+  it('appends story to an existing build run', async () => {
+    const { loadStoryWithStoryMap } = await import('@/build-runs/processor');
+    vi.mocked(loadStoryWithStoryMap).mockResolvedValue({
+      ok: true,
       data: {
-        id: STORY_ID,
-        release_id: 'release_1',
-        task_id: 'task_1',
-        title: 'Story 1',
-        requirements: 'Req',
-        acceptance_criteria: 'AC',
-        technical_guidelines: null,
-        status: 'ready',
-        updated_at: '2026-02-14T11:00:00.000Z',
+        story: {
+          id: STORY_ID,
+          release_id: 'release_1',
+          task_id: 'task_1',
+          title: 'Story 1',
+          requirements: 'Req',
+          acceptance_criteria: 'AC',
+          technical_guidelines: null,
+        } as never,
+        storyMapId: 'story_map_1',
       },
-      error: null,
     });
-    const storyEq = vi.fn().mockReturnValue({ single: storySingle });
-    const storySelect = vi.fn().mockReturnValue({ eq: storyEq });
-
-    const taskSingle = vi.fn().mockResolvedValue({ data: { activity_id: 'activity_1' }, error: null });
-    const taskEq = vi.fn().mockReturnValue({ single: taskSingle });
-    const taskSelect = vi.fn().mockReturnValue({ eq: taskEq });
-
-    const activitySingle = vi.fn().mockResolvedValue({ data: { story_map_id: 'story_map_1' }, error: null });
-    const activityEq = vi.fn().mockReturnValue({ single: activitySingle });
-    const activitySelect = vi.fn().mockReturnValue({ eq: activityEq });
 
     const targetRunSingle = vi.fn().mockResolvedValue({
       data: {
@@ -124,25 +107,24 @@ describe('story build route', () => {
     const targetRunSelect = vi.fn().mockReturnValue({ eq: targetRunEq });
 
     const from = vi.fn((table: string) => {
-      if (table === 'stories') return { select: storySelect };
-      if (table === 'tasks') return { select: taskSelect };
-      if (table === 'activities') return { select: activitySelect };
       if (table === 'build_runs') return { select: targetRunSelect };
       return {};
     });
 
     vi.mocked(createClient).mockResolvedValue({ from } as never);
-
-    vi.mocked(enqueueBuildRunStoriesAtomically).mockResolvedValue({
+    vi.mocked(appendBuildRunItems).mockResolvedValue({
       data: {
-        build_run_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        job_id: 'job_2',
-        queued_story_ids: [STORY_ID],
-        queued_items: 1,
         appended_items: 1,
+        total_items: 4,
       },
       error: null,
     } as never);
+    vi.mocked(processBuildRunById).mockResolvedValue({
+      status: 'completed',
+      totalItems: 4,
+      completedItems: 4,
+      failedItems: 0,
+    });
 
     const response = await POST(
       new Request(`http://localhost/api/stories/${STORY_ID}/build?build_run_id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa`, {
@@ -153,22 +135,21 @@ describe('story build route', () => {
       },
     );
 
-    expect(createBuildRunWithStoryJob).not.toHaveBeenCalled();
-    expect(enqueueBuildRunStoriesAtomically).toHaveBeenCalledWith(
+    expect(createBuildRunWithItems).not.toHaveBeenCalled();
+    expect(appendBuildRunItems).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
         buildRunId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         storyIds: [STORY_ID],
-        queueExisting: true,
       }),
     );
+    expect(processBuildRunById).toHaveBeenCalled();
 
     await expect(response.json()).resolves.toMatchObject({
       run_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       build_run_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      job_id: 'job_2',
       story_id: STORY_ID,
-      status: 'queued',
+      status: 'completed',
       appended_item: true,
     });
   });
