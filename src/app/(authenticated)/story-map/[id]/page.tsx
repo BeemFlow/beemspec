@@ -375,10 +375,6 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         </div>
       )}
 
-      <div className="px-4 pt-4">
-        <BuildRunsPanel releases={storyMap.releases} onError={setUiError} />
-      </div>
-
       <ScrollArea className="flex-1">
         <div className="p-4">
           <StoryMapCanvas
@@ -396,6 +392,7 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
             onRefresh={loadStoryMap}
             onError={setUiError}
           />
+          <BuildRunsPanel releases={storyMap.releases} onError={setUiError} />
         </div>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
