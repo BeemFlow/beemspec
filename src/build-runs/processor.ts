@@ -57,6 +57,7 @@ export async function createBuildRunWithItems(
     storyMapId: string;
     userId: string;
     storyIds: string[];
+    workingDirectory?: string | null;
   },
 ) {
   return supabase
@@ -65,6 +66,7 @@ export async function createBuildRunWithItems(
       p_story_map_id: input.storyMapId,
       p_triggered_by: input.userId,
       p_story_ids: input.storyIds,
+      p_working_directory: input.workingDirectory ?? null,
     })
     .single<CreateBuildRunResult>();
 }
@@ -133,7 +135,7 @@ async function insertSyncedRunItem(
   input: {
     runId: string;
     storyId: string;
-    linearIssueId: string;
+    linearIssueId: string | null;
     retryCount: number;
     lastRetryAt: string | null;
   },
@@ -199,15 +201,13 @@ async function syncAndInsertRunItem(
   },
 ) {
   const link = await getStoryLinearLink(supabase, input.story.id);
-  if (!link) throw new Error('Story is not synced to Linear. Use sync to Linear before building.');
-
-  const linearIssueId = link.linearIssueId;
-  const linearIssueIdentifier = link.linearIssueIdentifier ?? link.linearIssueId;
+  const linearIssueId = link?.linearIssueId ?? null;
+  const linearIssueIdentifier = link?.linearIssueIdentifier ?? link?.linearIssueId ?? null;
   const existing = await loadExistingBuildRunItem(supabase, input);
 
   if (existing?.status === BUILD_RUN_ITEM_STATUS.synced && existing.linear_issue_id === linearIssueId) {
     return {
-      linearIssue: { id: linearIssueId, identifier: linearIssueIdentifier },
+      linearIssue: linearIssueId ? { id: linearIssueId, identifier: linearIssueIdentifier! } : null,
       session: input.runSession,
     };
   }
@@ -236,7 +236,7 @@ async function syncAndInsertRunItem(
   });
 
   return {
-    linearIssue: { id: linearIssueId, identifier: linearIssueIdentifier },
+    linearIssue: linearIssueId ? { id: linearIssueId, identifier: linearIssueIdentifier! } : null,
     session: input.runSession,
   };
 }
@@ -266,6 +266,20 @@ async function finishBuildRun(
       completed_items: input.completedItems,
       failed_items: input.failedItems,
       finished_at: new Date().toISOString(),
+      error: input.error,
+    })
+    .eq('id', input.runId);
+}
+
+async function updateBuildRunCounts(
+  supabase: Supabase,
+  input: { runId: string; completedItems: number; failedItems: number; error: string | null },
+) {
+  return supabase
+    .from(BUILD_RUN_TABLE)
+    .update({
+      completed_items: input.completedItems,
+      failed_items: input.failedItems,
       error: input.error,
     })
     .eq('id', input.runId);
@@ -336,6 +350,7 @@ async function ensureRunSession(
     runId: string;
     releaseId: string | null;
     stories: Story[];
+    workingDirectory: string | null;
     openCodeSessions: OpenCodeSessions | null;
   },
 ): Promise<{ id: string; url: string } | null> {
@@ -366,6 +381,7 @@ async function ensureRunSession(
   const created = await input.openCodeSessions.createSession({
     releaseId: input.releaseId ?? undefined,
     runId: input.runId,
+    workingDirectory: input.workingDirectory ?? undefined,
     technicalGuidelines: null,
     stories: seededStories,
   });
@@ -425,6 +441,7 @@ export async function processBuildRunById(
     runId: string;
     releaseId: string | null;
     storyIds: string[];
+    workingDirectory?: string | null;
     openCodeSessions: OpenCodeSessions | null;
   },
 ) {
@@ -446,6 +463,7 @@ export async function processBuildRunById(
     runId: input.runId,
     releaseId: input.releaseId,
     stories: (stories ?? []) as Story[],
+    workingDirectory: input.workingDirectory ?? null,
     openCodeSessions: input.openCodeSessions,
   });
 
@@ -455,6 +473,29 @@ export async function processBuildRunById(
     runSession,
     openCodeSessions: input.openCodeSessions,
   });
+
+  // If stories were dispatched to an OpenCode session, fire the start prompt
+  // (non-blocking) and leave the run in "running" — the agent is working.
+  // Only auto-finish the run if all items failed or there's no session.
+  if (runSession && input.openCodeSessions && completedItems > 0) {
+    input.openCodeSessions.startSession(runSession.id, completedItems).catch((err) => {
+      console.error('Failed to send start prompt to OpenCode session', err);
+    });
+
+    await updateBuildRunCounts(supabase, {
+      runId: input.runId,
+      completedItems,
+      failedItems,
+      error: failedItems > 0 ? `${failedItems} item(s) failed to sync` : null,
+    });
+
+    return {
+      status: BUILD_RUN_STATUS.running,
+      totalItems: (stories ?? []).length,
+      completedItems,
+      failedItems,
+    };
+  }
 
   const summary = await summarizeAndFinishBuildRun(supabase, input.runId);
   return {

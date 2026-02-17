@@ -24,6 +24,7 @@ describe('release run route', () => {
       createSession: vi.fn(),
       getSessionById: vi.fn(),
       appendStoryAssignment: vi.fn(),
+      startSession: vi.fn(),
     });
   });
 

@@ -14,6 +14,7 @@ export interface OpenCodeSessionCreateInput {
   storyTitle?: string;
   linearIssueId?: string;
   linearIssueIdentifier?: string;
+  workingDirectory?: string;
   requirements?: string;
   acceptanceCriteria?: string;
   technicalGuidelines: string | null;
@@ -29,7 +30,7 @@ export interface OpenCodeSessionStoryAssignmentInput {
   runId: string;
   storyId: string;
   storyTitle: string;
-  linearIssueIdentifier: string;
+  linearIssueIdentifier: string | null;
   requirements: string;
   acceptanceCriteria: string;
   technicalGuidelines: string | null;
@@ -46,6 +47,7 @@ export interface OpenCodeSessionService {
   createSession(input: OpenCodeSessionCreateInput): Promise<OpenCodeSessionSnapshot>;
   getSessionById(sessionId: string): Promise<OpenCodeSessionSnapshot | null>;
   appendStoryAssignment(input: OpenCodeSessionStoryAssignmentInput): Promise<void>;
+  startSession(sessionId: string, storyCount: number): Promise<void>;
 }
 
 export interface SessionContextResponse {

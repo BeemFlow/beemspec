@@ -32,8 +32,13 @@ function getOpencodeAuthorizationHeader(): string | null {
   return `Basic ${encoded}`;
 }
 
-function getOpencodeSessionUrl(sessionId: string): string {
+function getOpencodeSessionUrl(sessionId: string, workingDirectory?: string): string {
   const baseUrl = env.openCodeWebBaseUrl() ?? getOpencodeBaseUrl();
+  const dir = workingDirectory ?? env.openCodeWorkingDirectory();
+  if (dir) {
+    const encodedDir = Buffer.from(dir).toString('base64').replace(/=+$/, '');
+    return `${baseUrl.replace(/\/$/, '')}/${encodedDir}/session/${sessionId}`;
+  }
   return `${baseUrl.replace(/\/$/, '')}/session/${sessionId}`;
 }
 
@@ -64,9 +69,7 @@ function buildSessionTitle(input: OpenCodeSessionCreateInput): string {
 }
 
 function buildSessionContextPrompt(input: OpenCodeSessionCreateInput): string {
-  const hasStoryContext = Boolean(
-    input.storyId && input.storyTitle && input.linearIssueIdentifier && input.requirements && input.acceptanceCriteria,
-  );
+  const hasStoryContext = Boolean(input.storyId && input.storyTitle && input.requirements && input.acceptanceCriteria);
 
   if (hasStoryContext) {
     return [
@@ -74,7 +77,7 @@ function buildSessionContextPrompt(input: OpenCodeSessionCreateInput): string {
       `Release ID: ${input.releaseId ?? 'none'}`,
       `Story ID: ${input.storyId}`,
       `Story Title: ${input.storyTitle}`,
-      `Linear Issue: ${input.linearIssueIdentifier}`,
+      ...(input.linearIssueIdentifier ? [`Linear Issue: ${input.linearIssueIdentifier}`] : []),
       '',
       '## Requirements',
       input.requirements as string,
@@ -115,7 +118,7 @@ function buildStoryAssignmentPrompt(input: OpenCodeSessionStoryAssignmentInput):
     `Run ID: ${input.runId}`,
     `Story ID: ${input.storyId}`,
     `Story Title: ${input.storyTitle}`,
-    `Linear Issue: ${input.linearIssueIdentifier}`,
+    ...(input.linearIssueIdentifier ? [`Linear Issue: ${input.linearIssueIdentifier}`] : []),
     '',
     '## Requirements',
     input.requirements,
@@ -132,10 +135,12 @@ async function createAndSeedSession(
   client: OpenCodeClient,
   input: OpenCodeSessionCreateInput,
 ): Promise<OpenCodeSessionSnapshot> {
+  const directory = input.workingDirectory;
   const created = await client.session.create({
     body: {
       title: buildSessionTitle(input),
     },
+    ...(directory ? { query: { directory } } : {}),
   });
 
   const session = readData<{ id: string; createdAt?: string; status?: string }>(created);
@@ -149,7 +154,7 @@ async function createAndSeedSession(
 
   return {
     id: session.id,
-    url: getOpencodeSessionUrl(session.id),
+    url: getOpencodeSessionUrl(session.id, directory),
     state: toSessionState(session.status),
     createdAt: session.createdAt ?? new Date().toISOString(),
   };
@@ -203,6 +208,21 @@ export function createOpenCodeSessions(enabled: boolean): OpenCodeSessions | nul
         body: {
           noReply: true,
           parts: [{ type: 'text', text: buildStoryAssignmentPrompt(input) }],
+        },
+      });
+    },
+    async startSession(sessionId: string, storyCount: number): Promise<void> {
+      const client = getClient();
+      const noun = storyCount === 1 ? 'story' : 'stories';
+      await client.session.prompt({
+        path: { id: sessionId },
+        body: {
+          parts: [
+            {
+              type: 'text',
+              text: `You have been assigned ${storyCount} ${noun} above. Please begin implementing them now. Work through each story, fulfilling the requirements and acceptance criteria. Follow any technical guidelines provided.`,
+            },
+          ],
         },
       });
     },

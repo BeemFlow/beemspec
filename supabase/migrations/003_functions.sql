@@ -206,7 +206,8 @@ CREATE OR REPLACE FUNCTION create_build_run_with_items(
   p_release_id UUID,
   p_story_map_id UUID,
   p_triggered_by UUID,
-  p_story_ids UUID[]
+  p_story_ids UUID[],
+  p_working_directory TEXT DEFAULT NULL
 )
 RETURNS TABLE (
   run_id UUID,
@@ -235,6 +236,7 @@ BEGIN
     story_map_id,
     triggered_by,
     status,
+    working_directory,
     total_items,
     completed_items,
     failed_items
@@ -244,6 +246,7 @@ BEGIN
     p_story_map_id,
     p_triggered_by,
     'queued',
+    p_working_directory,
     0,
     0,
     0

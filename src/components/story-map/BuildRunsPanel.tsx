@@ -1,13 +1,19 @@
 'use client';
 
-import { Loader2, RefreshCcw, Rocket, RotateCcw } from 'lucide-react';
+import { FolderOpen, Loader2, RefreshCcw, Rocket, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { errorMessage } from '@/lib/errors';
 import { fetchJson } from '@/lib/http';
 import type { Release } from '@/types';
+
+interface OpenCodeProject {
+  id: string;
+  path: string;
+}
 
 type BuildRunStatus = 'queued' | 'running' | 'completed' | 'failed';
 
@@ -353,6 +359,17 @@ export function BuildRunsPanel({ releases, onError }: Props) {
   const [syncingStoryId, setSyncingStoryId] = useState<string | null>(null);
   const [blockingStoryId, setBlockingStoryId] = useState<string | null>(null);
   const [buildingStoryId, setBuildingStoryId] = useState<string | null>(null);
+  const [projects, setProjects] = useState<OpenCodeProject[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchJson<OpenCodeProject[]>('/api/opencode/projects', undefined, 'Failed to load projects')
+      .then((data) => {
+        setProjects(data);
+        if (data.length > 0 && !selectedProject) setSelectedProject(data[0].path);
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (sortedReleases.length === 0) {
@@ -481,7 +498,11 @@ export function BuildRunsPanel({ releases, onError }: Props) {
     try {
       const result = await fetchJson<BuildReleaseResponse>(
         `/api/releases/${selectedReleaseId}/build`,
-        { method: 'POST' },
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workingDirectory: selectedProject }),
+        },
         'Failed to build release',
       );
       await loadRuns(selectedReleaseId, { preferredRunId: result.run_id, nextOffset: 0 });
@@ -491,7 +512,7 @@ export function BuildRunsPanel({ releases, onError }: Props) {
     } finally {
       setBuildingReleaseId(null);
     }
-  }, [loadRuns, onError, selectedReleaseId]);
+  }, [loadRuns, onError, selectedProject, selectedReleaseId]);
 
   const handleRetryFailedItems = useCallback(async () => {
     if (!selectedRun || !selectedReleaseId) return;
@@ -574,7 +595,11 @@ export function BuildRunsPanel({ releases, onError }: Props) {
         const runQuery = selectedRunId ? `?build_run_id=${encodeURIComponent(selectedRunId)}` : '';
         const result = await fetchJson<{ run_id: string }>(
           `/api/stories/${storyId}/build${runQuery}`,
-          { method: 'POST' },
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ workingDirectory: selectedProject }),
+          },
           'Failed to build story',
         );
 
@@ -589,7 +614,7 @@ export function BuildRunsPanel({ releases, onError }: Props) {
         setBuildingStoryId(null);
       }
     },
-    [loadRunDetail, loadRuns, loadStoryStates, onError, selectedReleaseId, selectedRunId],
+    [loadRunDetail, loadRuns, loadStoryStates, onError, selectedProject, selectedReleaseId, selectedRunId],
   );
 
   if (sortedReleases.length === 0) return null;
@@ -619,10 +644,26 @@ export function BuildRunsPanel({ releases, onError }: Props) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {projects.length > 0 && (
+            <Select value={selectedProject ?? ''} onValueChange={setSelectedProject}>
+              <SelectTrigger size="sm" className="w-[200px]">
+                <FolderOpen className="mr-2 h-4 w-4 shrink-0" />
+                <SelectValue placeholder="Select folder" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.path}>
+                    {project.path.split('/').pop()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
           <Button
             size="sm"
             onClick={handleBuildRelease}
-            disabled={!selectedReleaseId || buildingReleaseId === selectedReleaseId}
+            disabled={!selectedReleaseId || buildingReleaseId === selectedReleaseId || !selectedProject}
           >
             {buildingReleaseId === selectedReleaseId ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

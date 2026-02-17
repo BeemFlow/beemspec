@@ -10,7 +10,11 @@ import { invalidIdResponse, isValidUuid } from '@/lib/validations';
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 async function loadRun(supabase: Supabase, runId: string) {
-  return supabase.from(BUILD_RUN_TABLE).select('id, release_id, story_map_id, total_items').eq('id', runId).single();
+  return supabase
+    .from(BUILD_RUN_TABLE)
+    .select('id, release_id, story_map_id, total_items, working_directory')
+    .eq('id', runId)
+    .single();
 }
 
 async function loadFailedItemStoryIds(supabase: Supabase, runId: string) {
@@ -59,6 +63,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
       runId,
       releaseId: run.release_id,
       storyIds,
+      workingDirectory: run.working_directory as string | null,
       openCodeSessions,
     });
   } catch (error) {

@@ -47,6 +47,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!loaded.ok) return responseForStoryContextFailure(loaded);
 
   const { story, storyMapId } = loaded.data;
+  const body = await request.json().catch(() => ({}));
+  const workingDirectory = typeof body.workingDirectory === 'string' ? body.workingDirectory : null;
   const targetBuildRunId = new URL(request.url).searchParams.get('build_run_id');
 
   if (targetBuildRunId) {
@@ -82,6 +84,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         runId: targetBuildRunId,
         releaseId: (targetRun.release_id as string | null) ?? null,
         storyIds: [storyId],
+        workingDirectory,
         openCodeSessions,
       });
     } catch (error) {
@@ -105,6 +108,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     storyMapId,
     userId: auth.user.id,
     storyIds: [storyId],
+    workingDirectory,
   });
   if (runCreateError || !runResult) {
     return serverErrorResponse('Failed to create story build run', runCreateError ?? new Error('Run not created'));
@@ -115,6 +119,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       runId: runResult.run_id,
       releaseId: story.release_id,
       storyIds: [storyId],
+      workingDirectory,
       openCodeSessions,
     });
   } catch (error) {

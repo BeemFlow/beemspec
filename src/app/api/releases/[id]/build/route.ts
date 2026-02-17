@@ -30,7 +30,7 @@ async function loadActiveRunForRelease(supabase: Supabase, releaseId: string) {
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: route handles create-or-append run flow
-export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
@@ -39,6 +39,9 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
 
   const { id: releaseId } = await params;
   if (!isValidUuid(releaseId)) return invalidIdResponse();
+
+  const body = await request.json().catch(() => ({}));
+  const workingDirectory = typeof body.workingDirectory === 'string' ? body.workingDirectory : null;
 
   const supabase = await createClient();
   const { data: release, error: releaseError } = await loadRelease(supabase, releaseId);
@@ -70,6 +73,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
           runId: activeRun.id as string,
           releaseId,
           storyIds,
+          workingDirectory,
           openCodeSessions,
         });
       } catch (error) {
@@ -93,6 +97,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     storyMapId: release.story_map_id,
     userId: auth.user.id,
     storyIds,
+    workingDirectory,
   });
   if (runCreateError || !runResult) {
     return serverErrorResponse('Failed to create build run', runCreateError ?? new Error('Run not created'));
@@ -114,6 +119,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
       runId: runResult.run_id,
       releaseId,
       storyIds: runResult.created_story_ids,
+      workingDirectory,
       openCodeSessions,
     });
   } catch (error) {

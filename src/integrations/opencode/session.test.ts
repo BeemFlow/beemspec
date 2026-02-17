@@ -55,6 +55,7 @@ describe('opencode session service', () => {
     expect(create).toHaveBeenCalledWith({ body: { title: 'ENG-1 Authentication flow' } });
     expect(createOpencodeClientMock).toHaveBeenCalledWith({
       baseUrl: 'http://127.0.0.1:4096',
+      directory: undefined,
       headers: undefined,
     });
     expect(prompt).toHaveBeenCalledWith(
@@ -126,6 +127,7 @@ describe('opencode session service', () => {
 
     expect(createOpencodeClientMock).toHaveBeenCalledWith({
       baseUrl: 'http://127.0.0.1:5000',
+      directory: undefined,
       headers: { authorization: 'Basic YXV0b21hdGlvbjpzZWNyZXQ=' },
     });
   });

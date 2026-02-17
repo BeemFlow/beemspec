@@ -20,6 +20,7 @@ describe('build run retry route', () => {
       createSession: vi.fn(),
       getSessionById: vi.fn(),
       appendStoryAssignment: vi.fn(),
+      startSession: vi.fn(),
     });
   });
 

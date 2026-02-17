@@ -265,6 +265,7 @@ CREATE TABLE build_runs (
   completed_items INTEGER NOT NULL DEFAULT 0,
   failed_items INTEGER NOT NULL DEFAULT 0,
   error TEXT,
+  working_directory TEXT,
   opencode_session_id TEXT,
   opencode_session_url TEXT,
   finished_at TIMESTAMPTZ,

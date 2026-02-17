@@ -58,6 +58,10 @@ export const env = {
     return readEnv('BEEMSPEC_OPENCODE_WEB_BASE_URL');
   },
 
+  openCodeWorkingDirectory(): string | null {
+    return readEnv('BEEMSPEC_OPENCODE_WORKING_DIRECTORY');
+  },
+
   syncCronToken(): string | null {
     return readEnv('BEEMSPEC_SYNC_CRON_TOKEN');
   },
