@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
+import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { POST } from './route';
@@ -13,7 +13,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }));
 
-vi.mock('@/integrations/linear/issue-sync', () => ({
+vi.mock('@/integrations/linear/helpers', () => ({
   getLinearIssueSync: vi.fn(),
 }));
 
@@ -66,7 +66,7 @@ describe('linear batch sync route', () => {
     expect(syncStoriesByIdList).toHaveBeenCalledWith(
       expect.objectContaining({
         supabase: expect.anything(),
-        fallbackLinearIssueSync: expect.anything(),
+        fallbackIssueSync: expect.anything(),
         storyIds: ['story_1', 'story_2'],
       }),
     );

@@ -83,10 +83,10 @@ describe('team linear integration settings route', () => {
     expect(upsert).toHaveBeenCalledWith(
       {
         team_id: TEAM_ID,
-        linear_workspace_id: undefined,
+        linear_workspace_id: null,
         linear_team_id: 'team_linear_1',
-        linear_project_id: undefined,
-        linear_state_id: undefined,
+        linear_project_id: null,
+        linear_state_id: null,
       },
       { onConflict: 'team_id' },
     );

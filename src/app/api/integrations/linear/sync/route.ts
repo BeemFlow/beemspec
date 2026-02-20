@@ -1,15 +1,15 @@
+import { buildStoryPatchFromLinearIssue, linearSyncStorySchema, mapStoryToLinearIssueInput } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
 import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
-import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
-import { linearSyncStorySchema } from '@/integrations/linear/schemas';
+import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import { syncStoryToLinear } from '@/integrations/linear/story-sync';
+import type { IssueSync } from '@/integrations/sync';
 import {
-  buildStoryPatchFromLinearIssue,
-  LINEAR_SYNC_DIRECTION,
+  buildDbUpdateFromPatch,
+  SYNC_DIRECTION,
   shouldApplyRemoteUpdate,
-} from '@/integrations/linear/sync';
-import type { LinearIssueSync } from '@/integrations/linear/types';
+  syncStoryToRemote,
+} from '@/integrations/sync';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -35,21 +35,13 @@ async function syncRemoteToLocal(
     updatedAt: remote.updatedAt,
   });
 
-  // Build the DB update: scalar fields + merge content patch into existing content
-  const dbUpdate: Record<string, unknown> = { updated_at: patch.updated_at };
-  if (patch.title) dbUpdate.title = patch.title;
-  if (patch.status) dbUpdate.status = patch.status;
-
+  // Load current content for merge (only needed if patch has content fields)
+  let currentContent = null;
   if (patch.content) {
-    // Load current content to merge
     const { data: currentStory } = await supabase.from('stories').select('content').eq('id', story.id).single();
-    const currentContent = (currentStory?.content as Record<string, unknown>) ?? {
-      _version: 1,
-      requirements: '',
-      acceptance_criteria: '',
-    };
-    dbUpdate.content = { ...currentContent, ...patch.content };
+    currentContent = currentStory?.content ?? null;
   }
+  const dbUpdate = buildDbUpdateFromPatch(patch, currentContent);
 
   const { error: updateError } = await supabase.from('stories').update(dbUpdate).eq('id', story.id);
   if (updateError) {
@@ -64,17 +56,18 @@ async function syncRemoteToLocal(
     lastLinearUpdatedAt: remote.updatedAt,
   });
 
-  return NextResponse.json({ success: true, direction: LINEAR_SYNC_DIRECTION.remoteToLocal, story_id: story.id });
+  return NextResponse.json({ success: true, direction: SYNC_DIRECTION.remoteToLocal, story_id: story.id });
 }
 
 async function syncLocalToRemote(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  linearIssueSync: NonNullable<LinearIssueSync>,
-  target: Parameters<typeof syncStoryToLinear>[3],
+  issueSync: NonNullable<IssueSync>,
+  target: { teamId: string; projectId?: string; stateId?: string },
   story: Record<string, unknown>,
   link: { linearIssueId: string },
 ): Promise<NextResponse> {
-  const synced = await syncStoryToLinear(story as never, linearIssueSync, link.linearIssueId, target);
+  const input = mapStoryToLinearIssueInput(story as never, target);
+  const synced = await syncStoryToRemote(issueSync, input, link.linearIssueId);
   if (!synced) return ignored('sync did not produce a remote issue snapshot');
 
   await upsertStoryLinearLink(supabase, {
@@ -85,12 +78,12 @@ async function syncLocalToRemote(
     lastLinearUpdatedAt: synced.updatedAt,
   });
 
-  return NextResponse.json({ success: true, direction: LINEAR_SYNC_DIRECTION.localToRemote, story_id: story.id });
+  return NextResponse.json({ success: true, direction: SYNC_DIRECTION.localToRemote, story_id: story.id });
 }
 
 export async function syncStoryById(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
-  fallbackLinearIssueSync: LinearIssueSync | null;
+  fallbackIssueSync: IssueSync | null;
   storyId: string;
 }): Promise<NextResponse> {
   const { data: story, error: storyError } = await input.supabase
@@ -105,7 +98,7 @@ export async function syncStoryById(input: {
 
   const linearSyncContext = await resolveLinearSyncContextForStory(input.supabase, {
     storyId: input.storyId,
-    fallbackLinearIssueSync: input.fallbackLinearIssueSync,
+    fallbackIssueSync: input.fallbackIssueSync,
   });
   if (!linearSyncContext.targetConfigured || !linearSyncContext.target) {
     return ignored('no linear target configured for story team');
@@ -131,7 +124,7 @@ export async function syncStoryById(input: {
 
 export async function syncStoriesByIdList(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
-  fallbackLinearIssueSync: LinearIssueSync | null;
+  fallbackIssueSync: IssueSync | null;
   storyIds: string[];
 }): Promise<{
   considered: number;
@@ -147,7 +140,7 @@ export async function syncStoriesByIdList(input: {
     try {
       const response = await syncStoryById({
         supabase: input.supabase,
-        fallbackLinearIssueSync: input.fallbackLinearIssueSync,
+        fallbackIssueSync: input.fallbackIssueSync,
         storyId,
       });
       responses.push({ storyId, response });
@@ -184,7 +177,7 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const summary = await syncStoriesByIdList({
     supabase,
-    fallbackLinearIssueSync: getLinearIssueSync(),
+    fallbackIssueSync: getLinearIssueSync(),
     storyIds: [validation.data.story_id],
   });
 

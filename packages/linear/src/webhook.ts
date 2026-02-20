@@ -1,10 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import type {
-  LinearWebhookEvent,
-  LinearWebhookIngest,
-  LinearWebhookSignatureVerifier,
-} from '@/integrations/linear/types';
-import { env } from '@/lib/env';
+import type { WebhookEvent, WebhookIngest, WebhookSignatureVerifier } from '@/integrations/sync';
 
 const DEFAULT_MAX_DRIFT_MS = 5 * 60 * 1000;
 
@@ -45,7 +40,8 @@ function isMatchingSignature(expectedHex: string, candidateHex: string): boolean
   return timingSafeEqual(expected, candidate);
 }
 
-export function parseLinearWebhookEvent(rawBody: string, headers: Headers): LinearWebhookEvent {
+/** Parse a raw Linear webhook HTTP body + headers into a typed WebhookEvent. */
+export function parseLinearWebhookEvent(rawBody: string, headers: Headers): WebhookEvent {
   let body: unknown;
   try {
     body = JSON.parse(rawBody);
@@ -76,11 +72,15 @@ export function parseLinearWebhookEvent(rawBody: string, headers: Headers): Line
   };
 }
 
-export function createLinearWebhookIngest(enabled: boolean): LinearWebhookIngest | null {
+/**
+ * Create a WebhookIngest that validates the presence of a Linear-Signature header
+ * before parsing the event. The `enabled` flag allows gating at the app layer.
+ */
+export function createLinearWebhookIngest(enabled: boolean): WebhookIngest | null {
   if (!enabled) return null;
 
   return {
-    parseAndValidate(input: { rawBody: string; headers: Headers }): LinearWebhookEvent {
+    parseAndValidate(input: { rawBody: string; headers: Headers }): WebhookEvent {
       const signature = input.headers.get('Linear-Signature');
       if (!signature) {
         throw new Error('Invalid Linear webhook request');
@@ -90,14 +90,16 @@ export function createLinearWebhookIngest(enabled: boolean): LinearWebhookIngest
   };
 }
 
-export function getLinearWebhookIngest(): LinearWebhookIngest | null {
-  return createLinearWebhookIngest(Boolean(env.linearWebhookSecret()));
-}
-
-export function createLinearWebhookSignatureVerifier(
-  options: { secret?: string; maxTimestampDriftMs?: number; now?: () => number } = {},
-): LinearWebhookSignatureVerifier | null {
-  const secret = (options.secret ?? env.linearWebhookSecret() ?? '').trim();
+/**
+ * Create a WebhookSignatureVerifier for Linear's HMAC-SHA256 signing scheme.
+ * The secret is injected -- no env vars are read.
+ */
+export function createLinearWebhookSignatureVerifier(options: {
+  secret: string;
+  maxTimestampDriftMs?: number;
+  now?: () => number;
+}): WebhookSignatureVerifier | null {
+  const secret = options.secret.trim();
   if (!secret) return null;
 
   const maxTimestampDriftMs = options.maxTimestampDriftMs ?? DEFAULT_MAX_DRIFT_MS;

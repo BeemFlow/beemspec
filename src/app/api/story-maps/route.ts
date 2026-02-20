@@ -1,5 +1,5 @@
+import { createStoryMapSchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
-import { createStoryMapSchema } from '@/app/api/story-maps/schemas';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';

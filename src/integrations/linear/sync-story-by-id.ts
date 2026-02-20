@@ -1,17 +1,16 @@
+import { mapStoryToLinearIssueInput } from '@beemspec/linear';
 import { loadStoryWithStoryMap } from '@/build-runs/processor';
 import { resolveLinearSyncContextForStoryMap } from '@/integrations/linear/auth';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import { syncStoryToLinear } from '@/integrations/linear/story-sync';
-import type { LinearIssueSync } from '@/integrations/linear/types';
-import type { createClient } from '@/lib/supabase/server';
-
-type Supabase = Awaited<ReturnType<typeof createClient>>;
+import type { IssueSync } from '@/integrations/sync';
+import { syncStoryToRemote } from '@/integrations/sync';
+import type { Supabase } from '@/lib/supabase/types';
 
 export async function processStoryLinearSyncById(
   supabase: Supabase,
   input: {
     storyId: string;
-    linearIssueSync: LinearIssueSync | null;
+    linearIssueSync: IssueSync | null;
   },
 ) {
   const context = await loadStoryWithStoryMap(supabase, input.storyId);
@@ -19,7 +18,7 @@ export async function processStoryLinearSyncById(
 
   const linearSyncContext = await resolveLinearSyncContextForStoryMap(supabase, {
     storyMapId: context.data.storyMapId,
-    fallbackLinearIssueSync: input.linearIssueSync,
+    fallbackIssueSync: input.linearIssueSync,
   });
 
   if (!linearSyncContext.target || !linearSyncContext.targetConfigured) {
@@ -32,11 +31,11 @@ export async function processStoryLinearSyncById(
 
   const { story } = context.data;
   const existingLink = await getStoryLinearLink(supabase, input.storyId);
-  const linearIssue = await syncStoryToLinear(
-    story,
+  const input_ = mapStoryToLinearIssueInput(story, linearSyncContext.target);
+  const linearIssue = await syncStoryToRemote(
     linearSyncContext.linearIssueSync,
+    input_,
     existingLink?.linearIssueId ?? null,
-    linearSyncContext.target,
   );
   if (!linearIssue) throw new Error('Linear sync returned no issue snapshot');
 

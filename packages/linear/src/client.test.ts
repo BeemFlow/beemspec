@@ -1,6 +1,6 @@
 import { type Issue, type IssuePayload, type LinearClient, RatelimitedLinearError } from '@linear/sdk';
 import { describe, expect, it, vi } from 'vitest';
-import { createLinearIssueSync } from './issue-sync';
+import { createLinearClient } from './client';
 
 function makeIssue(overrides: Partial<Issue> = {}): Issue {
   return {
@@ -29,14 +29,14 @@ function makeClient(overrides: Partial<Pick<LinearClient, 'issue' | 'createIssue
   } as Pick<LinearClient, 'issue' | 'createIssue' | 'updateIssue'>;
 }
 
-describe('linear issue sync port', () => {
+describe('linear client (issue sync port)', () => {
   it('returns null when feature is disabled', () => {
-    expect(createLinearIssueSync(false)).toBeNull();
+    expect(createLinearClient(false)).toBeNull();
   });
 
   it('creates issue via sdk client', async () => {
     const client = makeClient();
-    const sync = createLinearIssueSync(true, {
+    const sync = createLinearClient(true, {
       apiKey: 'linear_api_key',
       client,
     });
@@ -69,7 +69,7 @@ describe('linear issue sync port', () => {
         .mockResolvedValueOnce(makeIssue({ id: 'lin_issue_2', identifier: 'ENG-102' })),
     });
 
-    const sync = createLinearIssueSync(true, {
+    const sync = createLinearClient(true, {
       apiKey: 'linear_api_key',
       client,
       sleep,
@@ -84,14 +84,14 @@ describe('linear issue sync port', () => {
   });
 
   it('throws clear error when enabled without API key', () => {
-    expect(() => createLinearIssueSync(true, { apiKey: '' })).toThrow(
+    expect(() => createLinearClient(true, { apiKey: '' })).toThrow(
       'Linear issue sync enabled but no auth credentials are configured',
     );
   });
 
   it('supports OAuth access token authentication', async () => {
     const client = makeClient();
-    const sync = createLinearIssueSync(true, {
+    const sync = createLinearClient(true, {
       accessToken: 'linear_oauth_access_token',
       client,
     });

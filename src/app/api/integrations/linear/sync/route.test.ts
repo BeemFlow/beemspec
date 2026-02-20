@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
-import { LINEAR_SYNC_DIRECTION } from '@/integrations/linear/sync';
+import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
+import { getLinearIssueSync } from '@/integrations/linear/helpers';
+import { SYNC_DIRECTION } from '@/integrations/sync';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { POST } from './route';
@@ -13,8 +14,12 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }));
 
-vi.mock('@/integrations/linear/issue-sync', () => ({
+vi.mock('@/integrations/linear/helpers', () => ({
   getLinearIssueSync: vi.fn(),
+}));
+
+vi.mock('@/integrations/linear/auth', () => ({
+  resolveLinearSyncContextForStory: vi.fn(),
 }));
 
 const STORY_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
@@ -43,13 +48,6 @@ function createSyncClient(storyUpdatedAt: string) {
       },
       status: 'ready',
       updated_at: storyUpdatedAt,
-      tasks: {
-        activities: {
-          story_maps: {
-            team_id: 'team_1',
-          },
-        },
-      },
     },
     error: null,
   });
@@ -84,17 +82,6 @@ function createSyncClient(storyUpdatedAt: string) {
   const linkUpsertSelect = vi.fn().mockReturnValue({ single: linkUpsertSingle });
   const linkUpsert = vi.fn().mockReturnValue({ select: linkUpsertSelect });
 
-  const settingsMaybeSingle = vi.fn().mockResolvedValue({
-    data: {
-      linear_team_id: 'team_linear_1',
-      linear_project_id: null,
-      linear_state_id: null,
-    },
-    error: null,
-  });
-  const settingsEq = vi.fn().mockReturnValue({ maybeSingle: settingsMaybeSingle });
-  const settingsSelect = vi.fn().mockReturnValue({ eq: settingsEq });
-
   const from = vi.fn((table: string) => {
     if (table === 'stories') {
       return {
@@ -106,11 +93,6 @@ function createSyncClient(storyUpdatedAt: string) {
       return {
         select: linkSelect,
         upsert: linkUpsert,
-      };
-    }
-    if (table === 'integration_settings') {
-      return {
-        select: settingsSelect,
       };
     }
     return {};
@@ -133,7 +115,7 @@ describe('linear sync route', () => {
     const { client, storyUpdate } = createSyncClient('2026-02-14T10:00:00.000Z');
     vi.mocked(createClient).mockResolvedValue(client as never);
 
-    vi.mocked(getLinearIssueSync).mockReturnValue({
+    const issueSync = {
       getIssueById: vi.fn().mockResolvedValue({
         id: 'lin_1',
         identifier: 'ENG-1',
@@ -144,6 +126,13 @@ describe('linear sync route', () => {
       }),
       createIssue: vi.fn(),
       updateIssue: vi.fn(),
+    };
+
+    vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
+      teamId: 'team_1',
+      target: { teamId: 'team_linear_1' },
+      targetConfigured: true,
+      linearIssueSync: issueSync,
     });
 
     const response = await POST(jsonRequest({ story_id: STORY_ID }));
@@ -161,7 +150,7 @@ describe('linear sync route', () => {
     );
     await expect(response.json()).resolves.toMatchObject({
       success: true,
-      direction: LINEAR_SYNC_DIRECTION.remoteToLocal,
+      direction: SYNC_DIRECTION.remoteToLocal,
     });
   });
 
@@ -178,17 +167,22 @@ describe('linear sync route', () => {
       updatedAt: '2026-02-14T12:00:00.000Z',
     });
 
-    vi.mocked(getLinearIssueSync).mockReturnValue({
-      getIssueById: vi.fn().mockResolvedValue({
-        id: 'lin_1',
-        identifier: 'ENG-1',
-        title: 'Remote older title',
-        description: null,
-        stateId: null,
-        updatedAt: '2026-02-14T11:00:00.000Z',
-      }),
-      createIssue: vi.fn(),
-      updateIssue,
+    vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
+      teamId: 'team_1',
+      target: { teamId: 'team_linear_1' },
+      targetConfigured: true,
+      linearIssueSync: {
+        getIssueById: vi.fn().mockResolvedValue({
+          id: 'lin_1',
+          identifier: 'ENG-1',
+          title: 'Remote older title',
+          description: null,
+          stateId: null,
+          updatedAt: '2026-02-14T11:00:00.000Z',
+        }),
+        createIssue: vi.fn(),
+        updateIssue,
+      },
     });
 
     const response = await POST(jsonRequest({ story_id: STORY_ID }));
@@ -196,7 +190,7 @@ describe('linear sync route', () => {
     expect(updateIssue).toHaveBeenCalledTimes(1);
     await expect(response.json()).resolves.toMatchObject({
       success: true,
-      direction: LINEAR_SYNC_DIRECTION.localToRemote,
+      direction: SYNC_DIRECTION.localToRemote,
     });
   });
 
@@ -213,17 +207,22 @@ describe('linear sync route', () => {
       updatedAt: '2026-02-14T11:00:00.000Z',
     });
 
-    vi.mocked(getLinearIssueSync).mockReturnValue({
-      getIssueById: vi.fn().mockResolvedValue({
-        id: 'lin_1',
-        identifier: 'ENG-1',
-        title: 'Remote equal title',
-        description: null,
-        stateId: null,
-        updatedAt: '2026-02-14T11:00:00.000Z',
-      }),
-      createIssue: vi.fn(),
-      updateIssue,
+    vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
+      teamId: 'team_1',
+      target: { teamId: 'team_linear_1' },
+      targetConfigured: true,
+      linearIssueSync: {
+        getIssueById: vi.fn().mockResolvedValue({
+          id: 'lin_1',
+          identifier: 'ENG-1',
+          title: 'Remote equal title',
+          description: null,
+          stateId: null,
+          updatedAt: '2026-02-14T11:00:00.000Z',
+        }),
+        createIssue: vi.fn(),
+        updateIssue,
+      },
     });
 
     const response = await POST(jsonRequest({ story_id: STORY_ID }));
@@ -231,7 +230,7 @@ describe('linear sync route', () => {
     expect(updateIssue).toHaveBeenCalledTimes(1);
     await expect(response.json()).resolves.toMatchObject({
       success: true,
-      direction: LINEAR_SYNC_DIRECTION.localToRemote,
+      direction: SYNC_DIRECTION.localToRemote,
     });
   });
 });

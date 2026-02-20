@@ -1,5 +1,3 @@
-// Types
-
 // Content helpers
 export { CONTENT_VERSION, createContent, emptyContent, isStoryContent } from './content';
 // Spatial operations
@@ -20,6 +18,51 @@ export {
   reorderItems,
   updateStory,
 } from './operations';
+export type {
+  CreateActivity,
+  CreatePersona,
+  CreateRelease,
+  CreateStory,
+  CreateStoryMap,
+  CreateTask,
+  ReorderActivities,
+  ReorderReleases,
+  ReorderStories,
+  ReorderTasks,
+  UpdateActivity,
+  UpdatePersona,
+  UpdateRelease,
+  UpdateStory,
+  UpdateStoryMap,
+  UpdateTask,
+} from './schemas';
+// Validation schemas (Zod)
+export {
+  activityBase,
+  createActivitySchema,
+  createPersonaSchema,
+  createReleaseSchema,
+  createStoryMapSchema,
+  createStorySchema,
+  createTaskSchema,
+  personaBase,
+  releaseBase,
+  reorderActivitiesSchema,
+  reorderReleasesSchema,
+  reorderStoriesSchema,
+  reorderTasksSchema,
+  storyBase,
+  storyContentSchema,
+  storyMapBase,
+  storyStatus,
+  taskBase,
+  updateActivitySchema,
+  updatePersonaSchema,
+  updateReleaseSchema,
+  updateStoryMapSchema,
+  updateStorySchema,
+  updateTaskSchema,
+} from './schemas';
 // Tree transformations
 export { buildTree, flattenTree } from './tree';
 export type {

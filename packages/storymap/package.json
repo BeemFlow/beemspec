@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Headless story map kernel — types, spatial operations, and React hook for Jeff Patton-style story mapping",
+  "description": "Headless story map kernel — types, spatial operations, and validation schemas for Jeff Patton-style story mapping",
   "main": "src/index.ts",
   "exports": {
     ".": "./src/index.ts"
   },
   "peerDependencies": {
-    "react": ">=18"
+    "react": ">=18",
+    "zod": ">=3"
   },
   "peerDependenciesMeta": {
     "react": {

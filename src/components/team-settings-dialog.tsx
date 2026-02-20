@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangle, Clock, Loader2, UserPlus } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DeleteButton } from '@/components/ui/delete-button';
@@ -10,50 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { errorMessage } from '@/lib/errors';
-import { fetchJson } from '@/lib/http';
+import {
+  type InviteStatus,
+  type LinearStatus,
+  type SettingsTab,
+  useTeamSettings,
+} from '@/components/use-team-settings';
 import type { TeamInvite, TeamMember, TeamWithRole } from '@/types';
-
-type SettingsTab = 'general' | 'integrations' | 'members' | 'danger';
-
-type InviteStatus =
-  | { type: 'idle' }
-  | { type: 'loading' }
-  | { type: 'success'; message: string }
-  | { type: 'error'; message: string };
-
-type LinearStatus =
-  | { type: 'idle' }
-  | { type: 'loading' }
-  | { type: 'success'; message: string }
-  | { type: 'error'; message: string };
-
-interface LinearIntegrationSettings {
-  team_id: string;
-  linear_workspace_id: string | null;
-  linear_team_id: string | null;
-  linear_project_id: string | null;
-  linear_state_id: string | null;
-  updated_at: string;
-}
-
-interface LinearOAuthConnection {
-  connected: boolean;
-  expires_at: string | null;
-  scope: string | null;
-}
-
-interface TeamSettingsPayload {
-  team_id: string;
-  role: string;
-  permissions: { is_owner: boolean };
-  members: TeamMember[];
-  invites: TeamInvite[];
-  linear: {
-    settings: LinearIntegrationSettings | null;
-    connection: LinearOAuthConnection;
-  };
-}
 
 interface TeamSettingsDialogProps {
   open: boolean;
@@ -129,15 +92,6 @@ function linearOAuthNoticeToStatus(input: { status: 'success' | 'error'; reason?
 
   const mappedReason = input.reason ? LINEAR_OAUTH_REASON_TO_MESSAGE[input.reason] : null;
   return { type: 'error', message: mappedReason ?? 'Linear OAuth failed.' };
-}
-
-function asInputValue(value: string | null | undefined): string {
-  return value ?? '';
-}
-
-function asNullable(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
 }
 
 function TeamGeneralTab({ isOwner, teamName, name, onNameChange, onSubmit }: TeamGeneralTabProps) {
@@ -448,253 +402,57 @@ export function TeamSettingsDialog({
   linearOAuthNotice = null,
   onLinearOAuthNoticeHandled,
 }: TeamSettingsDialogProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
-  const [name, setName] = useState('');
-  const [members, setMembers] = useState<TeamMember[]>([]);
-  const [invites, setInvites] = useState<TeamInvite[]>([]);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [inviteStatus, setInviteStatus] = useState<InviteStatus>({ type: 'idle' });
-  const [linearStatus, setLinearStatus] = useState<LinearStatus>({ type: 'idle' });
-  const [removingId, setRemovingId] = useState<string | null>(null);
-  const [cancelingId, setCancelingId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [savingLinearSettings, setSavingLinearSettings] = useState(false);
-  const [disconnectingLinear, setDisconnectingLinear] = useState(false);
-  const [linearWorkspaceId, setLinearWorkspaceId] = useState('');
-  const [linearTeamId, setLinearTeamId] = useState('');
-  const [linearProjectId, setLinearProjectId] = useState('');
-  const [linearStateId, setLinearStateId] = useState('');
-  const [linearConnected, setLinearConnected] = useState(false);
-  const [linearScope, setLinearScope] = useState<string | null>(null);
-  const [linearExpiresAt, setLinearExpiresAt] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
   const isOwner = team?.role === 'owner';
 
-  const loadData = useCallback(async () => {
-    if (!team) return;
+  const resolveLinearOAuthStatus = useCallback(linearOAuthNoticeToStatus, []);
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      const data = await fetchJson<TeamSettingsPayload>(
-        `/api/teams/${team.id}/settings`,
-        undefined,
-        'Failed to fetch team settings',
-      );
-
-      setMembers(data.members ?? []);
-      setInvites(data.invites ?? []);
-      setLinearWorkspaceId(asInputValue(data.linear.settings?.linear_workspace_id));
-      setLinearTeamId(asInputValue(data.linear.settings?.linear_team_id));
-      setLinearProjectId(asInputValue(data.linear.settings?.linear_project_id));
-      setLinearStateId(asInputValue(data.linear.settings?.linear_state_id));
-      setLinearConnected(Boolean(data.linear.connection.connected));
-      setLinearScope(data.linear.connection.scope ?? null);
-      setLinearExpiresAt(data.linear.connection.expires_at ?? null);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [team]);
-
-  useEffect(() => {
-    if (open && team) {
-      setActiveTab('general');
-      setName(team.name);
-      setError(null);
-      setInviteStatus({ type: 'idle' });
-      setLinearStatus({ type: 'idle' });
-      loadData();
-    }
-  }, [open, team, loadData]);
-
-  useEffect(() => {
-    if (!open || !linearOAuthNotice) return;
-
-    setActiveTab('integrations');
-    setLinearStatus(linearOAuthNoticeToStatus(linearOAuthNotice));
-    onLinearOAuthNoticeHandled?.();
-  }, [open, linearOAuthNotice, onLinearOAuthNoticeHandled]);
-
-  async function handleRename(event: React.FormEvent) {
-    event.preventDefault();
-    if (!team || !name.trim() || name === team.name) return;
-
-    try {
-      setError(null);
-      await fetchJson(
-        `/api/teams/${team.id}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim() }),
-        },
-        'Failed to rename team',
-      );
-      await onTeamUpdated();
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  }
-
-  async function handleInvite(event: React.FormEvent) {
-    event.preventDefault();
-    if (!team || !inviteEmail.trim()) return;
-
-    setInviteStatus({ type: 'loading' });
-    try {
-      const data = await fetchJson<{ status: 'added' | 'invited' }>(
-        `/api/teams/${team.id}/invites`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: inviteEmail.trim() }),
-        },
-        'Failed to invite user',
-      );
-
-      setInviteEmail('');
-      await loadData();
-      setInviteStatus({
-        type: 'success',
-        message: data.status === 'added' ? 'User added to team' : 'Invitation sent',
-      });
-      setTimeout(() => setInviteStatus({ type: 'idle' }), 3000);
-    } catch (err) {
-      setInviteStatus({ type: 'error', message: errorMessage(err) });
-    }
-  }
-
-  async function handleRemoveMember(userId: string) {
-    if (!team) return;
-
-    try {
-      setRemovingId(userId);
-      setError(null);
-      await fetchJson(
-        `/api/teams/${team.id}/members/${userId}`,
-        {
-          method: 'DELETE',
-        },
-        'Failed to remove member',
-      );
-      await loadData();
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setRemovingId(null);
-    }
-  }
-
-  async function handleCancelInvite(inviteId: string) {
-    if (!team) return;
-
-    try {
-      setCancelingId(inviteId);
-      setError(null);
-      await fetchJson(
-        `/api/teams/${team.id}/invites/${inviteId}`,
-        {
-          method: 'DELETE',
-        },
-        'Failed to cancel invite',
-      );
-      await loadData();
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setCancelingId(null);
-    }
-  }
-
-  function handleConnectLinear() {
-    if (!team || typeof window === 'undefined') return;
-
-    const returnTo = `${window.location.pathname}${window.location.search}`;
-    const params = new URLSearchParams({
-      team_id: team.id,
-      return_to: returnTo,
-    });
-
-    window.location.assign(`/api/integrations/linear/oauth/start?${params.toString()}`);
-  }
-
-  async function handleDisconnectLinear() {
-    if (!team) return;
-
-    try {
-      setDisconnectingLinear(true);
-      setLinearStatus({ type: 'loading' });
-      await fetchJson(
-        `/api/integrations/linear/oauth/connection?team_id=${team.id}`,
-        {
-          method: 'DELETE',
-        },
-        'Failed to disconnect Linear',
-      );
-      await loadData();
-      setLinearStatus({ type: 'success', message: 'Linear disconnected' });
-    } catch (err) {
-      setLinearStatus({ type: 'error', message: errorMessage(err) });
-    } finally {
-      setDisconnectingLinear(false);
-    }
-  }
-
-  async function handleSaveLinearSettings(event: React.FormEvent) {
-    event.preventDefault();
-    if (!team) return;
-
-    try {
-      setSavingLinearSettings(true);
-      setLinearStatus({ type: 'loading' });
-      await fetchJson(
-        `/api/teams/${team.id}/integrations/linear`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            linear_team_id: asNullable(linearTeamId),
-            linear_project_id: asNullable(linearProjectId),
-            linear_state_id: asNullable(linearStateId),
-          }),
-        },
-        'Failed to save Linear settings',
-      );
-      await loadData();
-      setLinearStatus({ type: 'success', message: 'Linear settings saved' });
-    } catch (err) {
-      setLinearStatus({ type: 'error', message: errorMessage(err) });
-    } finally {
-      setSavingLinearSettings(false);
-    }
-  }
-
-  async function handleDeleteTeam() {
-    if (!team) return;
-
-    try {
-      setDeleting(true);
-      setError(null);
-      await fetchJson(
-        `/api/teams/${team.id}`,
-        {
-          method: 'DELETE',
-        },
-        'Failed to delete team',
-      );
-      onOpenChange(false);
-      await onTeamUpdated();
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setDeleting(false);
-    }
-  }
+  const {
+    activeTab,
+    setActiveTab,
+    name,
+    setName,
+    members,
+    invites,
+    inviteEmail,
+    setInviteEmail,
+    loading,
+    inviteStatus,
+    linearStatus,
+    removingId,
+    cancelingId,
+    deleting,
+    savingLinearSettings,
+    disconnectingLinear,
+    linearWorkspaceId,
+    linearTeamId,
+    setLinearTeamId,
+    linearProjectId,
+    setLinearProjectId,
+    linearStateId,
+    setLinearStateId,
+    linearConnected,
+    linearScope,
+    linearExpiresAt,
+    error,
+    handleRename,
+    handleInvite,
+    handleRemoveMember,
+    handleCancelInvite,
+    handleConnectLinear,
+    handleDisconnectLinear,
+    handleSaveLinearSettings,
+    handleDeleteTeam,
+  } = useTeamSettings({
+    open,
+    teamId: team?.id,
+    teamName: team?.name,
+    isOwner,
+    onTeamUpdated,
+    onOpenChange,
+    linearOAuthNotice,
+    onLinearOAuthNoticeHandled,
+    resolveLinearOAuthStatus,
+  });
 
   if (!team) return null;
 

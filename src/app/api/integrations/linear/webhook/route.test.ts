@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
+import { createLinearWebhookSignatureVerifier, parseLinearWebhookEvent } from '@beemspec/linear';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLinearWebhookIngest, parseLinearWebhookEvent } from '@/integrations/linear/webhook-ingest';
+import { getLinearWebhookIngest, getLinearWebhookSignatureVerifier } from '@/integrations/linear/helpers';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { POST } from './route';
 
@@ -8,15 +9,10 @@ vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: vi.fn(),
 }));
 
-vi.mock('@/integrations/linear/webhook-ingest', async () => {
-  const actual = await vi.importActual<typeof import('@/integrations/linear/webhook-ingest')>(
-    '@/integrations/linear/webhook-ingest',
-  );
-  return {
-    ...actual,
-    getLinearWebhookIngest: vi.fn(),
-  };
-});
+vi.mock('@/integrations/linear/helpers', () => ({
+  getLinearWebhookIngest: vi.fn(),
+  getLinearWebhookSignatureVerifier: vi.fn(),
+}));
 
 function sign(body: string, secret: string): string {
   return createHmac('sha256', secret).update(body).digest('hex');
@@ -114,6 +110,9 @@ describe('linear webhook route', () => {
     vi.mocked(getLinearWebhookIngest).mockReturnValue({
       parseAndValidate: ({ rawBody, headers }) => parseLinearWebhookEvent(rawBody, headers),
     });
+    vi.mocked(getLinearWebhookSignatureVerifier).mockReturnValue(
+      createLinearWebhookSignatureVerifier({ secret: 'webhook_secret' }),
+    );
   });
 
   it('returns 401 for invalid signature', async () => {

@@ -1,34 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createLinearOAuthAuthorizeUrl } from '@/integrations/linear/auth';
+import { OAUTH_STATE_COOKIE, serializeStateCookie } from '@/integrations/linear/oauth';
+import { createLinearOAuthAuthorizeUrl } from '@/integrations/linear/oauth-token';
 import { requireAuth } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
+import { isTeamOwnerForRequest } from '@/lib/teams';
 import { isValidUuid } from '@/lib/validations';
-
-const OAUTH_STATE_COOKIE = 'beemspec_linear_oauth_state';
-
-interface OAuthStateCookie {
-  state: string;
-  teamId: string;
-  userId: string;
-  returnTo: string;
-}
-
-function serializeStateCookie(payload: OAuthStateCookie): string {
-  return Buffer.from(JSON.stringify(payload)).toString('base64url');
-}
-
-async function isTeamOwnerForRequest(userId: string, teamId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('team_members')
-    .select('role')
-    .eq('team_id', teamId)
-    .eq('user_id', userId)
-    .maybeSingle<{ role: string }>();
-
-  if (error || !data) return false;
-  return data.role === 'owner';
-}
 
 function resolveReturnTo(request: Request): string {
   const value = new URL(request.url).searchParams.get('return_to');

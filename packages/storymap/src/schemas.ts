@@ -1,17 +1,42 @@
 import { z } from 'zod';
 
+// ---------------------------------------------------------------------------
+// Shared primitives
+// ---------------------------------------------------------------------------
+
 const uuid = z.string().uuid();
 const nullableString = z.string().min(1).nullable();
 const name = z.string().min(1, 'Required').max(200);
 const sortOrder = z.number().int().min(0);
 
-export const storyStatus = z.enum(['backlog', 'ready', 'in_progress', 'review', 'done']);
-
 const atLeastOneField = <T extends Record<string, unknown>>(data: T): boolean =>
   Object.values(data).some((value) => value !== undefined);
 const atLeastOneFieldMessage = { message: 'At least one field must be provided' };
 
-const storyMapBase = z.object({
+// ---------------------------------------------------------------------------
+// Story status — single source of truth (derive the TS type via z.infer)
+// ---------------------------------------------------------------------------
+
+export const storyStatus = z.enum(['backlog', 'ready', 'in_progress', 'review', 'done']);
+
+// ---------------------------------------------------------------------------
+// Story content — structured spec fields stored as JSON
+// ---------------------------------------------------------------------------
+
+export const storyContentSchema = z.object({
+  _version: z.literal(1).optional().default(1),
+  requirements: z.string().min(1, 'Required'),
+  acceptance_criteria: z.string().min(1, 'Required'),
+  figma_link: z.url().nullable().optional(),
+  edge_cases: nullableString.optional(),
+  technical_guidelines: nullableString.optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Story map
+// ---------------------------------------------------------------------------
+
+export const storyMapBase = z.object({
   team_id: uuid,
   name,
   description: nullableString,
@@ -24,7 +49,11 @@ export const updateStoryMapSchema = storyMapBase
   .partial()
   .refine(atLeastOneField, atLeastOneFieldMessage);
 
-const releaseBase = z.object({
+// ---------------------------------------------------------------------------
+// Release
+// ---------------------------------------------------------------------------
+
+export const releaseBase = z.object({
   story_map_id: uuid,
   name,
   description: nullableString,
@@ -43,7 +72,11 @@ export const reorderReleasesSchema = z.object({
   order: z.array(uuid).min(1, 'Order array cannot be empty'),
 });
 
-const activityBase = z.object({
+// ---------------------------------------------------------------------------
+// Activity
+// ---------------------------------------------------------------------------
+
+export const activityBase = z.object({
   story_map_id: uuid,
   name,
   description: nullableString,
@@ -62,7 +95,11 @@ export const reorderActivitiesSchema = z.object({
   order: z.array(uuid).min(1, 'Order array cannot be empty'),
 });
 
-const taskBase = z.object({
+// ---------------------------------------------------------------------------
+// Task
+// ---------------------------------------------------------------------------
+
+export const taskBase = z.object({
   activity_id: uuid,
   name,
   description: nullableString,
@@ -80,16 +117,11 @@ export const reorderTasksSchema = z.object({
   order: z.array(uuid).min(1, 'Order array cannot be empty'),
 });
 
-const storyContentSchema = z.object({
-  _version: z.literal(1).optional().default(1),
-  requirements: z.string().min(1, 'Required'),
-  acceptance_criteria: z.string().min(1, 'Required'),
-  figma_link: z.url().nullable().optional(),
-  edge_cases: nullableString.optional(),
-  technical_guidelines: nullableString.optional(),
-});
+// ---------------------------------------------------------------------------
+// Story
+// ---------------------------------------------------------------------------
 
-const storyBase = z.object({
+export const storyBase = z.object({
   task_id: uuid,
   release_id: uuid.nullable(),
   title: z.string().min(1, 'Required').max(500),
@@ -115,7 +147,11 @@ export const reorderStoriesSchema = z.object({
   order: z.array(uuid).min(1, 'Order array cannot be empty'),
 });
 
-const personaBase = z.object({
+// ---------------------------------------------------------------------------
+// Persona
+// ---------------------------------------------------------------------------
+
+export const personaBase = z.object({
   story_map_id: uuid,
   name,
   description: nullableString,
@@ -132,6 +168,10 @@ export const updatePersonaSchema = personaBase
   .partial()
   .extend({ sort_order: sortOrder.optional() })
   .refine(atLeastOneField, atLeastOneFieldMessage);
+
+// ---------------------------------------------------------------------------
+// Inferred types
+// ---------------------------------------------------------------------------
 
 export type CreateStoryMap = z.infer<typeof createStoryMapSchema>;
 export type UpdateStoryMap = z.infer<typeof updateStoryMapSchema>;
@@ -154,5 +194,3 @@ export type ReorderStories = z.infer<typeof reorderStoriesSchema>;
 
 export type CreatePersona = z.infer<typeof createPersonaSchema>;
 export type UpdatePersona = z.infer<typeof updatePersonaSchema>;
-
-export { storyBase, storyContentSchema, taskBase, activityBase, personaBase, releaseBase, storyMapBase };

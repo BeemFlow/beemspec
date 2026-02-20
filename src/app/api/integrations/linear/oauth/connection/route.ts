@@ -1,26 +1,17 @@
 import { NextResponse } from 'next/server';
-import { deleteLinearOAuthConnectionForTeam, getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/auth';
+import {
+  deleteLinearOAuthConnectionForTeam,
+  getLinearOAuthConnectionStatusForTeam,
+} from '@/integrations/linear/connections';
 import { requireAuth } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { isTeamOwnerForRequest } from '@/lib/teams';
 import { isValidUuid } from '@/lib/validations';
 
 function getTeamId(request: Request): string | null {
   const teamId = new URL(request.url).searchParams.get('team_id');
   if (!teamId || !isValidUuid(teamId)) return null;
   return teamId;
-}
-
-async function isTeamOwnerForRequest(userId: string, teamId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('team_members')
-    .select('role')
-    .eq('team_id', teamId)
-    .eq('user_id', userId)
-    .maybeSingle<{ role: string }>();
-
-  if (error || !data) return false;
-  return data.role === 'owner';
 }
 
 export async function GET(request: Request) {
@@ -34,7 +25,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Only team owners can view Linear connection' }, { status: 403 });
   }
 
-  const connection = await getLinearOAuthConnectionStatusForTeam(teamId);
+  const connection = await getLinearOAuthConnectionStatusForTeam(createAdminClient(), teamId);
   return NextResponse.json({
     team_id: teamId,
     connected: Boolean(connection),
@@ -54,6 +45,6 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Only team owners can disconnect Linear' }, { status: 403 });
   }
 
-  await deleteLinearOAuthConnectionForTeam(teamId);
+  await deleteLinearOAuthConnectionForTeam(createAdminClient(), teamId);
   return NextResponse.json({ success: true, team_id: teamId, connected: false });
 }

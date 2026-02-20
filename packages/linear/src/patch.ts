@@ -1,10 +1,9 @@
 import type { StoryContent } from '@beemspec/storymap';
-import {
-  mapLinearStatusToStoryStatus,
-  parseLinearDescriptionToStoryFields,
-  type StoryStatus,
-} from '@/integrations/linear/story-sync';
+import type { StoryPatchFromRemote } from '@/integrations/sync';
+import { parseLinearDescriptionToStoryFields } from './description';
+import { mapLinearStatusToStoryStatus } from './status-map';
 
+/** Input shape for building a story patch from a Linear issue. */
 export interface LinearIssueForSync {
   title: string | null;
   description: string | null;
@@ -12,36 +11,13 @@ export interface LinearIssueForSync {
   updatedAt: string;
 }
 
-export const LINEAR_SYNC_DIRECTION = {
-  remoteToLocal: 'remote_to_local',
-  localToRemote: 'local_to_remote',
-} as const;
-
-export type LinearSyncDirection = (typeof LINEAR_SYNC_DIRECTION)[keyof typeof LINEAR_SYNC_DIRECTION];
-
-export interface StoryPatchFromLinear {
-  title?: string;
-  content?: Partial<StoryContent>;
-  status?: StoryStatus;
-  updated_at: string;
-}
-
-export function parseTimestampMs(value: string | null | undefined): number | null {
-  if (!value) return null;
-  const ms = Date.parse(value);
-  return Number.isFinite(ms) ? ms : null;
-}
-
-export function shouldApplyRemoteUpdate(remoteUpdatedAt: string | null, localUpdatedAt: string | null): boolean {
-  const remoteMs = parseTimestampMs(remoteUpdatedAt);
-  const localMs = parseTimestampMs(localUpdatedAt);
-  if (remoteMs === null || localMs === null) return false;
-  return remoteMs > localMs;
-}
-
-export function buildStoryPatchFromLinearIssue(input: LinearIssueForSync): StoryPatchFromLinear {
+/**
+ * Build a generic StoryPatchFromRemote by parsing a Linear issue's
+ * description (markdown sections) and mapping its state name.
+ */
+export function buildStoryPatchFromLinearIssue(input: LinearIssueForSync): StoryPatchFromRemote {
   const fromDescription = parseLinearDescriptionToStoryFields(input.description);
-  const patch: StoryPatchFromLinear = {
+  const patch: StoryPatchFromRemote = {
     updated_at: input.updatedAt,
   };
 
@@ -79,8 +55,4 @@ export function buildStoryPatchFromLinearIssue(input: LinearIssueForSync): Story
   patch.status = mappedFromState ?? mappedFromDescription ?? undefined;
 
   return patch;
-}
-
-export function hasMutableStoryFields(patch: StoryPatchFromLinear): boolean {
-  return Boolean(patch.title || patch.content || patch.status);
 }

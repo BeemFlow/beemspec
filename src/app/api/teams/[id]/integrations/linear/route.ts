@@ -1,29 +1,11 @@
+import { updateLinearIntegrationSettingsSchema } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
-import { updateLinearIntegrationSettingsSchema } from '@/integrations/linear/schemas';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
+import { normalize } from '@/lib/strings';
 import { createClient } from '@/lib/supabase/server';
+import { isTeamOwnerForRequest } from '@/lib/teams';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
-
-function normalizeText(value: string | null | undefined): string | null | undefined {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-async function isTeamOwnerForRequest(userId: string, teamId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('team_members')
-    .select('role')
-    .eq('team_id', teamId)
-    .eq('user_id', userId)
-    .maybeSingle<{ role: string }>();
-
-  if (error || !data) return false;
-  return data.role === 'owner';
-}
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
@@ -64,10 +46,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const payload = {
     team_id: teamId,
-    linear_workspace_id: normalizeText(validation.data.linear_workspace_id),
-    linear_team_id: normalizeText(validation.data.linear_team_id),
-    linear_project_id: normalizeText(validation.data.linear_project_id),
-    linear_state_id: normalizeText(validation.data.linear_state_id),
+    linear_workspace_id: normalize(validation.data.linear_workspace_id),
+    linear_team_id: normalize(validation.data.linear_team_id),
+    linear_project_id: normalize(validation.data.linear_project_id),
+    linear_state_id: normalize(validation.data.linear_state_id),
   };
 
   const { data, error } = await supabase

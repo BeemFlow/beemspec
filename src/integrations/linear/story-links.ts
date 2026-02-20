@@ -1,3 +1,5 @@
+import type { SupabaseLike } from '@/lib/supabase/types';
+
 interface StoryLinearLinkRecord {
   story_id: string;
   linear_issue_id: string;
@@ -5,10 +7,6 @@ interface StoryLinearLinkRecord {
   last_local_updated_at?: string | null;
   last_linear_updated_at?: string | null;
 }
-
-type SupabaseLike = {
-  from: (table: string) => unknown;
-};
 
 interface StoryLinearLinksTable {
   select(columns: string): {

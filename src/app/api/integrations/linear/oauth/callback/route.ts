@@ -1,54 +1,12 @@
-import { LinearClient } from '@linear/sdk';
+import { getLinearViewerInfo } from '@beemspec/linear';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { exchangeLinearOAuthCode, upsertLinearOAuthConnection } from '@/integrations/linear/auth';
+import { toExpiresAt, upsertLinearOAuthConnection } from '@/integrations/linear/connections';
+import { OAUTH_STATE_COOKIE, parseStateCookie } from '@/integrations/linear/oauth';
+import { exchangeLinearOAuthCode } from '@/integrations/linear/oauth-token';
 import { requireAuth } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
-
-const OAUTH_STATE_COOKIE = 'beemspec_linear_oauth_state';
-
-interface OAuthStateCookie {
-  state: string;
-  teamId: string;
-  userId: string;
-  returnTo: string;
-}
-
-async function isTeamOwnerForRequest(userId: string, teamId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('team_members')
-    .select('role')
-    .eq('team_id', teamId)
-    .eq('user_id', userId)
-    .maybeSingle<{ role: string }>();
-
-  if (error || !data) return false;
-  return data.role === 'owner';
-}
-
-function parseCookie(value: string | undefined): OAuthStateCookie | null {
-  if (!value) return null;
-
-  try {
-    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as Partial<OAuthStateCookie>;
-    if (!parsed.state || !parsed.teamId || !parsed.userId) return null;
-    return {
-      state: parsed.state,
-      teamId: parsed.teamId,
-      userId: parsed.userId,
-      returnTo: parsed.returnTo?.startsWith('/') ? parsed.returnTo : '/',
-    };
-  } catch {
-    return null;
-  }
-}
-
-function tokenExpiresAt(expiresIn: number | null): string | null {
-  if (!expiresIn || expiresIn <= 0) return null;
-  return new Date(Date.now() + expiresIn * 1000).toISOString();
-}
+import { isTeamOwnerForRequest } from '@/lib/teams';
 
 function redirectWithState(request: Request, returnTo: string, status: 'success' | 'error', reason?: string) {
   const base = new URL(returnTo, request.url);
@@ -73,7 +31,7 @@ export async function GET(request: Request) {
   const code = url.searchParams.get('code') ?? '';
   const oauthError = url.searchParams.get('error') ?? '';
   const cookieStore = await cookies();
-  const cookie = parseCookie(cookieStore.get(OAUTH_STATE_COOKIE)?.value);
+  const cookie = parseStateCookie(cookieStore.get(OAUTH_STATE_COOKIE)?.value);
 
   if (!cookie) {
     return redirectWithState(request, '/', 'error', 'missing_state');
@@ -93,25 +51,23 @@ export async function GET(request: Request) {
 
   try {
     const token = await exchangeLinearOAuthCode(code);
-    const linearClient = new LinearClient({ accessToken: token.accessToken });
-    const viewer = await linearClient.viewer;
-    const organization = await viewer.organization;
+    const viewerInfo = await getLinearViewerInfo(token.accessToken);
 
-    await upsertLinearOAuthConnection({
+    const admin = createAdminClient();
+
+    await upsertLinearOAuthConnection(admin, {
       teamId: cookie.teamId,
       accessToken: token.accessToken,
       refreshToken: token.refreshToken,
       tokenType: token.tokenType,
       scope: token.scope,
-      expiresAt: tokenExpiresAt(token.expiresIn),
+      expiresAt: toExpiresAt(token.expiresIn),
       userId: auth.user.id,
     });
-
-    const admin = createAdminClient();
     await admin.from('integration_settings').upsert(
       {
         team_id: cookie.teamId,
-        linear_workspace_id: organization?.id ?? undefined,
+        linear_workspace_id: viewerInfo.organizationId ?? undefined,
       },
       { onConflict: 'team_id' },
     );

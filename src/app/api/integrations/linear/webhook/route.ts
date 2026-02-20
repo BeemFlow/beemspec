@@ -1,12 +1,9 @@
+import { buildStoryPatchFromLinearIssue } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
+import { getLinearWebhookIngest, getLinearWebhookSignatureVerifier } from '@/integrations/linear/helpers';
 import { getStoryLinearLinkByLinearIssueId, upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import {
-  buildStoryPatchFromLinearIssue,
-  hasMutableStoryFields,
-  shouldApplyRemoteUpdate,
-} from '@/integrations/linear/sync';
-import type { LinearWebhookEvent } from '@/integrations/linear/types';
-import { createLinearWebhookSignatureVerifier, getLinearWebhookIngest } from '@/integrations/linear/webhook-ingest';
+import type { WebhookEvent } from '@/integrations/sync';
+import { buildDbUpdateFromPatch, hasMutableStoryFields, shouldApplyRemoteUpdate } from '@/integrations/sync';
 import { serverErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -68,7 +65,7 @@ async function insertWebhookReceipt(
 
 async function persistIgnoredReceipt(
   supabase: ReturnType<typeof createAdminClient>,
-  event: LinearWebhookEvent,
+  event: WebhookEvent,
   error?: string,
 ): Promise<NextResponse> {
   const receipt = await insertWebhookReceipt(supabase, {
@@ -83,22 +80,22 @@ async function persistIgnoredReceipt(
   return successResponse({ duplicate: receipt.duplicate, ignored: true });
 }
 
-function isSupportedIssueEvent(event: LinearWebhookEvent): boolean {
+function isSupportedIssueEvent(event: WebhookEvent): boolean {
   return event.type === 'Issue' && ['create', 'update'].includes(event.action);
 }
 
-function parseAndVerifyEvent(request: Request, rawBody: string): LinearWebhookEvent | null {
+function parseAndVerifyEvent(request: Request, rawBody: string): WebhookEvent | null {
   const ingest = getLinearWebhookIngest();
   if (!ingest) return null;
 
-  let event: LinearWebhookEvent;
+  let event: WebhookEvent;
   try {
     event = ingest.parseAndValidate({ rawBody, headers: request.headers });
   } catch {
     return null;
   }
 
-  const verifier = createLinearWebhookSignatureVerifier();
+  const verifier = getLinearWebhookSignatureVerifier();
   if (!verifier) {
     throw new Error('Linear webhook secret is not configured');
   }
@@ -111,7 +108,7 @@ function parseAndVerifyEvent(request: Request, rawBody: string): LinearWebhookEv
 
 async function processIssueEvent(
   supabase: ReturnType<typeof createAdminClient>,
-  event: LinearWebhookEvent,
+  event: WebhookEvent,
 ): Promise<NextResponse> {
   const payload = asRecord(event.payload);
   const linearIssueId = getString(payload?.id);
@@ -156,21 +153,13 @@ async function processIssueEvent(
     return persistIgnoredReceipt(supabase, event, 'No supported fields for writeback');
   }
 
-  // Build the DB update: scalar fields + merge content patch into existing content
-  const dbUpdate: Record<string, unknown> = { updated_at: patch.updated_at };
-  if (patch.title) dbUpdate.title = patch.title;
-  if (patch.status) dbUpdate.status = patch.status;
-
+  // Load current content for merge (only needed if patch has content fields)
+  let currentContent = null;
   if (patch.content) {
-    // Load current content to merge
     const { data: currentStory } = await supabase.from('stories').select('content').eq('id', link.storyId).single();
-    const currentContent = (currentStory?.content as Record<string, unknown>) ?? {
-      _version: 1,
-      requirements: '',
-      acceptance_criteria: '',
-    };
-    dbUpdate.content = { ...currentContent, ...patch.content };
+    currentContent = currentStory?.content ?? null;
   }
+  const dbUpdate = buildDbUpdateFromPatch(patch, currentContent);
 
   const { error: updateError } = await supabase.from('stories').update(dbUpdate).eq('id', link.storyId);
   if (updateError) throw updateError;
@@ -199,7 +188,7 @@ export async function POST(request: Request) {
   }
 
   const rawBody = await request.text();
-  let event: LinearWebhookEvent;
+  let event: WebhookEvent;
 
   try {
     const parsed = parseAndVerifyEvent(request, rawBody);

@@ -3,9 +3,8 @@ import type { BuildRunItemStatus, BuildRunStatus } from '@/build-runs/constants'
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
+import type { Supabase } from '@/lib/supabase/types';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-
-type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 interface StoryStateRow {
   story_id: string;

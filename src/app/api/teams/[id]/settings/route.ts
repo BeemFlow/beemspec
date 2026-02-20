@@ -1,22 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/auth';
+import { getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/connections';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { getTeamRoleForUser } from '@/lib/teams';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-
-async function getTeamRoleForRequest(teamId: string, userId: string): Promise<string | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('team_members')
-    .select('role')
-    .eq('team_id', teamId)
-    .eq('user_id', userId)
-    .maybeSingle<{ role: string }>();
-
-  if (error) throw error;
-  return data?.role ?? null;
-}
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
@@ -25,12 +14,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id: teamId } = await params;
   if (!isValidUuid(teamId)) return invalidIdResponse();
 
-  let role: string | null;
-  try {
-    role = await getTeamRoleForRequest(teamId, auth.user.id);
-  } catch (error) {
-    return serverErrorResponse('Failed to load team membership', error);
-  }
+  const role = await getTeamRoleForUser(auth.user.id, teamId);
 
   if (!role) {
     return NextResponse.json({ error: 'Team not found' }, { status: 404 });
@@ -56,7 +40,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         .order('created_at', { ascending: false })
     : Promise.resolve({ data: [], error: null });
 
-  const connectionPromise = isOwner ? getLinearOAuthConnectionStatusForTeam(teamId) : Promise.resolve(null);
+  const connectionPromise = isOwner
+    ? getLinearOAuthConnectionStatusForTeam(createAdminClient(), teamId)
+    : Promise.resolve(null);
 
   let membersResult: Awaited<typeof membersPromise>;
   let integrationResult: Awaited<typeof integrationPromise>;

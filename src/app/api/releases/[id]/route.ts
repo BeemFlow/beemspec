@@ -1,5 +1,5 @@
+import { updateReleaseSchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
-import { updateReleaseSchema } from '@/app/api/story-maps/schemas';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';

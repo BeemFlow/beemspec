@@ -7,10 +7,8 @@ import {
 } from '@/build-runs/constants';
 import { getStoryLinearLink } from '@/integrations/linear/story-links';
 import { createOpenCodeSessions, type OpenCodeSessions } from '@/integrations/opencode/session';
-import type { createClient } from '@/lib/supabase/server';
+import type { Supabase } from '@/lib/supabase/types';
 import type { Story } from '@/types';
-
-type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 // ---------------------------------------------------------------------------
 // Lazy session-state refresh — transitions stale "running" runs

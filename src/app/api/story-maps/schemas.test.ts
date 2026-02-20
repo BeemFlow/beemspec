@@ -1,6 +1,5 @@
+import { createStorySchema, updateStorySchema } from '@beemspec/storymap';
 import { describe, expect, it } from 'vitest';
-
-import { createStorySchema, updateStorySchema } from './schemas';
 
 describe('story-map schemas', () => {
   it('defaults create story status to backlog', () => {

@@ -9,9 +9,8 @@ import { createOpenCodeSessions } from '@/integrations/opencode/session';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
+import type { Supabase } from '@/lib/supabase/types';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-
-type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 async function loadBuildRunById(supabase: Supabase, buildRunId: string) {
   return supabase

@@ -1,8 +1,8 @@
+import { updateStorySchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
-import { updateStorySchema } from '@/app/api/story-maps/schemas';
 import { loadStoryWithStoryMap } from '@/build-runs/processor';
 import { isLinearSyncAvailableForStoryMap } from '@/integrations/linear/auth';
-import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
+import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
@@ -61,7 +61,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     const linearSyncEnabled = await isLinearSyncAvailableForStoryMap(supabase, {
       storyMapId: context.data.storyMapId,
-      fallbackLinearIssueSync: linearIssueSync,
+      fallbackIssueSync: linearIssueSync,
     });
     if (!linearSyncEnabled) return NextResponse.json(data);
 

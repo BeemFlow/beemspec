@@ -24,7 +24,7 @@ async function fetchSessionContext(sessionId: string): Promise<SessionContextRes
 
   try {
     const response = await fetch(
-      `${apiUrl.replace(/\/$/, '')}/api/opencode/sessions/${encodeURIComponent(sessionId)}/context`,
+      `${apiUrl.replace(/\/$/, '')}/api/integrations/opencode/sessions/${encodeURIComponent(sessionId)}/context`,
       { method: 'GET', headers },
     );
     if (!response.ok) return null;

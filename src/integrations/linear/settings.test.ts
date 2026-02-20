@@ -1,54 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  getLinearStorySyncTargetForStory,
-  getLinearStorySyncTargetForStoryMap,
-  getLinearStorySyncTargetForTask,
-} from './settings';
+import { getSyncTargetForStory, getSyncTargetForStoryMap } from './settings';
 
 describe('linear settings target resolution', () => {
-  it('resolves target from integration_settings for task', async () => {
-    const taskSingle = vi.fn().mockResolvedValue({
-      data: {
-        activities: {
-          story_maps: {
-            team_id: 'team_db_1',
-          },
-        },
-      },
-      error: null,
-    });
-    const taskEq = vi.fn().mockReturnValue({ single: taskSingle });
-    const taskSelect = vi.fn().mockReturnValue({ eq: taskEq });
-
-    const settingsMaybeSingle = vi.fn().mockResolvedValue({
-      data: {
-        linear_team_id: 'linear_team_db',
-        linear_project_id: 'linear_project_db',
-        linear_state_id: null,
-      },
-      error: null,
-    });
-    const settingsEq = vi.fn().mockReturnValue({ maybeSingle: settingsMaybeSingle });
-    const settingsSelect = vi.fn().mockReturnValue({ eq: settingsEq });
-
-    const from = vi.fn((table: string) => {
-      if (table === 'tasks') return { select: taskSelect };
-      if (table === 'integration_settings') return { select: settingsSelect };
-      return {};
-    });
-
-    const target = await getLinearStorySyncTargetForTask({ from }, 'task_1');
-
-    expect(target).toEqual({
-      teamId: 'linear_team_db',
-      projectId: 'linear_project_db',
-      stateId: undefined,
-    });
-  });
-
   it('returns null when settings unavailable', async () => {
     const from = vi.fn().mockReturnValue({});
-    const target = await getLinearStorySyncTargetForStory({ from }, 'story_1');
+    const target = await getSyncTargetForStory({ from }, 'story_1');
 
     expect(target).toBeNull();
   });
@@ -78,7 +34,7 @@ describe('linear settings target resolution', () => {
       return {};
     });
 
-    const target = await getLinearStorySyncTargetForStoryMap({ from }, 'story_map_1');
+    const target = await getSyncTargetForStoryMap({ from }, 'story_map_1');
 
     expect(target).toEqual({
       teamId: 'linear_team_db',

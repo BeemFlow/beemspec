@@ -3,6 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { z } from 'zod';
 import { markStoryBlocked } from '@/build-runs/processor';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getStoryContext } from './queries';
 
 interface McpRuntime {
   server: McpServer;
@@ -35,39 +36,14 @@ function createMcpServer(): McpServer {
     },
     async ({ storyId }) => {
       const supabase = createAdminClient();
-      const { data: story, error } = await supabase
-        .from('stories')
-        .select('id, release_id, title, content')
-        .eq('id', storyId)
-        .single();
+      const context = await getStoryContext(supabase, storyId);
 
-      if (error || !story) {
+      if (!context) {
         return {
           isError: true,
-          content: [{ type: 'text', text: 'Story not found' }],
+          content: [{ type: 'text', text: 'Story not found or not assigned to a release' }],
         };
       }
-
-      if (!story.release_id) {
-        return {
-          isError: true,
-          content: [{ type: 'text', text: 'Story is not assigned to a release' }],
-        };
-      }
-
-      const storyContent = story.content as {
-        requirements?: string;
-        acceptance_criteria?: string;
-        technical_guidelines?: string | null;
-      };
-      const context = {
-        releaseId: story.release_id,
-        storyId: story.id,
-        storyTitle: story.title,
-        requirements: storyContent.requirements ?? '',
-        acceptanceCriteria: storyContent.acceptance_criteria ?? '',
-        technicalGuidelines: storyContent.technical_guidelines ?? null,
-      };
 
       return {
         content: [{ type: 'text', text: jsonText(context) }],

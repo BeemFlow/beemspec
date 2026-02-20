@@ -1,7 +1,8 @@
 import { homedir } from 'node:os';
+import { buildAuthorizationHeader } from '@beemspec/opencode';
 import { NextResponse } from 'next/server';
+import { getOpenCodeClientConfig } from '@/integrations/opencode/session';
 import { requireAuth } from '@/lib/auth';
-import { env } from '@/lib/env';
 
 interface OpenCodeProject {
   id: string;
@@ -24,13 +25,16 @@ export async function GET() {
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
-  const baseUrl = env.openCodeBaseUrl();
-  const fetchOpts = { cache: 'no-store' as const };
+  const config = getOpenCodeClientConfig();
+  const authorization = buildAuthorizationHeader(config);
+  const headers: Record<string, string> = {};
+  if (authorization) headers.authorization = authorization;
+  const fetchOpts = { cache: 'no-store' as const, headers };
 
   try {
     const [projectsRes, sessionsRes] = await Promise.all([
-      fetch(`${baseUrl}/project`, fetchOpts),
-      fetch(`${baseUrl}/session`, fetchOpts),
+      fetch(`${config.baseUrl}/project`, fetchOpts),
+      fetch(`${config.baseUrl}/session`, fetchOpts),
     ]);
 
     const directories = new Map<string, string>();

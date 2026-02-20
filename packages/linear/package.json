@@ -1,0 +1,23 @@
+{
+  "name": "@beemspec/linear",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Linear sync adapter -- description formatting, status mapping, SDK client, and webhook parsing for story map / Linear issue sync",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@linear/sdk": "^75.0.0"
+  },
+  "peerDependencies": {
+    "@beemspec/storymap": ">=0.1.0",
+    "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "zod": {
+      "optional": true
+    }
+  }
+}

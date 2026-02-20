@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadStoryWithStoryMap } from '@/build-runs/processor';
-import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
+import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
@@ -11,7 +11,7 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 vi.mock('@/build-runs/processor', () => ({
   loadStoryWithStoryMap: vi.fn(),
 }));
-vi.mock('@/integrations/linear/issue-sync', () => ({ getLinearIssueSync: vi.fn() }));
+vi.mock('@/integrations/linear/helpers', () => ({ getLinearIssueSync: vi.fn() }));
 vi.mock('@/integrations/linear/sync-story-by-id', () => ({ processStoryLinearSyncById: vi.fn() }));
 
 const STORY_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';

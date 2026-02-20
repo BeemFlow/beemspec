@@ -6,8 +6,7 @@ import {
   NetworkLinearError,
   RatelimitedLinearError,
 } from '@linear/sdk';
-import type { LinearIssueSnapshot, LinearIssueSync, LinearIssueUpsertInput } from '@/integrations/linear/types';
-import { env } from '@/lib/env';
+import type { IssueSnapshot, IssueSync, IssueUpsertInput } from '@/integrations/sync';
 
 const DEFAULT_MAX_RETRIES = 2;
 const BASE_BACKOFF_MS = 250;
@@ -16,7 +15,8 @@ type SleepFn = (ms: number) => Promise<void>;
 
 type LinearClientLike = Pick<LinearClient, 'issue' | 'createIssue' | 'updateIssue'>;
 
-export interface LinearIssueSyncOptions {
+/** Options for creating a Linear IssueSync client. Credentials are injected. */
+export interface LinearClientOptions {
   apiKey?: string;
   accessToken?: string;
   maxRetries?: number;
@@ -26,10 +26,6 @@ export interface LinearIssueSyncOptions {
 
 function sleepMs(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function getConfiguredApiKey(): string | null {
-  return env.linearApiKey();
 }
 
 function getBackoffMs(attempt: number): number {
@@ -51,7 +47,7 @@ function isRetryable(error: unknown): boolean {
   return false;
 }
 
-function toSnapshot(issue: Issue): LinearIssueSnapshot {
+function toSnapshot(issue: Issue): IssueSnapshot {
   return {
     id: issue.id,
     identifier: issue.identifier,
@@ -88,11 +84,33 @@ function getIssueFromPayload(payload: IssuePayload, operation: string): Promise<
   return payload.issue;
 }
 
-export function createLinearIssueSync(enabled: boolean, options: LinearIssueSyncOptions = {}): LinearIssueSync | null {
+/** Information about the authenticated Linear user's organization. */
+export interface LinearViewerInfo {
+  organizationId: string | undefined;
+}
+
+/**
+ * Fetch the authenticated user's organization from Linear.
+ * Access token is injected — no env vars are read.
+ */
+export async function getLinearViewerInfo(accessToken: string): Promise<LinearViewerInfo> {
+  const client = new LinearClient({ accessToken });
+  const viewer = await client.viewer;
+  const organization = await viewer.organization;
+  return { organizationId: organization?.id };
+}
+
+/**
+ * Create an IssueSync implementation backed by the Linear SDK.
+ * Credentials are injected via options -- no env vars are read.
+ *
+ * Returns null when `enabled` is false (feature-gated at the app layer).
+ */
+export function createLinearClient(enabled: boolean, options: LinearClientOptions = {}): IssueSync | null {
   if (!enabled) return null;
 
   const accessToken = options.accessToken ?? null;
-  const apiKey = options.apiKey ?? getConfiguredApiKey() ?? '';
+  const apiKey = options.apiKey ?? '';
   if (!accessToken && !apiKey && !options.client) throw createMissingAuthError();
 
   const client = options.client ?? new LinearClient(accessToken ? { accessToken } : { apiKey });
@@ -101,19 +119,19 @@ export function createLinearIssueSync(enabled: boolean, options: LinearIssueSync
   const sleep = options.sleep ?? sleepMs;
 
   return {
-    async getIssueById(issueId: string): Promise<LinearIssueSnapshot | null> {
+    async getIssueById(issueId: string): Promise<IssueSnapshot | null> {
       const issue = await withRetry(() => client.issue(issueId), maxRetries, sleep);
       if (!issue?.id) return null;
       return toSnapshot(issue);
     },
 
-    async createIssue(input: LinearIssueUpsertInput): Promise<LinearIssueSnapshot> {
+    async createIssue(input: IssueUpsertInput): Promise<IssueSnapshot> {
       const payload = await withRetry(() => client.createIssue(input), maxRetries, sleep);
       const issue = await getIssueFromPayload(payload, 'createIssue');
       return toSnapshot(issue);
     },
 
-    async updateIssue(issueId: string, input: Partial<LinearIssueUpsertInput>): Promise<LinearIssueSnapshot> {
+    async updateIssue(issueId: string, input: Partial<IssueUpsertInput>): Promise<IssueSnapshot> {
       const payload = await withRetry(
         () => client.updateIssue(issueId, input as Parameters<LinearClientLike['updateIssue']>[1]),
         maxRetries,
@@ -123,8 +141,4 @@ export function createLinearIssueSync(enabled: boolean, options: LinearIssueSync
       return toSnapshot(issue);
     },
   };
-}
-
-export function getLinearIssueSync(): LinearIssueSync | null {
-  return createLinearIssueSync(Boolean(env.linearApiKey()));
 }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createOpenCodeSessions, resetOpenCodeClientForTests } from './session';
+import { createOpenCodeSessions } from './session';
 
 const { createOpencodeClientMock, create, prompt, get } = vi.hoisted(() => ({
   createOpencodeClientMock: vi.fn(),
@@ -20,7 +20,6 @@ vi.mock('@opencode-ai/sdk', () => ({
 
 describe('opencode session service', () => {
   beforeEach(() => {
-    resetOpenCodeClientForTests();
     vi.clearAllMocks();
     delete process.env.BEEMSPEC_OPENCODE_BASE_URL;
     delete process.env.BEEMSPEC_OPENCODE_WEB_BASE_URL;

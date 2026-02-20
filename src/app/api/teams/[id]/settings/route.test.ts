@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/auth';
+import { getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/connections';
 import { requireAuth } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { getTeamRoleForUser } from '@/lib/teams';
 import { GET } from './route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
-vi.mock('@/integrations/linear/auth', () => ({
+vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: vi.fn() }));
+vi.mock('@/lib/teams', () => ({ getTeamRoleForUser: vi.fn() }));
+vi.mock('@/integrations/linear/connections', () => ({
   getLinearOAuthConnectionStatusForTeam: vi.fn(),
 }));
 
@@ -19,10 +23,7 @@ describe('team settings route', () => {
   });
 
   it('returns consolidated settings payload for owner', async () => {
-    const roleMaybeSingle = vi.fn().mockResolvedValue({ data: { role: 'owner' }, error: null });
-    const roleEqUser = vi.fn().mockReturnValue({ maybeSingle: roleMaybeSingle });
-    const roleEqTeam = vi.fn().mockReturnValue({ eq: roleEqUser });
-    const roleSelect = vi.fn().mockReturnValue({ eq: roleEqTeam });
+    vi.mocked(getTeamRoleForUser).mockResolvedValue('owner');
 
     const integrationMaybeSingle = vi.fn().mockResolvedValue({
       data: {
@@ -44,7 +45,6 @@ describe('team settings route', () => {
     const invitesSelect = vi.fn().mockReturnValue({ eq: invitesEq });
 
     const from = vi.fn((table: string) => {
-      if (table === 'team_members') return { select: roleSelect };
       if (table === 'integration_settings') return { select: integrationSelect };
       if (table === 'team_invites') return { select: invitesSelect };
       return {};
@@ -74,13 +74,7 @@ describe('team settings route', () => {
   });
 
   it('returns 404 when user is not a team member', async () => {
-    const roleMaybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-    const roleEqUser = vi.fn().mockReturnValue({ maybeSingle: roleMaybeSingle });
-    const roleEqTeam = vi.fn().mockReturnValue({ eq: roleEqUser });
-    const roleSelect = vi.fn().mockReturnValue({ eq: roleEqTeam });
-    const from = vi.fn(() => ({ select: roleSelect }));
-
-    vi.mocked(createClient).mockResolvedValue({ from } as never);
+    vi.mocked(getTeamRoleForUser).mockResolvedValue(null);
 
     const response = await GET(new Request('http://localhost/api/test'), { params: Promise.resolve({ id: TEAM_ID }) });
 

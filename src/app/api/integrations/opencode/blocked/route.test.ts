@@ -34,7 +34,7 @@ describe('opencode blocked route', () => {
     vi.mocked(createClient).mockResolvedValue({ from } as never);
 
     const response = await POST(
-      new Request('http://localhost/api/opencode/blocked', {
+      new Request('http://localhost/api/integrations/opencode/blocked', {
         method: 'POST',
         body: JSON.stringify({ story_id: STORY_ID, reason: 'Waiting on API access' }),
       }),
@@ -58,7 +58,7 @@ describe('opencode blocked route', () => {
     vi.mocked(createAdminClient).mockReturnValue({ from } as never);
 
     const response = await POST(
-      new Request('http://localhost/api/opencode/blocked', {
+      new Request('http://localhost/api/integrations/opencode/blocked', {
         method: 'POST',
         headers: { authorization: 'Bearer token_123' },
         body: JSON.stringify({ story_id: STORY_ID, reason: 'Waiting on API access' }),

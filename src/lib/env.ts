@@ -1,8 +1,7 @@
+import { normalize } from '@/lib/strings';
+
 function readEnv(name: string): string | null {
-  const value = process.env[name];
-  if (!value) return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
+  return normalize(process.env[name]);
 }
 
 export const env = {

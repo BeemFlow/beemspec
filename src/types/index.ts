@@ -57,5 +57,5 @@ export interface ReleaseWithStories extends Release {
   stories: Story[];
 }
 
-// Re-export for convenience
-import type { Release, Story, StoryMapFull } from '@beemspec/storymap';
+// Import for local use in ReleaseWithStories
+import type { Release, Story } from '@beemspec/storymap';

@@ -1,27 +1,11 @@
-import type { LinearStorySyncTarget } from '@/integrations/linear/story-sync';
+import type { SyncTarget } from '@/integrations/sync';
+import { normalize } from '@/lib/strings';
+import type { SupabaseLike } from '@/lib/supabase/types';
 
 interface IntegrationSettingsRow {
   linear_team_id: string | null;
   linear_project_id: string | null;
   linear_state_id: string | null;
-}
-
-type SupabaseLike = {
-  from: (table: string) => unknown;
-};
-
-interface TasksTable {
-  select(columns: string): {
-    eq(
-      column: string,
-      value: string,
-    ): {
-      single(): Promise<{
-        data: { activities: { story_maps: { team_id: string } | null } | null } | null;
-        error: unknown;
-      }>;
-    };
-  };
 }
 
 interface StoriesTable {
@@ -64,13 +48,7 @@ interface TeamIdResult {
   teamId: string | null;
 }
 
-function normalize(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function toLinearTarget(row: IntegrationSettingsRow | null): LinearStorySyncTarget | null {
+function toLinearTarget(row: IntegrationSettingsRow | null): SyncTarget | null {
   if (!row) return null;
 
   const teamId = normalize(row.linear_team_id);
@@ -83,7 +61,7 @@ function toLinearTarget(row: IntegrationSettingsRow | null): LinearStorySyncTarg
   };
 }
 
-async function getSettingsForTeamId(supabase: SupabaseLike, teamId: string): Promise<LinearStorySyncTarget | null> {
+async function getSettingsForTeamId(supabase: SupabaseLike, teamId: string): Promise<SyncTarget | null> {
   const table = supabase.from('integration_settings') as IntegrationSettingsTable;
   const { data, error } = await table
     .select('linear_team_id, linear_project_id, linear_state_id')
@@ -105,52 +83,18 @@ async function getTeamIdForStoryMapInternal(supabase: SupabaseLike, storyMapId: 
   }
 }
 
-export async function getLinearStorySyncTargetForTeamId(
-  supabase: SupabaseLike,
-  teamId: string,
-): Promise<LinearStorySyncTarget | null> {
-  return getSettingsForTeamId(supabase, teamId);
-}
-
 export async function getTeamIdForStoryMap(supabase: SupabaseLike, storyMapId: string): Promise<string | null> {
   const result = await getTeamIdForStoryMapInternal(supabase, storyMapId);
   return result.teamId;
 }
 
-export async function getLinearStorySyncTargetForStoryMap(
-  supabase: SupabaseLike,
-  storyMapId: string,
-): Promise<LinearStorySyncTarget | null> {
+export async function getSyncTargetForStoryMap(supabase: SupabaseLike, storyMapId: string): Promise<SyncTarget | null> {
   const result = await getTeamIdForStoryMapInternal(supabase, storyMapId);
   if (!result.teamId) return null;
   return getSettingsForTeamId(supabase, result.teamId);
 }
 
-export async function getLinearStorySyncTargetForTask(
-  supabase: SupabaseLike,
-  taskId: string,
-): Promise<LinearStorySyncTarget | null> {
-  try {
-    const tasksTable = supabase.from('tasks') as TasksTable;
-    const { data, error } = await tasksTable
-      .select('activities!inner(story_maps!inner(team_id))')
-      .eq('id', taskId)
-      .single();
-    if (error) throw error;
-
-    const teamId = data?.activities?.story_maps?.team_id;
-    if (!teamId) return null;
-
-    return getSettingsForTeamId(supabase, teamId);
-  } catch {
-    return null;
-  }
-}
-
-export async function getLinearStorySyncTargetForStory(
-  supabase: SupabaseLike,
-  storyId: string,
-): Promise<LinearStorySyncTarget | null> {
+export async function getSyncTargetForStory(supabase: SupabaseLike, storyId: string): Promise<SyncTarget | null> {
   try {
     const storiesTable = supabase.from('stories') as StoriesTable;
     const { data, error } = await storiesTable

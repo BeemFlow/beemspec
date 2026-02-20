@@ -1,7 +1,7 @@
+import { linearSyncBatchSchema } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
 import { syncStoriesByIdList } from '@/app/api/integrations/linear/sync/route';
-import { getLinearIssueSync } from '@/integrations/linear/issue-sync';
-import { linearSyncBatchSchema } from '@/integrations/linear/schemas';
+import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { requireAuth } from '@/lib/auth';
 import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 
   const summary = await syncStoriesByIdList({
     supabase,
-    fallbackLinearIssueSync: linearIssueSync,
+    fallbackIssueSync: linearIssueSync,
     storyIds,
   });
 

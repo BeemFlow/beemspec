@@ -4,7 +4,6 @@ import { Check, ChevronDown, LogOut, Plus, Settings, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useTeam } from '@/app/(authenticated)/team-context';
 import { TeamSettingsDialog } from '@/components/team-settings-dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PromptDialog } from '@/components/ui/prompt-dialog';
+import { useTeam } from '@/contexts/team-context';
 
 interface AppShellProps {
   children: React.ReactNode;
