@@ -80,24 +80,26 @@ export const reorderTasksSchema = z.object({
   order: z.array(uuid).min(1, 'Order array cannot be empty'),
 });
 
+const storyContentSchema = z.object({
+  _version: z.literal(1).optional().default(1),
+  requirements: z.string().min(1, 'Required'),
+  acceptance_criteria: z.string().min(1, 'Required'),
+  figma_link: z.url().nullable().optional(),
+  edge_cases: nullableString.optional(),
+  technical_guidelines: nullableString.optional(),
+});
+
 const storyBase = z.object({
   task_id: uuid,
   release_id: uuid.nullable(),
   title: z.string().min(1, 'Required').max(500),
-  requirements: z.string().min(1, 'Required'),
-  acceptance_criteria: z.string().min(1, 'Required'),
-  figma_link: z.url().nullable(),
-  edge_cases: nullableString,
-  technical_guidelines: nullableString,
+  content: storyContentSchema,
   status: storyStatus,
 });
 
 export const createStorySchema = storyBase
   .partial({
     release_id: true,
-    figma_link: true,
-    edge_cases: true,
-    technical_guidelines: true,
     status: true,
   })
   .extend({ status: storyStatus.optional().default('backlog') });
@@ -153,4 +155,4 @@ export type ReorderStories = z.infer<typeof reorderStoriesSchema>;
 export type CreatePersona = z.infer<typeof createPersonaSchema>;
 export type UpdatePersona = z.infer<typeof updatePersonaSchema>;
 
-export { storyBase, taskBase, activityBase, personaBase, releaseBase, storyMapBase };
+export { storyBase, storyContentSchema, taskBase, activityBase, personaBase, releaseBase, storyMapBase };

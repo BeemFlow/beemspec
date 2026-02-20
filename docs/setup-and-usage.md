@@ -110,11 +110,11 @@ APIs:
 
 ## 8) OpenCode + MCP usage
 
-Package: `packages/opencode-beemspec`
+Package: `packages/opencode` (`@beemspec/opencode`)
 
 For OpenCode runtime, load:
 
-- `opencode-beemspec/runtime`
+- `@beemspec/opencode/runtime`
 
 Add remote MCP server config in OpenCode:
 

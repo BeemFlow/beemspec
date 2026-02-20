@@ -43,11 +43,7 @@ export async function POST(request: Request) {
       task_id: validation.data.task_id,
       release_id: validation.data.release_id ?? null,
       title: validation.data.title,
-      requirements: validation.data.requirements,
-      acceptance_criteria: validation.data.acceptance_criteria,
-      figma_link: validation.data.figma_link ?? null,
-      edge_cases: validation.data.edge_cases ?? null,
-      technical_guidelines: validation.data.technical_guidelines ?? null,
+      content: validation.data.content,
       status: validation.data.status,
     })
     .select()

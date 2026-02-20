@@ -37,7 +37,7 @@ function createMcpServer(): McpServer {
       const supabase = createAdminClient();
       const { data: story, error } = await supabase
         .from('stories')
-        .select('id, release_id, title, requirements, acceptance_criteria, technical_guidelines')
+        .select('id, release_id, title, content')
         .eq('id', storyId)
         .single();
 
@@ -55,13 +55,18 @@ function createMcpServer(): McpServer {
         };
       }
 
+      const storyContent = story.content as {
+        requirements?: string;
+        acceptance_criteria?: string;
+        technical_guidelines?: string | null;
+      };
       const context = {
         releaseId: story.release_id,
         storyId: story.id,
         storyTitle: story.title,
-        requirements: story.requirements,
-        acceptanceCriteria: story.acceptance_criteria,
-        technicalGuidelines: story.technical_guidelines,
+        requirements: storyContent.requirements ?? '',
+        acceptanceCriteria: storyContent.acceptance_criteria ?? '',
+        technicalGuidelines: storyContent.technical_guidelines ?? null,
       };
 
       return {

@@ -268,9 +268,9 @@ async function syncAndInsertRunItem(
       storyTitle: input.story.title,
       linearIssueIdentifier,
       workingDirectory: input.workingDirectory,
-      requirements: input.story.requirements,
-      acceptanceCriteria: input.story.acceptance_criteria,
-      technicalGuidelines: input.story.technical_guidelines,
+      requirements: input.story.content.requirements,
+      acceptanceCriteria: input.story.content.acceptance_criteria,
+      technicalGuidelines: input.story.content.technical_guidelines ?? null,
     });
   }
 

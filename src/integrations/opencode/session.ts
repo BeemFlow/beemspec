@@ -1,11 +1,11 @@
-import { createOpencodeClient } from '@opencode-ai/sdk';
-import { env } from '@/lib/env';
 import type {
   OpenCodeSessionCreateInput,
   OpenCodeSessionService,
   OpenCodeSessionSnapshot,
   OpenCodeSessionStoryAssignmentInput,
-} from '../../../packages/opencode-beemspec/src/types';
+} from '@beemspec/opencode';
+import { createOpencodeClient } from '@opencode-ai/sdk';
+import { env } from '@/lib/env';
 
 export type OpenCodeSessions = OpenCodeSessionService;
 

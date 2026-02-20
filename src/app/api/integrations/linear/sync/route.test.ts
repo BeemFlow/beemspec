@@ -33,11 +33,14 @@ function createSyncClient(storyUpdatedAt: string) {
       id: STORY_ID,
       task_id: STORY_ID,
       title: 'Story',
-      requirements: 'Req',
-      acceptance_criteria: 'AC',
-      figma_link: null,
-      edge_cases: null,
-      technical_guidelines: null,
+      content: {
+        _version: 1,
+        requirements: 'Req',
+        acceptance_criteria: 'AC',
+        figma_link: null,
+        edge_cases: null,
+        technical_guidelines: null,
+      },
       status: 'ready',
       updated_at: storyUpdatedAt,
       tasks: {
@@ -148,8 +151,10 @@ describe('linear sync route', () => {
     expect(storyUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Remote newer title',
-        requirements: 'Remote req',
-        acceptance_criteria: '- [ ] Remote AC',
+        content: expect.objectContaining({
+          requirements: 'Remote req',
+          acceptance_criteria: '- [ ] Remote AC',
+        }),
         status: 'in_progress',
         updated_at: '2026-02-14T11:00:00.000Z',
       }),

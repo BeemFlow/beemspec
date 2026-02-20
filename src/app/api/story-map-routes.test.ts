@@ -377,8 +377,10 @@ describe('story map API routes', () => {
         jsonRequest({
           task_id: VALID_ID,
           title: 'Login',
-          requirements: 'As a user...',
-          acceptance_criteria: '- [ ] Can log in',
+          content: {
+            requirements: 'As a user...',
+            acceptance_criteria: '- [ ] Can log in',
+          },
         }),
       );
 
@@ -386,11 +388,11 @@ describe('story map API routes', () => {
         task_id: VALID_ID,
         release_id: null,
         title: 'Login',
-        requirements: 'As a user...',
-        acceptance_criteria: '- [ ] Can log in',
-        figma_link: null,
-        edge_cases: null,
-        technical_guidelines: null,
+        content: {
+          _version: 1,
+          requirements: 'As a user...',
+          acceptance_criteria: '- [ ] Can log in',
+        },
         status: 'backlog',
       });
       await expect(response.json()).resolves.toMatchObject({ id: VALID_ID, title: 'Login' });
@@ -400,11 +402,14 @@ describe('story map API routes', () => {
       const { client } = createInsertClient({
         id: VALID_ID,
         title: 'Login',
-        requirements: 'As a user...',
-        acceptance_criteria: '- [ ] Can log in',
-        edge_cases: null,
-        technical_guidelines: null,
-        figma_link: null,
+        content: {
+          _version: 1,
+          requirements: 'As a user...',
+          acceptance_criteria: '- [ ] Can log in',
+          edge_cases: null,
+          technical_guidelines: null,
+          figma_link: null,
+        },
         status: 'backlog',
       });
       vi.mocked(createClient).mockResolvedValue(client as never);
@@ -419,8 +424,10 @@ describe('story map API routes', () => {
         jsonRequest({
           task_id: VALID_ID,
           title: 'Login',
-          requirements: 'As a user...',
-          acceptance_criteria: '- [ ] Can log in',
+          content: {
+            requirements: 'As a user...',
+            acceptance_criteria: '- [ ] Can log in',
+          },
         }),
       );
 
@@ -502,11 +509,14 @@ describe('story map API routes', () => {
       const story = {
         id: VALID_ID,
         title: 'Story edited',
-        requirements: 'As a user...',
-        acceptance_criteria: '- [ ] Can update',
-        edge_cases: null,
-        technical_guidelines: null,
-        figma_link: null,
+        content: {
+          _version: 1,
+          requirements: 'As a user...',
+          acceptance_criteria: '- [ ] Can update',
+          edge_cases: null,
+          technical_guidelines: null,
+          figma_link: null,
+        },
         status: 'ready',
       };
 

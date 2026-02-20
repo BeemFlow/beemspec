@@ -1,4 +1,15 @@
-export type StoryStatus = 'backlog' | 'ready' | 'in_progress' | 'review' | 'done';
+export type {
+  Activity,
+  ActivityWithTasks,
+  Release,
+  Story,
+  StoryContent,
+  StoryMap,
+  StoryMapFull,
+  StoryStatus,
+  Task,
+  TaskWithStories,
+} from '@beemspec/storymap';
 
 export type TeamRole = 'owner' | 'member';
 
@@ -31,15 +42,6 @@ export interface TeamInvite {
   accepted_at: string | null;
 }
 
-export interface StoryMap {
-  id: string;
-  team_id: string;
-  name: string;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface Persona {
   id: string;
   story_map_id: string;
@@ -50,63 +52,10 @@ export interface Persona {
   created_at: string;
 }
 
-export interface Activity {
-  id: string;
-  story_map_id: string;
-  name: string;
-  description: string | null;
-  sort_order: number;
-  created_at: string;
-}
-
-export interface Task {
-  id: string;
-  activity_id: string;
-  name: string;
-  description: string | null;
-  sort_order: number;
-  created_at: string;
-}
-
-export interface Release {
-  id: string;
-  story_map_id: string;
-  name: string;
-  description: string | null;
-  sort_order: number;
-  created_at: string;
-}
-
-export interface Story {
-  id: string;
-  task_id: string;
-  release_id: string | null;
-  title: string;
-  requirements: string;
-  acceptance_criteria: string;
-  figma_link: string | null;
-  edge_cases: string | null;
-  technical_guidelines: string | null;
-  status: StoryStatus;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-}
-
-// Joined types for UI
-export interface TaskWithStories extends Task {
-  stories: Story[];
-}
-
-export interface ActivityWithTasks extends Activity {
-  tasks: TaskWithStories[];
-}
-
+// Joined types with timestamps for DB rows
 export interface ReleaseWithStories extends Release {
   stories: Story[];
 }
 
-export interface StoryMapFull extends StoryMap {
-  activities: ActivityWithTasks[];
-  releases: Release[];
-}
+// Re-export for convenience
+import type { Release, Story, StoryMapFull } from '@beemspec/storymap';

@@ -23,8 +23,10 @@ describe('linear sync helpers', () => {
 
     expect(patch).toMatchObject({
       title: 'Remote title',
-      requirements: 'Req',
-      acceptance_criteria: '- [ ] AC',
+      content: {
+        requirements: 'Req',
+        acceptance_criteria: '- [ ] AC',
+      },
       status: 'in_progress',
       updated_at: '2026-02-14T11:00:00.000Z',
     });

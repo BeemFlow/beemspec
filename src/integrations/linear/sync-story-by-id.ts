@@ -30,9 +30,10 @@ export async function processStoryLinearSyncById(
     throw new Error('Linear integration is not enabled');
   }
 
+  const { story } = context.data;
   const existingLink = await getStoryLinearLink(supabase, input.storyId);
   const linearIssue = await syncStoryToLinear(
-    context.data.story,
+    story,
     linearSyncContext.linearIssueSync,
     existingLink?.linearIssueId ?? null,
     linearSyncContext.target,
@@ -43,7 +44,7 @@ export async function processStoryLinearSyncById(
     storyId: input.storyId,
     linearIssueId: linearIssue.id,
     linearIssueIdentifier: linearIssue.identifier,
-    lastLocalUpdatedAt: context.data.story.updated_at ?? null,
+    lastLocalUpdatedAt: null,
     lastLinearUpdatedAt: linearIssue.updatedAt,
   });
 

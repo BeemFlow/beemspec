@@ -1,13 +1,10 @@
+import type { StoryContent } from '@beemspec/storymap';
 import type { LinearIssueSnapshot, LinearIssueSync, LinearIssueUpsertInput } from '@/integrations/linear/types';
 
 export interface StoryForLinearSync {
   id: string;
   title: string;
-  requirements: string;
-  acceptance_criteria: string;
-  edge_cases: string | null;
-  technical_guidelines: string | null;
-  figma_link: string | null;
+  content: StoryContent;
   status: string;
 }
 
@@ -19,7 +16,7 @@ export interface LinearStorySyncTarget {
 
 export type StoryStatus = 'backlog' | 'ready' | 'in_progress' | 'review' | 'done';
 
-function section(title: string, body: string | null): string | null {
+function section(title: string, body: string | null | undefined): string | null {
   if (!body) return null;
   return `## ${title}\n${body}`;
 }
@@ -49,7 +46,16 @@ function sectionBody(description: string, title: string): string | null {
   return body.length > 0 ? body : null;
 }
 
-export function parseLinearDescriptionToStoryFields(description: string | null): Partial<StoryForLinearSync> {
+export interface ParsedLinearStoryFields {
+  requirements?: string;
+  acceptance_criteria?: string;
+  figma_link?: string | null;
+  edge_cases?: string | null;
+  technical_guidelines?: string | null;
+  status?: string;
+}
+
+export function parseLinearDescriptionToStoryFields(description: string | null): ParsedLinearStoryFields {
   if (!description) return {};
 
   const requirements = sectionBody(description, 'Requirements');
@@ -70,13 +76,14 @@ export function parseLinearDescriptionToStoryFields(description: string | null):
 }
 
 function buildDescription(story: StoryForLinearSync): string {
+  const { content } = story;
   const parts = [
-    section('Requirements', story.requirements),
-    section('Acceptance Criteria', story.acceptance_criteria),
+    section('Requirements', content.requirements),
+    section('Acceptance Criteria', content.acceptance_criteria),
     section('Status', story.status),
-    section('Figma', story.figma_link),
-    section('Edge Cases', story.edge_cases),
-    section('Technical Guidelines', story.technical_guidelines),
+    section('Figma', content.figma_link),
+    section('Edge Cases', content.edge_cases),
+    section('Technical Guidelines', content.technical_guidelines),
     section('BeemSpec Story ID', story.id),
   ].filter((value): value is string => Boolean(value));
 

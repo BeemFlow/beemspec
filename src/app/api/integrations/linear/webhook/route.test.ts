@@ -67,6 +67,11 @@ function createWebhookAdminClient(
     data: {
       id: 'story_1',
       updated_at: options.localStoryUpdatedAt ?? '2026-02-14T10:00:00.000Z',
+      content: {
+        _version: 1,
+        requirements: 'Existing req',
+        acceptance_criteria: 'Existing AC',
+      },
     },
     error: null,
   });
@@ -174,8 +179,10 @@ describe('linear webhook route', () => {
     expect(admin.storyUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Story title updated from Linear',
-        requirements: 'Updated req',
-        acceptance_criteria: '- [ ] Updated AC',
+        content: expect.objectContaining({
+          requirements: 'Updated req',
+          acceptance_criteria: '- [ ] Updated AC',
+        }),
         status: 'in_progress',
       }),
     );

@@ -34,7 +34,24 @@ async function syncRemoteToLocal(
     stateName: null,
     updatedAt: remote.updatedAt,
   });
-  const { error: updateError } = await supabase.from('stories').update(patch).eq('id', story.id);
+
+  // Build the DB update: scalar fields + merge content patch into existing content
+  const dbUpdate: Record<string, unknown> = { updated_at: patch.updated_at };
+  if (patch.title) dbUpdate.title = patch.title;
+  if (patch.status) dbUpdate.status = patch.status;
+
+  if (patch.content) {
+    // Load current content to merge
+    const { data: currentStory } = await supabase.from('stories').select('content').eq('id', story.id).single();
+    const currentContent = (currentStory?.content as Record<string, unknown>) ?? {
+      _version: 1,
+      requirements: '',
+      acceptance_criteria: '',
+    };
+    dbUpdate.content = { ...currentContent, ...patch.content };
+  }
+
+  const { error: updateError } = await supabase.from('stories').update(dbUpdate).eq('id', story.id);
   if (updateError) {
     return serverErrorResponse('Failed to apply remote sync update', updateError);
   }

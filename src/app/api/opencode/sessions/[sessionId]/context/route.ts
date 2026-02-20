@@ -46,7 +46,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ sess
   const storyIds = items.map((item) => item.story_id as string);
   const { data: stories, error: storiesError } = await supabase
     .from('stories')
-    .select('id, title, requirements, acceptance_criteria, technical_guidelines')
+    .select('id, title, content')
     .in('id', storyIds);
 
   if (storiesError) return serverErrorResponse('Failed to load stories', storiesError);
@@ -55,12 +55,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ sess
     sessionId,
     releaseId: (run.release_id as string | null) ?? null,
     runId: run.id,
-    stories: (stories ?? []).map((story) => ({
-      storyId: story.id,
-      storyTitle: story.title,
-      requirements: story.requirements,
-      acceptanceCriteria: story.acceptance_criteria,
-      technicalGuidelines: story.technical_guidelines,
-    })),
+    stories: (stories ?? []).map((story) => {
+      const content = story.content as {
+        requirements?: string;
+        acceptance_criteria?: string;
+        technical_guidelines?: string | null;
+      };
+      return {
+        storyId: story.id,
+        storyTitle: story.title,
+        requirements: content.requirements ?? '',
+        acceptanceCriteria: content.acceptance_criteria ?? '',
+        technicalGuidelines: content.technical_guidelines ?? null,
+      };
+    }),
   });
 }

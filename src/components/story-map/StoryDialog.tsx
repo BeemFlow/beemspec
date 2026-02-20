@@ -11,13 +11,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import type { Release, Story, StoryStatus } from '@/types';
 
+interface StoryFormData {
+  title: string;
+  content: {
+    _version: 1;
+    requirements: string;
+    acceptance_criteria: string;
+    figma_link?: string | null;
+    edge_cases?: string | null;
+    technical_guidelines?: string | null;
+  };
+  status: StoryStatus;
+  release_id: string | null;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   story: Story | null;
   releases: Release[];
   defaultReleaseId?: string | null;
-  onSave: (story: Partial<Story>) => Promise<void> | void;
+  onSave: (story: Partial<StoryFormData>) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
 }
 
@@ -38,11 +52,11 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
   useEffect(() => {
     if (story) {
       setTitle(story.title);
-      setRequirements(story.requirements);
-      setAcceptanceCriteria(story.acceptance_criteria);
-      setFigmaLink(story.figma_link || '');
-      setEdgeCases(story.edge_cases || '');
-      setTechnicalGuidelines(story.technical_guidelines || '');
+      setRequirements(story.content.requirements);
+      setAcceptanceCriteria(story.content.acceptance_criteria);
+      setFigmaLink(story.content.figma_link || '');
+      setEdgeCases(story.content.edge_cases || '');
+      setTechnicalGuidelines(story.content.technical_guidelines || '');
       setStatus(story.status);
       setReleaseId(story.release_id || NO_RELEASE);
     } else {
@@ -66,11 +80,14 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
       setIsSubmitting(true);
       await onSave({
         title,
-        requirements,
-        acceptance_criteria: acceptanceCriteria,
-        figma_link: figmaLink || null,
-        edge_cases: edgeCases || null,
-        technical_guidelines: technicalGuidelines || null,
+        content: {
+          _version: 1,
+          requirements,
+          acceptance_criteria: acceptanceCriteria,
+          figma_link: figmaLink || null,
+          edge_cases: edgeCases || null,
+          technical_guidelines: technicalGuidelines || null,
+        },
         status,
         release_id: releaseId === NO_RELEASE ? null : releaseId,
       });

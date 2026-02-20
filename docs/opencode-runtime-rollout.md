@@ -19,7 +19,7 @@ In `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-beemspec"],
+  "plugin": ["@beemspec/opencode"],
   "mcp": {
     "beemspec": {
       "type": "remote",
@@ -36,7 +36,7 @@ In `opencode.json`:
 For local plugin loading, use runtime export:
 
 ```ts
-import BeemSpecPlugin from 'opencode-beemspec/runtime'
+import BeemSpecPlugin from '@beemspec/opencode/runtime'
 export default BeemSpecPlugin
 ```
 

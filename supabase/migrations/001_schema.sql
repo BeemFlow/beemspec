@@ -130,12 +130,8 @@ CREATE TABLE stories (
   task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   release_id UUID REFERENCES releases(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
-  requirements TEXT NOT NULL,
-  acceptance_criteria TEXT NOT NULL,
-  figma_link TEXT,
-  edge_cases TEXT,
-  technical_guidelines TEXT,
   status TEXT DEFAULT 'backlog' CHECK(status IN ('backlog', 'ready', 'in_progress', 'review', 'done')),
+  content JSONB NOT NULL DEFAULT '{"_version": 1, "requirements": "", "acceptance_criteria": ""}',
   sort_order INTEGER DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

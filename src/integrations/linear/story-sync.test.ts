@@ -10,11 +10,14 @@ import {
 const story = {
   id: 'story_1',
   title: 'Login',
-  requirements: 'As a user, I can log in.',
-  acceptance_criteria: '- [ ] Can submit credentials',
-  edge_cases: 'Locked account',
-  technical_guidelines: 'Use existing auth API',
-  figma_link: 'https://figma.com/file/abc',
+  content: {
+    _version: 1 as const,
+    requirements: 'As a user, I can log in.',
+    acceptance_criteria: '- [ ] Can submit credentials',
+    edge_cases: 'Locked account',
+    technical_guidelines: 'Use existing auth API',
+    figma_link: 'https://figma.com/file/abc',
+  },
   status: 'backlog',
 };
 

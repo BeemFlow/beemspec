@@ -1,3 +1,4 @@
+import type { StoryContent } from '@beemspec/storymap';
 import {
   mapLinearStatusToStoryStatus,
   parseLinearDescriptionToStoryFields,
@@ -20,11 +21,7 @@ export type LinearSyncDirection = (typeof LINEAR_SYNC_DIRECTION)[keyof typeof LI
 
 export interface StoryPatchFromLinear {
   title?: string;
-  requirements?: string;
-  acceptance_criteria?: string;
-  figma_link?: string | null;
-  edge_cases?: string | null;
-  technical_guidelines?: string | null;
+  content?: Partial<StoryContent>;
   status?: StoryStatus;
   updated_at: string;
 }
@@ -49,13 +46,33 @@ export function buildStoryPatchFromLinearIssue(input: LinearIssueForSync): Story
   };
 
   if (input.title) patch.title = input.title;
-  if (typeof fromDescription.requirements === 'string') patch.requirements = fromDescription.requirements;
-  if (typeof fromDescription.acceptance_criteria === 'string')
-    patch.acceptance_criteria = fromDescription.acceptance_criteria;
-  if ('figma_link' in fromDescription) patch.figma_link = fromDescription.figma_link ?? null;
-  if ('edge_cases' in fromDescription) patch.edge_cases = fromDescription.edge_cases ?? null;
-  if ('technical_guidelines' in fromDescription)
-    patch.technical_guidelines = fromDescription.technical_guidelines ?? null;
+
+  // Build content patch from parsed description fields
+  const contentPatch: Partial<StoryContent> = {};
+  let hasContentFields = false;
+  if (typeof fromDescription.requirements === 'string') {
+    contentPatch.requirements = fromDescription.requirements;
+    hasContentFields = true;
+  }
+  if (typeof fromDescription.acceptance_criteria === 'string') {
+    contentPatch.acceptance_criteria = fromDescription.acceptance_criteria;
+    hasContentFields = true;
+  }
+  if ('figma_link' in fromDescription) {
+    contentPatch.figma_link = fromDescription.figma_link ?? null;
+    hasContentFields = true;
+  }
+  if ('edge_cases' in fromDescription) {
+    contentPatch.edge_cases = fromDescription.edge_cases ?? null;
+    hasContentFields = true;
+  }
+  if ('technical_guidelines' in fromDescription) {
+    contentPatch.technical_guidelines = fromDescription.technical_guidelines ?? null;
+    hasContentFields = true;
+  }
+  if (hasContentFields) {
+    patch.content = contentPatch;
+  }
 
   const mappedFromState = mapLinearStatusToStoryStatus(input.stateName);
   const mappedFromDescription = mapLinearStatusToStoryStatus(fromDescription.status ?? null);
@@ -65,13 +82,5 @@ export function buildStoryPatchFromLinearIssue(input: LinearIssueForSync): Story
 }
 
 export function hasMutableStoryFields(patch: StoryPatchFromLinear): boolean {
-  return Boolean(
-    patch.title ||
-      patch.requirements ||
-      patch.acceptance_criteria ||
-      patch.figma_link !== undefined ||
-      patch.edge_cases !== undefined ||
-      patch.technical_guidelines !== undefined ||
-      patch.status,
-  );
+  return Boolean(patch.title || patch.content || patch.status);
 }

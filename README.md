@@ -1,139 +1,60 @@
 # BeemSpec
 
-BeemSpec is a story-mapping and release-planning tool. It is currently focused on helping teams define product scope clearly before execution.
+BeemSpec is the planning layer for AI-native software teams. It connects product planning directly to AI coding agents, so your team can go from story to working code without manual handoff.
 
-## Current product scope
+## The problem
 
-- Story map management with activities, tasks, stories, and release slicing.
-- Team-based collaboration with authentication, team switching, and member invites.
-- Drag-and-drop map interactions for reordering and moving work across the board.
-- Story detail capture for requirements, acceptance criteria, design links, edge cases, and technical notes.
-- Personas are intentionally deferred from the active UI flow until post-hardening product validation.
+Product teams spend significant effort translating plans into work that developers (or AI agents) can act on. Requirements live in one tool, tasks in another, and context is lost at every handoff. When AI coding agents enter the picture, the gap gets worse -- they need structured, complete context to produce good output, and most planning tools weren't built to provide that.
 
-## Product direction
+## What BeemSpec does
 
-BeemSpec is being built as the planning source of truth.
+BeemSpec is a **story mapping and release planning tool** that doubles as an **AI build orchestrator**. You plan your product visually, then BeemSpec feeds that context directly to an AI coding agent to start building.
 
-- BeemSpec: planning context (`what` and `why`).
-- Linear: execution coordination (`when` and `who`) - story sync foundation implemented.
-- OpenCode: implementation runtime - session management is implemented through the official SDK.
+### Plan visually with story maps
 
-Near-term focus is hardening and polishing the Story Map experience for daily dogfooding before building integrations.
+Lay out your product as a story map -- a grid where columns represent user activities and tasks, and rows represent releases. Drop stories into the grid to define what ships when. Each story captures requirements, acceptance criteria, design links, edge cases, and technical guidelines in structured fields that both humans and AI agents can consume.
 
-Linear outbound sync now supports team-scoped OAuth 2.0 (recommended) and API key fallback:
+### Build with AI agents
 
-- OAuth env:
-  - `LINEAR_CLIENT_ID`
-  - `LINEAR_CLIENT_SECRET`
-  - `LINEAR_OAUTH_REDIRECT_URI`
-- Optional fallback:
-  - `LINEAR_API_KEY`
+Click "Build Release" and BeemSpec creates an AI coding session (powered by [OpenCode](https://opencode.ai)), seeds it with full story context, and instructs the agent to start implementing. Track build progress per story, retry failures, and link back to the AI session -- all from the story map UI.
 
-Story-triggered outbound sync target is loaded from team integration settings (`integration_settings` table).
+### Stay in sync with Linear
 
-Current management API for team settings:
+BeemSpec syncs bidirectionally with [Linear](https://linear.app). Stories created or updated in BeemSpec automatically appear as Linear issues, and changes in Linear flow back. Your planning stays in BeemSpec, your execution tracking stays in Linear, and they never drift apart.
 
-- `GET /api/teams/:id/integrations/linear`
-- `PUT /api/teams/:id/integrations/linear`
+## How the three systems work together
 
-Linear OAuth connect API:
+| System | Role | Owns |
+|---|---|---|
+| **BeemSpec** | Planning source of truth | *What* to build and *why* |
+| **Linear** | Execution coordination | *When* and *who* |
+| **OpenCode** | AI implementation runtime | *How* (the code) |
 
-- `GET /api/integrations/linear/oauth/start?team_id=:id&return_to=/:path`
-- `GET /api/integrations/linear/oauth/callback`
-- `GET /api/integrations/linear/oauth/connection?team_id=:id`
-- `DELETE /api/integrations/linear/oauth/connection?team_id=:id`
+BeemSpec sits at the top of this stack. It pushes structured context downstream -- to Linear for tracking, and to OpenCode for implementation. AI agents can also call back into BeemSpec during a coding session (via MCP tools) to fetch story details or report blockers.
 
-Inbound sync uses a code-defined latest-write-wins policy (newer `updated_at` wins) to keep both systems convergent.
+## Key capabilities
 
-Manual sync backfill endpoint:
+- **Story map management**: activities, tasks, stories, and release slicing with full drag-and-drop
+- **Structured story specs**: requirements, acceptance criteria, design links, edge cases, and technical notes
+- **Build runs**: trigger AI coding sessions for an entire release or a single story, monitor progress, retry failures
+- **Linear integration**: bidirectional sync with OAuth, webhook ingestion, and batch backfill for drift correction
+- **OpenCode integration**: session creation, context seeding, MCP server for agent-to-app communication
+- **Team collaboration**: authentication, team switching, member invites, role-based access
+- **MCP server**: exposes tools for AI agents to load story context and report blockers during implementation
 
-- `POST /api/integrations/linear/sync`
-- body: `{ "story_id": "<uuid>" }`
+## Tech stack
 
-Batch sync backfill endpoint (for lightweight periodic drift correction):
+- **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS, Radix UI, dnd-kit
+- **Backend**: Next.js API Routes, Supabase (PostgreSQL + Auth), row-level security
+- **Integrations**: Linear SDK, OpenCode SDK, MCP SDK
+- **Tooling**: Biome (lint/format), Vitest (testing)
 
-- `POST /api/integrations/linear/sync/batch`
-- body: `{ "limit": 25, "older_than_minutes": 30 }` (both optional for stale-link selection)
-- optional targeted body: `{ "story_ids": ["<uuid>", "<uuid>"] }` (sync exactly these stories)
+## Documentation
 
-Batch sync supports machine-trigger auth token:
+Detailed docs live in the `docs/` directory:
 
-- `BEEMSPEC_SYNC_CRON_TOKEN`
-- call with `Authorization: Bearer <token>`
-
-Cron setup guide:
-
-- `docs/sync-cron.md`
-
-Build-run API foundation:
-
-- `POST /api/releases/:id/build`
-- `GET /api/releases/:id/runs` (supports `limit`, `offset`, optional `status`)
-- `GET /api/releases/:id/story-states` (latest run state per story)
-- `GET /api/build-runs/:id`
-- `POST /api/build-runs/:id/retry`
-- `POST /api/stories/:id/build` (single-story build)
-- `POST /api/stories/:id/build?build_run_id=:id` (append story to existing build run/session)
-- `POST /api/stories/:id/sync-linear` (manual per-story Linear sync)
-- `POST /api/build-runs/dispatch` (durable build-run queue dispatch)
-
-Terminology:
-
-- `build_runs` = user-visible build attempts and outcomes
-- `worker_jobs` = internal durable queue records for build-run execution
-
-Story map UI now includes a Build Runs panel for:
-
-- selecting a release
-- triggering `Build Release`
-- viewing recent run history and item-level details
-- retrying failed run items
-
-Build run item diagnostics include `retry_count` and `last_retry_at` for retry observability.
-
-Build run items also persist OpenCode session linkage (`opencode_session_id`, `opencode_session_url`) when OpenCode integration is enabled.
-
-OpenCode runtime session integration uses the official SDK (`@opencode-ai/sdk`) against:
-
-- `BEEMSPEC_OPENCODE_BASE_URL` (defaults to `http://127.0.0.1:4096`)
-- optional `BEEMSPEC_OPENCODE_WEB_BASE_URL` for deep-link URL generation
-- optional HTTP basic auth for password-protected OpenCode servers:
-  - `BEEMSPEC_OPENCODE_SERVER_USERNAME` (defaults to `opencode` when password is set)
-  - `BEEMSPEC_OPENCODE_SERVER_PASSWORD`
-
-OpenCode MCP endpoint:
-
-- `POST /api/mcp`
-- `GET /api/mcp`
-- `DELETE /api/mcp`
-
-Related OpenCode utility route:
-
-- `POST /api/opencode/blocked`
-
-Shared token for MCP server to app calls:
-
-- `BEEMSPEC_OPENCODE_TOKEN`
-
-Optional worker token for dispatch endpoint:
-
-- `BEEMSPEC_WORKER_TOKEN`
-
-OpenCode integration package is implemented at `packages/opencode-beemspec` for hook support. MCP tools are served from this Next app using the official MCP SDK.
-
-Quick docs:
-
-- Setup + usage: `docs/setup-and-usage.md`
-- System flow: `docs/system-flow.md`
-- OpenCode runtime rollout: `docs/opencode-runtime-rollout.md`
-- Codebase map: `docs/codebase-map.md`
-
-Inbound webhook sync requires a webhook signing secret:
-
-- `BEEMSPEC_LINEAR_WEBHOOK_SECRET`
-
-Webhook endpoint:
-
-- `POST /api/integrations/linear/webhook`
-
-Implementation note: Linear outbound integration uses the official SDK (`@linear/sdk`) for issue read/create/update operations.
+- `docs/setup-and-usage.md`: setup and usage guide
+- `docs/system-flow.md`: end-to-end system flow
+- `docs/opencode-runtime-rollout.md`: OpenCode runtime integration details
+- `docs/codebase-map.md`: codebase architecture and reading guide
+- `docs/sync-cron.md`: Linear sync cron setup
