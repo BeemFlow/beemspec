@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Settings } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { use, useCallback, useEffect, useState } from 'react';
 import { ActivityDialog } from '@/components/story-map/ActivityDialog';
@@ -46,11 +46,42 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   const [storyMap, setStoryMap] = useState<StoryMapFull | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [uiError, setUiError] = useState<string | null>(null);
+  const [uiNotice, setUiNotice] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogState>(CLOSED);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [syncingLinear, setSyncingLinear] = useState(false);
 
   async function request(input: RequestInfo | URL, init: RequestInit | undefined, fallback: string) {
     await fetchJson(input, init, fallback);
+  }
+
+  async function handleSyncLinear() {
+    setSyncingLinear(true);
+    setUiError(null);
+    setUiNotice(null);
+
+    try {
+      const result = await fetchJson<{ considered: number; succeeded: number; failed: number }>(
+        `/api/story-maps/${id}/integrations/linear/sync`,
+        {
+          method: 'POST',
+        },
+        'Failed to sync story map with Linear',
+      );
+
+      if (result.failed > 0) {
+        setUiError(
+          `Linear sync completed with ${result.failed} failures (${result.succeeded}/${result.considered} succeeded).`,
+        );
+      } else {
+        setUiNotice(`Linear sync complete: ${result.succeeded}/${result.considered} stories synced.`);
+      }
+      loadStoryMap();
+    } catch (err) {
+      setUiError(errorMessage(err));
+    } finally {
+      setSyncingLinear(false);
+    }
   }
 
   const loadStoryMap = useCallback(async () => {
@@ -366,12 +397,25 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
           </Button>
         </Link>
         <h1 className="truncate text-base font-semibold sm:text-xl">{storyMap.name}</h1>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleSyncLinear} disabled={syncingLinear}>
+            <RefreshCw className={`mr-1 h-4 w-4 ${syncingLinear ? 'animate-spin' : ''}`} />
+            Sync
+          </Button>
           <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Story map settings">
             <Settings className="h-4 w-4" />
           </Button>
         </div>
       </header>
+
+      {uiNotice && (
+        <div className="mx-4 mt-3 flex items-center justify-between rounded-md border border-emerald-300/60 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <span>{uiNotice}</span>
+          <Button size="sm" variant="ghost" onClick={() => setUiNotice(null)}>
+            Dismiss
+          </Button>
+        </div>
+      )}
 
       {uiError && (
         <div className="mx-4 mt-3 flex items-center justify-between rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
