@@ -106,7 +106,7 @@ function createWebhookAdminClient(
 describe('linear webhook route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.BEEMSPEC_LINEAR_WEBHOOK_SECRET = 'webhook_secret';
+    process.env.LINEAR_WEBHOOK_SECRET = 'webhook_secret';
     vi.mocked(getLinearWebhookIngest).mockReturnValue({
       parseAndValidate: ({ rawBody, headers }) => parseLinearWebhookEvent(rawBody, headers),
     });

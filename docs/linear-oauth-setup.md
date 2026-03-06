@@ -23,7 +23,7 @@ Set the following environment variables in your app runtime:
 
 Optional but recommended for webhook writeback verification:
 
-- `BEEMSPEC_LINEAR_WEBHOOK_SECRET`
+- `LINEAR_WEBHOOK_SECRET`
 
 ## 3) Connect from Team Settings
 
