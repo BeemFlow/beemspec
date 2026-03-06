@@ -11,8 +11,28 @@ function getString(value: unknown, key: string): string {
 }
 
 function parseTimestampMs(timestamp: string): number | null {
-  const value = Date.parse(timestamp);
+  const trimmed = timestamp.trim();
+  if (/^\d+$/.test(trimmed)) {
+    const numeric = Number(trimmed);
+    if (!Number.isFinite(numeric) || numeric <= 0) return null;
+    return numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
+  }
+
+  const value = Date.parse(trimmed);
   return Number.isFinite(value) ? value : null;
+}
+
+function getWebhookTimestamp(value: unknown): string {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return String(Math.floor(value));
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+
+  throw new Error('Invalid Linear webhook payload: missing webhookTimestamp');
 }
 
 function parseSignatureCandidates(signatureHeader: string): string[] {
@@ -57,7 +77,7 @@ export function parseLinearWebhookEvent(rawBody: string, headers: Headers): Webh
   const type = getString(record.type, 'type');
   const action = getString(record.action, 'action');
   const createdAt = getString(record.createdAt, 'createdAt');
-  const webhookTimestamp = getString(record.webhookTimestamp, 'webhookTimestamp');
+  const webhookTimestamp = getWebhookTimestamp(record.webhookTimestamp);
 
   const deliveryId = headers.get('Linear-Delivery');
   const webhookId = typeof record.webhookId === 'string' ? record.webhookId : null;
