@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { env } from '@/lib/env';
 
 interface RegisteredClientPayload {
@@ -56,18 +56,6 @@ interface AuthorizationCodePayload {
   expiresAt: number;
 }
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __beemspecMcpAuthCodes: Map<string, AuthorizationCodePayload> | undefined;
-}
-
-function getCodeStore(): Map<string, AuthorizationCodePayload> {
-  if (!globalThis.__beemspecMcpAuthCodes) {
-    globalThis.__beemspecMcpAuthCodes = new Map();
-  }
-  return globalThis.__beemspecMcpAuthCodes;
-}
-
 function getSigningSecret(): string {
   const secret = env.mcpOAuthSecret();
   if (!secret) {
@@ -78,6 +66,35 @@ function getSigningSecret(): string {
 
 function signPayload(payload: string): string {
   return createHmac('sha256', getSigningSecret()).update(payload).digest('base64url');
+}
+
+function getEncryptionKey(): Buffer {
+  return createHash('sha256').update(getSigningSecret()).digest();
+}
+
+function encryptPayload(plaintext: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', getEncryptionKey(), iv);
+  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${iv.toString('base64url')}.${ciphertext.toString('base64url')}.${tag.toString('base64url')}`;
+}
+
+function decryptPayload(token: string): string | null {
+  const [ivPart, ciphertextPart, tagPart] = token.split('.');
+  if (!ivPart || !ciphertextPart || !tagPart) return null;
+
+  try {
+    const decipher = createDecipheriv('aes-256-gcm', getEncryptionKey(), Buffer.from(ivPart, 'base64url'));
+    decipher.setAuthTag(Buffer.from(tagPart, 'base64url'));
+    const plaintext = Buffer.concat([
+      decipher.update(Buffer.from(ciphertextPart, 'base64url')),
+      decipher.final(),
+    ]).toString('utf8');
+    return plaintext;
+  } catch {
+    return null;
+  }
 }
 
 function encodeSignedObject(input: unknown): string {
@@ -141,8 +158,7 @@ export function issueAuthorizationCode(input: {
   userId: string;
   refreshToken: string;
 }): string {
-  const code = `mcpc_${randomUUID().replaceAll('-', '')}`;
-  getCodeStore().set(code, {
+  const payload: AuthorizationCodePayload = {
     clientId: input.clientId,
     redirectUri: input.redirectUri,
     codeChallenge: input.codeChallenge,
@@ -150,16 +166,24 @@ export function issueAuthorizationCode(input: {
     userId: input.userId,
     refreshToken: input.refreshToken,
     expiresAt: Date.now() + 5 * 60 * 1000,
-  });
-  return code;
+  };
+
+  const encoded = encryptPayload(JSON.stringify(payload));
+  return `mcpc_${encoded}`;
 }
 
 export function consumeAuthorizationCode(code: string): AuthorizationCodePayload | null {
-  const item = getCodeStore().get(code);
-  if (!item) return null;
-  getCodeStore().delete(code);
-  if (item.expiresAt < Date.now()) return null;
-  return item;
+  if (!code.startsWith('mcpc_')) return null;
+  const plaintext = decryptPayload(code.slice('mcpc_'.length));
+  if (!plaintext) return null;
+
+  try {
+    const item = JSON.parse(plaintext) as AuthorizationCodePayload;
+    if (item.expiresAt < Date.now()) return null;
+    return item;
+  } catch {
+    return null;
+  }
 }
 
 export function verifyPkceS256(codeVerifier: string, codeChallenge: string): boolean {
