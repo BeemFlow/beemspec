@@ -30,9 +30,9 @@ function getCodeStore(): Map<string, AuthorizationCodePayload> {
 }
 
 function getSigningSecret(): string {
-  const secret = env.mcpOAuthSecret() ?? env.supabaseSecretKey();
+  const secret = env.mcpOAuthSecret();
   if (!secret) {
-    throw new Error('Missing BEEMSPEC_MCP_OAUTH_SECRET or SUPABASE_SECRET_KEY for MCP OAuth signing');
+    throw new Error('Missing BEEMSPEC_MCP_OAUTH_SECRET for MCP OAuth signing');
   }
   return secret;
 }

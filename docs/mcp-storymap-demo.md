@@ -9,8 +9,10 @@ Set these env vars for the BeemSpec app:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SECRET_KEY`
+- `BEEMSPEC_MCP_OAUTH_SECRET`
 
 MCP authentication uses a user OAuth access token (Supabase Auth), not a shared static token.
+Use a dedicated `BEEMSPEC_MCP_OAUTH_SECRET` value for MCP OAuth signing (do not reuse `SUPABASE_SECRET_KEY`).
 
 ## 2) Start BeemSpec
 
