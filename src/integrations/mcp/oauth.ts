@@ -7,7 +7,7 @@ interface RegisteredClientPayload {
   issued_at: number;
 }
 
-function normalizeRedirectUri(uri: string): string | null {
+export function normalizeMcpRedirectUri(uri: string): string | null {
   try {
     const parsed = new URL(uri);
     parsed.hash = '';
@@ -37,13 +37,20 @@ function normalizeRedirectUri(uri: string): string | null {
 function redirectUriMatches(allowed: string[], requested: string): boolean {
   if (allowed.includes(requested)) return true;
 
-  const normalizedRequested = normalizeRedirectUri(requested);
+  const normalizedRequested = normalizeMcpRedirectUri(requested);
   if (!normalizedRequested) return false;
 
   return allowed.some((uri) => {
-    const normalizedAllowed = normalizeRedirectUri(uri);
+    const normalizedAllowed = normalizeMcpRedirectUri(uri);
     return normalizedAllowed !== null && normalizedAllowed === normalizedRequested;
   });
+}
+
+export function isSameMcpRedirectUri(a: string, b: string): boolean {
+  if (a === b) return true;
+  const normalizedA = normalizeMcpRedirectUri(a);
+  const normalizedB = normalizeMcpRedirectUri(b);
+  return normalizedA !== null && normalizedB !== null && normalizedA === normalizedB;
 }
 
 interface AuthorizationCodePayload {

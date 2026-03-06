@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { consumeAuthorizationCode, verifyPkceS256 } from '@/integrations/mcp/oauth';
+import { consumeAuthorizationCode, isSameMcpRedirectUri, verifyPkceS256 } from '@/integrations/mcp/oauth';
 import { refreshSupabaseAccessToken } from '@/lib/supabase/token';
 
 export const runtime = 'nodejs';
@@ -30,7 +30,7 @@ async function handleAuthorizationCodeGrant(form: FormData) {
     return tokenError('invalid_grant', 'Authorization code is invalid or expired');
   }
 
-  if (record.clientId !== clientId || record.redirectUri !== redirectUri) {
+  if (record.clientId !== clientId || !isSameMcpRedirectUri(record.redirectUri, redirectUri)) {
     return tokenError('invalid_grant', 'Client or redirect mismatch');
   }
 
