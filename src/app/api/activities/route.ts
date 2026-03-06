@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { validateRequest } from '@/lib/validations';
+import { createActivity, reorderActivities } from '@/storymap/service';
 
 export async function PUT(request: Request) {
   const auth = await requireAuth();
@@ -13,10 +14,7 @@ export async function PUT(request: Request) {
   if (!validation.success) return validation.response;
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc('reorder_activities', {
-    p_story_map_id: validation.data.story_map_id,
-    p_order: validation.data.order,
-  });
+  const { error } = await reorderActivities(supabase, validation.data);
 
   if (error) {
     return serverErrorResponse('Failed to reorder activities', error);
@@ -32,15 +30,7 @@ export async function POST(request: Request) {
   if (!validation.success) return validation.response;
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('activities')
-    .insert({
-      story_map_id: validation.data.story_map_id,
-      name: validation.data.name,
-      description: validation.data.description ?? null,
-    })
-    .select()
-    .single();
+  const { data, error } = await createActivity(supabase, validation.data);
 
   if (error) {
     return serverErrorResponse('Failed to create activity', error);

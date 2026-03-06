@@ -40,7 +40,7 @@ BeemSpec sits at the top of this stack. It pushes structured context downstream 
 - **Linear integration**: bidirectional sync with OAuth, webhook ingestion, and batch backfill for drift correction
 - **OpenCode integration**: session creation, context seeding, MCP server for agent-to-app communication
 - **Team collaboration**: authentication, team switching, member invites, role-based access
-- **MCP server**: exposes tools for AI agents to load story context and report blockers during implementation
+- **MCP server**: exposes end-to-end story map management tools (maps, activities, tasks, releases, stories, personas) plus story context and blocker reporting for coding agents
 
 ## Tech stack
 
@@ -58,3 +58,4 @@ Detailed docs live in the `docs/` directory:
 - `docs/opencode-runtime-rollout.md`: OpenCode runtime integration details
 - `docs/codebase-map.md`: codebase architecture and reading guide
 - `docs/sync-cron.md`: Linear sync cron setup
+- `docs/mcp-storymap-demo.md`: MCP setup and story map management demo flow

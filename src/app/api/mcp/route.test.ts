@@ -1,45 +1,61 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { handleOpenCodeMcpRequest } from '@/integrations/opencode/mcp-server';
+import { authenticateMcpRequest } from '@/integrations/mcp/auth';
+import { handleMcpRequest } from '@/integrations/mcp/server';
 import { GET, POST } from './route';
 
-vi.mock('@/integrations/opencode/mcp-server', () => ({
-  handleOpenCodeMcpRequest: vi.fn(),
+const mockSupabase = {} as never;
+
+vi.mock('@/integrations/mcp/auth', () => ({
+  authenticateMcpRequest: vi.fn(),
+}));
+
+vi.mock('@/integrations/mcp/server', () => ({
+  handleMcpRequest: vi.fn(),
 }));
 
 describe('mcp route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.BEEMSPEC_OPENCODE_TOKEN;
-    vi.mocked(handleOpenCodeMcpRequest).mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.mocked(authenticateMcpRequest).mockResolvedValue({
+      ok: true,
+      user: { id: 'user-1', email: 'user@example.com' },
+      supabase: mockSupabase,
+    });
+    vi.mocked(handleMcpRequest).mockResolvedValue(new Response('{}', { status: 200 }));
   });
 
-  it('allows requests when token is not configured', async () => {
+  it('allows requests when bearer auth succeeds', async () => {
     const response = await GET(new Request('http://localhost/api/mcp', { method: 'GET' }));
 
-    expect(handleOpenCodeMcpRequest).toHaveBeenCalled();
+    expect(handleMcpRequest).toHaveBeenCalled();
     expect(response.status).toBe(200);
   });
 
-  it('returns 401 when token is configured and missing', async () => {
-    process.env.BEEMSPEC_OPENCODE_TOKEN = 'token_123';
+  it('returns 401 when auth fails', async () => {
+    vi.mocked(authenticateMcpRequest).mockResolvedValue({
+      ok: false,
+      response: new Response('{"error":"Unauthorized"}', { status: 401 }),
+    });
 
     const response = await POST(new Request('http://localhost/api/mcp', { method: 'POST' }));
 
-    expect(handleOpenCodeMcpRequest).not.toHaveBeenCalled();
+    expect(handleMcpRequest).not.toHaveBeenCalled();
     expect(response.status).toBe(401);
   });
 
-  it('accepts bearer token when configured', async () => {
-    process.env.BEEMSPEC_OPENCODE_TOKEN = 'token_123';
-
+  it('passes authenticated supabase client into MCP handler', async () => {
     const response = await POST(
       new Request('http://localhost/api/mcp', {
         method: 'POST',
-        headers: { authorization: 'Bearer token_123' },
+        headers: { authorization: 'Bearer user-token' },
       }),
     );
 
-    expect(handleOpenCodeMcpRequest).toHaveBeenCalled();
+    expect(authenticateMcpRequest).toHaveBeenCalled();
+    expect(handleMcpRequest).toHaveBeenCalledWith(expect.any(Request), mockSupabase, {
+      id: 'user-1',
+      email: 'user@example.com',
+    });
     expect(response.status).toBe(200);
   });
 });

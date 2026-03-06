@@ -45,6 +45,10 @@ export const env = {
     return readEnv('BEEMSPEC_OPENCODE_BASE_URL') ?? 'http://127.0.0.1:4096';
   },
 
+  mcpOAuthSecret(): string | null {
+    return readEnv('BEEMSPEC_MCP_OAUTH_SECRET');
+  },
+
   openCodeServerUsername(): string | null {
     return readEnv('BEEMSPEC_OPENCODE_SERVER_USERNAME') ?? readEnv('OPENCODE_SERVER_USERNAME');
   },

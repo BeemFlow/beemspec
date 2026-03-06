@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { validateRequest } from '@/lib/validations';
+import { createPersona } from '@/storymap/service';
 
 export async function POST(request: Request) {
   const auth = await requireAuth();
@@ -13,16 +14,7 @@ export async function POST(request: Request) {
   if (!validation.success) return validation.response;
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('personas')
-    .insert({
-      story_map_id: validation.data.story_map_id,
-      name: validation.data.name,
-      description: validation.data.description ?? null,
-      goals: validation.data.goals ?? null,
-    })
-    .select()
-    .single();
+  const { data, error } = await createPersona(supabase, validation.data);
 
   if (error) {
     return serverErrorResponse('Failed to create persona', error);

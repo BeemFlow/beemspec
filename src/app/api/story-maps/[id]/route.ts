@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
-import { invalidIdResponse, isValidUuid, pickDefined, validateRequest } from '@/lib/validations';
+import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
+import { deleteStoryMap, getStoryMapGraph, updateStoryMap } from '@/storymap/service';
 import type { StoryMapFull } from '@/types';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -15,17 +16,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
   const supabase = await createClient();
 
-  const [mapResult, activitiesResult, releasesResult] = await Promise.all([
-    supabase.from('story_maps').select('*').eq('id', id).single(),
-    supabase
-      .from('activities')
-      .select(`*, tasks(*, stories(*))`)
-      .eq('story_map_id', id)
-      .order('sort_order')
-      .order('sort_order', { referencedTable: 'tasks' })
-      .order('sort_order', { referencedTable: 'tasks.stories' }),
-    supabase.from('releases').select('*').eq('story_map_id', id).order('sort_order'),
-  ]);
+  const { mapResult, activitiesResult, releasesResult } = await getStoryMapGraph(supabase, id);
 
   // Check main map first
   if (mapResult.error) {
@@ -62,12 +53,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!validation.success) return validation.response;
 
   const supabase = await createClient();
-  const updateData = {
-    ...pickDefined(validation.data),
-    updated_at: new Date().toISOString(),
-  };
-
-  const { data, error } = await supabase.from('story_maps').update(updateData).eq('id', id).select().single();
+  const { data, error } = await updateStoryMap(supabase, id, validation.data);
 
   if (error) {
     if (error.code === DbErrorCode.NOT_FOUND) {
@@ -86,7 +72,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   if (!isValidUuid(id)) return invalidIdResponse();
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from('story_maps').delete().eq('id', id).select().single();
+  const { data, error } = await deleteStoryMap(supabase, id);
 
   if (error) {
     if (error.code === DbErrorCode.NOT_FOUND) {

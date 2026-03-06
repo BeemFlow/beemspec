@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
-import { invalidIdResponse, isValidUuid, pickDefined, validateRequest } from '@/lib/validations';
+import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
+import { deleteRelease, updateRelease } from '@/storymap/service';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
@@ -16,12 +17,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!validation.success) return validation.response;
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('releases')
-    .update(pickDefined(validation.data))
-    .eq('id', id)
-    .select()
-    .single();
+  const { data, error } = await updateRelease(supabase, id, validation.data);
 
   if (error) {
     if (error.code === DbErrorCode.NOT_FOUND) {
@@ -40,7 +36,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   if (!isValidUuid(id)) return invalidIdResponse();
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from('releases').delete().eq('id', id).select().single();
+  const { data, error } = await deleteRelease(supabase, id);
 
   if (error) {
     if (error.code === DbErrorCode.NOT_FOUND) {
