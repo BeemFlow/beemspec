@@ -7,6 +7,45 @@ interface RegisteredClientPayload {
   issued_at: number;
 }
 
+function normalizeRedirectUri(uri: string): string | null {
+  try {
+    const parsed = new URL(uri);
+    parsed.hash = '';
+
+    const isLoopback = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    if (isLoopback) {
+      parsed.hostname = '127.0.0.1';
+    }
+
+    if (
+      (parsed.protocol === 'http:' && parsed.port === '80') ||
+      (parsed.protocol === 'https:' && parsed.port === '443')
+    ) {
+      parsed.port = '';
+    }
+
+    if (parsed.pathname.length > 1) {
+      parsed.pathname = parsed.pathname.replace(/\/+$/, '');
+    }
+
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function redirectUriMatches(allowed: string[], requested: string): boolean {
+  if (allowed.includes(requested)) return true;
+
+  const normalizedRequested = normalizeRedirectUri(requested);
+  if (!normalizedRequested) return false;
+
+  return allowed.some((uri) => {
+    const normalizedAllowed = normalizeRedirectUri(uri);
+    return normalizedAllowed !== null && normalizedAllowed === normalizedRequested;
+  });
+}
+
 interface AuthorizationCodePayload {
   clientId: string;
   redirectUri: string;
@@ -89,7 +128,7 @@ export function validateRegisteredClient(
   if (!clientId.startsWith('bsmcp_')) return { valid: false, reason: 'unknown_client' };
   const payload = decodeSignedObject<RegisteredClientPayload>(clientId.slice('bsmcp_'.length));
   if (!payload) return { valid: false, reason: 'invalid_client' };
-  if (!payload.redirect_uris.includes(redirectUri)) {
+  if (!redirectUriMatches(payload.redirect_uris, redirectUri)) {
     return { valid: false, reason: 'redirect_uri_mismatch' };
   }
   return { valid: true };
