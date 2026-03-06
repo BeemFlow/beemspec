@@ -1,13 +1,13 @@
 'use client';
 
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { use, useCallback, useEffect, useState } from 'react';
 import { ActivityDialog } from '@/components/story-map/ActivityDialog';
 import { AgentKickoffPanel } from '@/components/story-map/AgentKickoffPanel';
-import { LinearSyncPanel } from '@/components/story-map/LinearSyncPanel';
 import { StoryDialog } from '@/components/story-map/StoryDialog';
 import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas';
+import { StoryMapSettingsDialog } from '@/components/story-map/StoryMapSettingsDialog';
 import { TaskDialog } from '@/components/story-map/TaskDialog';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -47,6 +47,7 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [uiError, setUiError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogState>(CLOSED);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   async function request(input: RequestInfo | URL, init: RequestInit | undefined, fallback: string) {
     await fetchJson(input, init, fallback);
@@ -365,6 +366,11 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
           </Button>
         </Link>
         <h1 className="truncate text-base font-semibold sm:text-xl">{storyMap.name}</h1>
+        <div className="ml-auto">
+          <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Story map settings">
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
       </header>
 
       {uiError && (
@@ -393,11 +399,17 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
             onRefresh={loadStoryMap}
             onError={setUiError}
           />
-          <LinearSyncPanel storyMapId={storyMap.id} />
           <AgentKickoffPanel storyMapId={storyMap.id} storyMapName={storyMap.name} releases={storyMap.releases} />
         </div>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
+
+      <StoryMapSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        storyMapId={storyMap.id}
+        storyMapName={storyMap.name}
+      />
 
       <StoryDialog
         open={dialog.type === 'story:edit' || dialog.type === 'story:create'}

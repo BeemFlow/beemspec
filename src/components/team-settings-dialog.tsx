@@ -219,7 +219,7 @@ function LinearSettingsForm(input: {
         )}
       </div>
       <div className="space-y-2">
-        <Label>Linear project (optional)</Label>
+        <Label>Default Linear project (optional)</Label>
         {filteredProjectOptions.length > 0 ? (
           <Select
             value={input.projectId || NO_SELECTION}
@@ -227,10 +227,10 @@ function LinearSettingsForm(input: {
             disabled={!input.isOwner || input.saving || input.optionsLoading}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Use team default" />
+              <SelectValue placeholder="No default project" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NO_SELECTION}>Use team default</SelectItem>
+              <SelectItem value={NO_SELECTION}>No default project</SelectItem>
               {filteredProjectOptions.map((project) => (
                 <SelectItem key={project.id} value={project.id}>
                   {project.name}
