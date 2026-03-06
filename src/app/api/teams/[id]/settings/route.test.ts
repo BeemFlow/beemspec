@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/connections';
 import { requireAuth } from '@/lib/auth';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { getTeamRoleForUser } from '@/lib/teams';
 import { GET } from './route';

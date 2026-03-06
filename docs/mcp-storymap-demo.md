@@ -67,7 +67,7 @@ If using manual bearer mode, get a Supabase user access token for an account tha
 - Releases: `release_create`, `release_update`, `release_delete`, `release_reorder`
 - Stories: `story_get`, `story_create`, `story_update`, `story_delete`, `story_reorder`
 - Personas: `persona_list`, `persona_create`, `persona_update`, `persona_delete`
-- Agent helpers: `story_context_get`, `story_mark_blocked`
+- Agent helper: `story_context_get`
 
 ## 5) Demo flow suggestion
 
@@ -76,4 +76,4 @@ If using manual bearer mode, get a Supabase user access token for an account tha
 3. Create a new activity, task, and story.
 4. Reorder tasks or stories.
 5. Update the story status/content.
-6. Mark the story blocked with `story_mark_blocked`.
+6. If blocked, update story status/content with `story_update` and include blocker details.

@@ -89,6 +89,55 @@ export interface LinearViewerInfo {
   organizationId: string | undefined;
 }
 
+export interface LinearTeamOption {
+  id: string;
+  name: string;
+  key: string | null;
+}
+
+export interface LinearProjectOption {
+  id: string;
+  name: string;
+  teamIds: string[];
+}
+
+export interface LinearStateOption {
+  id: string;
+  name: string;
+  type: string | null;
+  teamId: string;
+}
+
+export interface LinearWorkspaceOptions {
+  organizationId: string | undefined;
+  teams: LinearTeamOption[];
+  projects: LinearProjectOption[];
+  states: LinearStateOption[];
+}
+
+interface LinearConnection<T> {
+  nodes?: Array<T | null> | null;
+}
+
+interface LinearProjectLike {
+  id?: string | null;
+  name?: string | null;
+}
+
+interface LinearStateLike {
+  id?: string | null;
+  name?: string | null;
+  type?: string | null;
+}
+
+interface LinearTeamLike {
+  id?: string | null;
+  name?: string | null;
+  key?: string | null;
+  projects?: () => Promise<LinearConnection<LinearProjectLike>>;
+  states?: () => Promise<LinearConnection<LinearStateLike>>;
+}
+
 /**
  * Fetch the authenticated user's organization from Linear.
  * Access token is injected — no env vars are read.
@@ -98,6 +147,81 @@ export async function getLinearViewerInfo(accessToken: string): Promise<LinearVi
   const viewer = await client.viewer;
   const organization = await viewer.organization;
   return { organizationId: organization?.id };
+}
+
+export async function getLinearWorkspaceOptions(accessToken: string): Promise<LinearWorkspaceOptions> {
+  const client = new LinearClient({ accessToken });
+  const viewer = await client.viewer;
+  const organization = await viewer.organization;
+
+  const teamsConnection = (await client.teams()) as unknown as LinearConnection<LinearTeamLike>;
+  const teamNodes = teamsConnection.nodes ?? [];
+
+  const teams: LinearTeamOption[] = [];
+  const projectsById = new Map<string, LinearProjectOption>();
+  const statesById = new Map<string, LinearStateOption>();
+
+  for (const node of teamNodes) {
+    const team = node as LinearTeamLike | null;
+    const teamId = typeof team?.id === 'string' ? team.id : null;
+    const teamName = typeof team?.name === 'string' ? team.name.trim() : '';
+    if (!teamId || !teamName) continue;
+
+    teams.push({
+      id: teamId,
+      name: teamName,
+      key: typeof team?.key === 'string' && team.key.trim().length > 0 ? team.key : null,
+    });
+
+    const projectsConnection = team?.projects ? await team.projects() : { nodes: [] };
+    for (const projectNode of projectsConnection.nodes ?? []) {
+      const projectId = typeof projectNode?.id === 'string' ? projectNode.id : null;
+      const projectName = typeof projectNode?.name === 'string' ? projectNode.name.trim() : '';
+      if (!projectId || !projectName) continue;
+
+      const existing = projectsById.get(projectId);
+      if (existing) {
+        if (!existing.teamIds.includes(teamId)) {
+          existing.teamIds.push(teamId);
+        }
+        continue;
+      }
+
+      projectsById.set(projectId, {
+        id: projectId,
+        name: projectName,
+        teamIds: [teamId],
+      });
+    }
+
+    const statesConnection = team?.states ? await team.states() : { nodes: [] };
+    for (const stateNode of statesConnection.nodes ?? []) {
+      const stateId = typeof stateNode?.id === 'string' ? stateNode.id : null;
+      const stateName = typeof stateNode?.name === 'string' ? stateNode.name.trim() : '';
+      if (!stateId || !stateName) continue;
+
+      if (!statesById.has(stateId)) {
+        statesById.set(stateId, {
+          id: stateId,
+          name: stateName,
+          teamId,
+          type: typeof stateNode?.type === 'string' && stateNode.type.trim().length > 0 ? stateNode.type : null,
+        });
+      }
+    }
+  }
+
+  teams.sort((a, b) => a.name.localeCompare(b.name));
+
+  const projects = [...projectsById.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const states = [...statesById.values()].sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    organizationId: organization?.id,
+    teams,
+    projects,
+    states,
+  };
 }
 
 /**

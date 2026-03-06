@@ -32,6 +32,37 @@ interface LinearOAuthConnection {
   scope: string | null;
 }
 
+interface LinearTeamOption {
+  id: string;
+  name: string;
+  key: string | null;
+}
+
+interface LinearProjectOption {
+  id: string;
+  name: string;
+  teamIds: string[];
+}
+
+interface LinearStateOption {
+  id: string;
+  name: string;
+  type: string | null;
+  teamId: string;
+}
+
+interface LinearOptionsPayload {
+  connected: boolean;
+  settings: LinearIntegrationSettings | null;
+  options: {
+    workspace_id: string | null;
+    teams: LinearTeamOption[];
+    projects: LinearProjectOption[];
+    states: LinearStateOption[];
+  };
+  applied_defaults: boolean;
+}
+
 interface TeamSettingsPayload {
   team_id: string;
   role: string;
@@ -83,6 +114,10 @@ export interface UseTeamSettingsReturn {
   linearConnected: boolean;
   linearScope: string | null;
   linearExpiresAt: string | null;
+  linearOptionsLoading: boolean;
+  linearTeamOptions: LinearTeamOption[];
+  linearProjectOptions: LinearProjectOption[];
+  linearStateOptions: LinearStateOption[];
   error: string | null;
   handleRename: (event: React.FormEvent) => Promise<void>;
   handleInvite: (event: React.FormEvent) => Promise<void>;
@@ -128,13 +163,45 @@ export function useTeamSettings({
   const [savingLinearSettings, setSavingLinearSettings] = useState(false);
   const [disconnectingLinear, setDisconnectingLinear] = useState(false);
   const [linearWorkspaceId, setLinearWorkspaceId] = useState('');
-  const [linearTeamId, setLinearTeamId] = useState('');
-  const [linearProjectId, setLinearProjectId] = useState('');
-  const [linearStateId, setLinearStateId] = useState('');
+  const [linearTeamId, setLinearTeamIdState] = useState('');
+  const [linearProjectId, setLinearProjectIdState] = useState('');
+  const [linearStateId, setLinearStateIdState] = useState('');
   const [linearConnected, setLinearConnected] = useState(false);
   const [linearScope, setLinearScope] = useState<string | null>(null);
   const [linearExpiresAt, setLinearExpiresAt] = useState<string | null>(null);
+  const [linearOptionsLoading, setLinearOptionsLoading] = useState(false);
+  const [linearTeamOptions, setLinearTeamOptions] = useState<LinearTeamOption[]>([]);
+  const [linearProjectOptions, setLinearProjectOptions] = useState<LinearProjectOption[]>([]);
+  const [linearStateOptions, setLinearStateOptions] = useState<LinearStateOption[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const loadLinearOptions = useCallback(async (inputTeamId: string) => {
+    setLinearOptionsLoading(true);
+    try {
+      const data = await fetchJson<LinearOptionsPayload>(
+        `/api/teams/${inputTeamId}/integrations/linear/options`,
+        undefined,
+        'Failed to fetch Linear options',
+      );
+
+      setLinearWorkspaceId(asInputValue(data.settings?.linear_workspace_id ?? data.options.workspace_id));
+      setLinearTeamIdState(asInputValue(data.settings?.linear_team_id));
+      setLinearProjectIdState(asInputValue(data.settings?.linear_project_id));
+      setLinearStateIdState(asInputValue(data.settings?.linear_state_id));
+
+      setLinearTeamOptions(data.options.teams ?? []);
+      setLinearProjectOptions(data.options.projects ?? []);
+      setLinearStateOptions(data.options.states ?? []);
+
+      if (data.applied_defaults) {
+        setLinearStatus({ type: 'success', message: 'Linear defaults configured automatically' });
+      }
+    } catch (err) {
+      setLinearStatus({ type: 'error', message: errorMessage(err) });
+    } finally {
+      setLinearOptionsLoading(false);
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     if (!teamId) return;
@@ -152,18 +219,28 @@ export function useTeamSettings({
       setMembers(data.members ?? []);
       setInvites(data.invites ?? []);
       setLinearWorkspaceId(asInputValue(data.linear.settings?.linear_workspace_id));
-      setLinearTeamId(asInputValue(data.linear.settings?.linear_team_id));
-      setLinearProjectId(asInputValue(data.linear.settings?.linear_project_id));
-      setLinearStateId(asInputValue(data.linear.settings?.linear_state_id));
+      setLinearTeamIdState(asInputValue(data.linear.settings?.linear_team_id));
+      setLinearProjectIdState(asInputValue(data.linear.settings?.linear_project_id));
+      setLinearStateIdState(asInputValue(data.linear.settings?.linear_state_id));
       setLinearConnected(Boolean(data.linear.connection.connected));
       setLinearScope(data.linear.connection.scope ?? null);
       setLinearExpiresAt(data.linear.connection.expires_at ?? null);
+      if (!data.linear.connection.connected) {
+        setLinearTeamOptions([]);
+        setLinearProjectOptions([]);
+        setLinearStateOptions([]);
+      }
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setLoading(false);
     }
   }, [teamId]);
+
+  useEffect(() => {
+    if (!open || activeTab !== 'integrations' || !teamId || !isOwner || !linearConnected) return;
+    loadLinearOptions(teamId);
+  }, [activeTab, isOwner, linearConnected, loadLinearOptions, open, teamId]);
 
   useEffect(() => {
     if (open && teamId) {
@@ -330,12 +407,39 @@ export function useTeamSettings({
         'Failed to save Linear settings',
       );
       await loadData();
+      await loadLinearOptions(teamId);
       setLinearStatus({ type: 'success', message: 'Linear settings saved' });
     } catch (err) {
       setLinearStatus({ type: 'error', message: errorMessage(err) });
     } finally {
       setSavingLinearSettings(false);
     }
+  }
+
+  function setLinearTeamId(value: string) {
+    setLinearTeamIdState(value);
+
+    setLinearProjectIdState((current) => {
+      if (!current) return current;
+      const project = linearProjectOptions.find((item) => item.id === current);
+      if (!project || project.teamIds.includes(value)) return current;
+      return '';
+    });
+
+    setLinearStateIdState((current) => {
+      if (!current) return current;
+      const state = linearStateOptions.find((item) => item.id === current);
+      if (!state || state.teamId === value) return current;
+      return '';
+    });
+  }
+
+  function setLinearProjectId(value: string) {
+    setLinearProjectIdState(value);
+  }
+
+  function setLinearStateId(value: string) {
+    setLinearStateIdState(value);
   }
 
   async function handleDeleteTeam() {
@@ -387,6 +491,10 @@ export function useTeamSettings({
     linearConnected,
     linearScope,
     linearExpiresAt,
+    linearOptionsLoading,
+    linearTeamOptions,
+    linearProjectOptions,
+    linearStateOptions,
     error,
     handleRename,
     handleInvite,

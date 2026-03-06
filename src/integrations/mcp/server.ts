@@ -19,7 +19,6 @@ import {
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
-import { markStoryBlocked } from '@/build-runs/processor';
 import type { AuthenticatedUser } from '@/lib/auth';
 import { DbErrorCode } from '@/lib/errors';
 import type { Supabase } from '@/lib/supabase/types';
@@ -248,7 +247,8 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     'storymap_workflow_guide',
     {
       title: 'Story Map Workflow Guide',
-      description: 'Read-first guide for agents. Use this to plan minimal tool calls before editing a story map.',
+      description:
+        'CALL THIS FIRST BEFORE TOUCHING THE STORYMAP. Read-first guide for agents to plan minimal tool calls before any edits.',
       annotations: readAnnotations,
     },
     withToolErrorBoundary('storymap_workflow_guide', async () => {
@@ -873,29 +873,6 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       }
 
       return successResult(context);
-    }),
-  );
-
-  server.registerTool(
-    'story_mark_blocked',
-    {
-      title: 'Mark Story Blocked',
-      description: 'Set story as blocked with a clear reason during implementation handoff or execution.',
-      inputSchema: {
-        story_id: z.string().uuid().describe('BeemSpec story UUID'),
-        reason: z.string().min(1).max(2000).describe('Blocked reason'),
-      },
-      annotations: mutateAnnotations,
-    },
-    withToolErrorBoundary('story_mark_blocked', async ({ story_id, reason }) => {
-      const supabase = createAdminClient();
-      const result = await markStoryBlocked(supabase, { storyId: story_id, reason });
-
-      if (!result.ok) {
-        return errorResult(result.error, { status: result.status });
-      }
-
-      return successResult({ blocked: true });
     }),
   );
 

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { loadStoryWithStoryMap } from '@/build-runs/processor';
 import { isLinearSyncAvailableForStoryMap } from '@/integrations/linear/auth';
 import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
@@ -7,6 +6,7 @@ import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
+import { loadStoryWithStoryMap } from '@/storymap/story-context';
 
 export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();

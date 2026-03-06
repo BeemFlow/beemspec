@@ -3,15 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "BeemSpec OpenCode session management, prompt building, and plugin hooks",
+  "description": "BeemSpec MCP context mapping and OpenCode compaction plugin",
   "main": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
     "./runtime": "./src/runtime.ts"
   },
   "peerDependencies": {
-    "@opencode-ai/plugin": "^1.2.6",
-    "@opencode-ai/sdk": "^1.2.6",
-    "zod": "^4.3.3"
+    "@opencode-ai/plugin": "^1.2.6"
   }
 }

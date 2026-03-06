@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { use, useCallback, useEffect, useState } from 'react';
 import { ActivityDialog } from '@/components/story-map/ActivityDialog';
-import { BuildRunsPanel } from '@/components/story-map/BuildRunsPanel';
+import { AgentKickoffPanel } from '@/components/story-map/AgentKickoffPanel';
 import { StoryDialog } from '@/components/story-map/StoryDialog';
 import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas';
 import { TaskDialog } from '@/components/story-map/TaskDialog';
@@ -392,7 +392,7 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
             onRefresh={loadStoryMap}
             onError={setUiError}
           />
-          <BuildRunsPanel releases={storyMap.releases} onError={setUiError} />
+          <AgentKickoffPanel storyMapId={storyMap.id} storyMapName={storyMap.name} releases={storyMap.releases} />
         </div>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>

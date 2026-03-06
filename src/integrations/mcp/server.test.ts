@@ -80,7 +80,7 @@ describe('mcp server', () => {
     expect(toolNames.has('story_create')).toBe(true);
     expect(toolNames.has('persona_create')).toBe(true);
     expect(toolNames.has('story_context_get')).toBe(true);
-    expect(toolNames.has('story_mark_blocked')).toBe(true);
+    expect(toolNames.has('story_mark_blocked')).toBe(false);
     expect(toolNames.has('story')).toBe(false);
     expect(toolNames.has('blocked')).toBe(false);
   });

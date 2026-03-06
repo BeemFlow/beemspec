@@ -1,10 +1,10 @@
 import { mapStoryToLinearIssueInput } from '@beemspec/linear';
-import { loadStoryWithStoryMap } from '@/build-runs/processor';
 import { resolveLinearSyncContextForStoryMap } from '@/integrations/linear/auth';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import type { IssueSync } from '@/integrations/sync';
 import { syncStoryToRemote } from '@/integrations/sync';
 import type { Supabase } from '@/lib/supabase/types';
+import { loadStoryWithStoryMap } from '@/storymap/story-context';
 
 export async function processStoryLinearSyncById(
   supabase: Supabase,

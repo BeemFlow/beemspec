@@ -2,9 +2,16 @@
 // Description formatting, status mapping, SDK client, webhook parsing,
 // and request validation for story map <-> Linear issue sync.
 
-export type { LinearClientOptions, LinearViewerInfo } from './client';
+export type {
+  LinearClientOptions,
+  LinearProjectOption,
+  LinearStateOption,
+  LinearTeamOption,
+  LinearViewerInfo,
+  LinearWorkspaceOptions,
+} from './client';
 // Client (SDK wrapper with retry/backoff)
-export { createLinearClient, getLinearViewerInfo } from './client';
+export { createLinearClient, getLinearViewerInfo, getLinearWorkspaceOptions } from './client';
 export type { ParsedLinearStoryFields } from './description';
 // Description serialize/parse
 export { buildLinearDescription, mapStoryToLinearIssueInput, parseLinearDescriptionToStoryFields } from './description';

@@ -37,32 +37,8 @@ export const env = {
     return readEnv('BEEMSPEC_LINEAR_WEBHOOK_SECRET');
   },
 
-  openCodeToken(): string | null {
-    return readEnv('BEEMSPEC_OPENCODE_TOKEN');
-  },
-
-  openCodeBaseUrl(): string {
-    return readEnv('BEEMSPEC_OPENCODE_BASE_URL') ?? 'http://127.0.0.1:4096';
-  },
-
   mcpOAuthSecret(): string | null {
     return readEnv('BEEMSPEC_MCP_OAUTH_SECRET');
-  },
-
-  openCodeServerUsername(): string | null {
-    return readEnv('BEEMSPEC_OPENCODE_SERVER_USERNAME') ?? readEnv('OPENCODE_SERVER_USERNAME');
-  },
-
-  openCodeServerPassword(): string | null {
-    return readEnv('BEEMSPEC_OPENCODE_SERVER_PASSWORD') ?? readEnv('OPENCODE_SERVER_PASSWORD');
-  },
-
-  openCodeWebBaseUrl(): string | null {
-    return readEnv('BEEMSPEC_OPENCODE_WEB_BASE_URL');
-  },
-
-  openCodeWorkingDirectory(): string | null {
-    return readEnv('BEEMSPEC_OPENCODE_WORKING_DIRECTORY');
   },
 
   syncCronToken(): string | null {

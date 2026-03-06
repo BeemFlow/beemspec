@@ -2,6 +2,7 @@ import { getLinearViewerInfo } from '@beemspec/linear';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { toExpiresAt, upsertLinearOAuthConnection } from '@/integrations/linear/connections';
+import { applySuggestedLinearSettings, resolveLinearOptions } from '@/integrations/linear/discovery';
 import { OAUTH_STATE_COOKIE, parseStateCookie } from '@/integrations/linear/oauth';
 import { exchangeLinearOAuthCode } from '@/integrations/linear/oauth-token';
 import { requireAuth } from '@/lib/auth';
@@ -64,10 +65,34 @@ export async function GET(request: Request) {
       expiresAt: toExpiresAt(token.expiresIn),
       userId: auth.user.id,
     });
+
+    const { data: current } = await admin
+      .from('integration_settings')
+      .select('linear_workspace_id, linear_team_id, linear_project_id, linear_state_id')
+      .eq('team_id', cookie.teamId)
+      .maybeSingle();
+
+    const workspaceOptions = await resolveLinearOptions(token.accessToken).catch(() => null);
+    const suggested = workspaceOptions
+      ? applySuggestedLinearSettings(
+          {
+            linearWorkspaceId: current?.linear_workspace_id ?? viewerInfo.organizationId ?? null,
+            linearTeamId: current?.linear_team_id ?? null,
+            linearProjectId: current?.linear_project_id ?? null,
+            linearStateId: current?.linear_state_id ?? null,
+          },
+          workspaceOptions,
+        )
+      : null;
+
     await admin.from('integration_settings').upsert(
       {
         team_id: cookie.teamId,
-        linear_workspace_id: viewerInfo.organizationId ?? undefined,
+        linear_workspace_id:
+          suggested?.linearWorkspaceId ?? current?.linear_workspace_id ?? viewerInfo.organizationId ?? null,
+        linear_team_id: suggested?.linearTeamId ?? current?.linear_team_id ?? null,
+        linear_project_id: suggested?.linearProjectId ?? current?.linear_project_id ?? null,
+        linear_state_id: suggested?.linearStateId ?? current?.linear_state_id ?? null,
       },
       { onConflict: 'team_id' },
     );

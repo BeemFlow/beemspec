@@ -52,8 +52,6 @@ ALTER TABLE story_linear_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE integration_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE linear_oauth_connections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE integration_webhook_receipts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE build_runs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE build_run_items ENABLE ROW LEVEL SECURITY;
 
 
 -- =============================================================================
@@ -574,76 +572,6 @@ CREATE POLICY "Team owners can delete integration settings"
   ON integration_settings FOR DELETE
   USING (is_team_owner(team_id));
 
-
--- =============================================================================
--- RLS Policies: Build Runs
--- =============================================================================
-
-CREATE POLICY "Team members can view build runs"
-  ON build_runs FOR SELECT
-  USING (EXISTS (
-    SELECT 1 FROM story_maps sm
-    WHERE sm.id = story_map_id
-      AND is_team_member(sm.team_id)
-  ));
-
-CREATE POLICY "Team members can create build runs"
-  ON build_runs FOR INSERT
-  TO authenticated
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM story_maps sm
-    WHERE sm.id = story_map_id
-      AND is_team_member(sm.team_id)
-  ));
-
-CREATE POLICY "Team members can update build runs"
-  ON build_runs FOR UPDATE
-  USING (EXISTS (
-    SELECT 1 FROM story_maps sm
-    WHERE sm.id = story_map_id
-      AND is_team_member(sm.team_id)
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM story_maps sm
-    WHERE sm.id = story_map_id
-      AND is_team_member(sm.team_id)
-  ));
-
-CREATE POLICY "Team members can view build run items"
-  ON build_run_items FOR SELECT
-  USING (EXISTS (
-    SELECT 1 FROM build_runs rr
-    JOIN story_maps sm ON sm.id = rr.story_map_id
-    WHERE rr.id = build_run_id
-      AND is_team_member(sm.team_id)
-  ));
-
-CREATE POLICY "Team members can create build run items"
-  ON build_run_items FOR INSERT
-  TO authenticated
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM build_runs rr
-    JOIN story_maps sm ON sm.id = rr.story_map_id
-    WHERE rr.id = build_run_id
-      AND is_team_member(sm.team_id)
-  ));
-
-CREATE POLICY "Team members can update build run items"
-  ON build_run_items FOR UPDATE
-  USING (EXISTS (
-    SELECT 1 FROM build_runs rr
-    JOIN story_maps sm ON sm.id = rr.story_map_id
-    WHERE rr.id = build_run_id
-      AND is_team_member(sm.team_id)
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM build_runs rr
-    JOIN story_maps sm ON sm.id = rr.story_map_id
-    WHERE rr.id = build_run_id
-      AND is_team_member(sm.team_id)
-  ));
-
-
 -- =============================================================================
 -- Auto-create Personal Team on Signup
 -- =============================================================================
@@ -696,8 +624,8 @@ AS $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.team_members
-    WHERE team_id = p_team_id
-    AND user_id = (SELECT auth.uid())
+    WHERE public.team_members.team_id = p_team_id
+    AND public.team_members.user_id = (SELECT auth.uid())
   ) THEN
     RAISE EXCEPTION 'Not authorized';
   END IF;
@@ -707,7 +635,7 @@ BEGIN
     tm.id,
     tm.user_id,
     tm.role,
-    u.email,
+    u.email::text,
     tm.created_at
   FROM public.team_members tm
   JOIN auth.users u ON u.id = tm.user_id

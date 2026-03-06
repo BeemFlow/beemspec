@@ -2,9 +2,7 @@
 
 BeemSpec OpenCode plugin package.
 
-It provides:
-
-- Session compaction hook (`experimental.session.compacting`) that fetches fresh story data from the BeemSpec API on each compaction, ensuring long-running sessions never lose or stale-serve story context
+It provides an `experimental.session.compacting` hook that pulls current story-map context through BeemSpec MCP and injects compacted context into the session.
 
 It does not inject custom tools. BeemSpec tools are served by the app's HTTP MCP endpoint (`/api/mcp`).
 
@@ -19,7 +17,7 @@ The BeemSpec MCP endpoint exposes full story map management operations:
 - Releases: create/update/delete/reorder
 - Stories: get/create/update/delete/reorder
 - Personas: list/create/update/delete
-- Build agent helpers: `story_context_get` and `story_mark_blocked`
+- Build agent helper: `story_context_get`
 
 ## Usage
 
@@ -68,6 +66,12 @@ export default BeemSpecPlugin
 Required env vars:
 
 - `BEEMSPEC_API_URL` (base URL of the BeemSpec instance, e.g. `http://127.0.0.1:3000`)
-- `BEEMSPEC_SUPABASE_ACCESS_TOKEN` (Supabase user access token for MCP Authorization header)
+- `BEEMSPEC_MCP_TOKEN` (OAuth/Bearer token accepted by `/api/mcp`)
+- `BEEMSPEC_STORY_MAP_ID` (story map UUID)
 
-The plugin calls `GET /api/opencode/sessions/:sessionId/context` on every compaction to pull the latest story data from Supabase rather than relying on a local cache.
+Optional:
+
+- `BEEMSPEC_MCP_URL` (defaults to `${BEEMSPEC_API_URL}/api/mcp`)
+- `BEEMSPEC_RELEASE_ID` (limit compaction to one release)
+
+The plugin calls MCP `tools/call` with `storymap_get` on each compaction to pull the latest story data instead of relying on local cache.

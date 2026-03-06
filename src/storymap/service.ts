@@ -16,12 +16,12 @@ import type {
   UpdateStoryMap,
   UpdateTask,
 } from '@beemspec/storymap';
-import { loadStoryWithStoryMap } from '@/build-runs/processor';
 import { isLinearSyncAvailableForStoryMap } from '@/integrations/linear/auth';
 import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
 import type { Supabase } from '@/lib/supabase/types';
 import { pickDefined } from '@/lib/validations';
+import { loadStoryWithStoryMap } from './story-context';
 
 export async function listStoryMaps(supabase: Supabase, teamId: string) {
   return supabase.from('story_maps').select('*').eq('team_id', teamId).order('updated_at', { ascending: false });

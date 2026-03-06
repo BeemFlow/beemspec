@@ -1,6 +1,6 @@
 # BeemSpec
 
-BeemSpec is the planning layer for AI-native software teams. It connects product planning directly to AI coding agents, so your team can go from story to working code without manual handoff.
+BeemSpec is the planning layer for AI-native software teams. It connects product planning directly to AI coding agents via MCP, so your team can go from story to working code without manual handoff.
 
 ## The problem
 
@@ -8,7 +8,7 @@ Product teams spend significant effort translating plans into work that develope
 
 ## What BeemSpec does
 
-BeemSpec is a **story mapping and release planning tool** that doubles as an **AI build orchestrator**. You plan your product visually, then BeemSpec feeds that context directly to an AI coding agent to start building.
+BeemSpec is a **story mapping and release planning tool** with an **agent-ready MCP surface**. You plan your product visually, then agents fetch structured context directly from BeemSpec through MCP tools.
 
 ### Plan visually with story maps
 
@@ -16,7 +16,7 @@ Lay out your product as a story map -- a grid where columns represent user activ
 
 ### Build with AI agents
 
-Click "Build Release" and BeemSpec creates an AI coding session (powered by [OpenCode](https://opencode.ai)), seeds it with full story context, and instructs the agent to start implementing. Track build progress per story, retry failures, and link back to the AI session -- all from the story map UI.
+Use the Agent Kickoff panel to copy a starter prompt, paste it into your coding agent, and have the agent pull the latest release context via MCP (`storymap_get` and `story_context_get`). This keeps execution local to the developer's agent while BeemSpec stays the shared planning source of truth.
 
 ### Stay in sync with Linear
 
@@ -28,17 +28,16 @@ BeemSpec syncs bidirectionally with [Linear](https://linear.app). Stories create
 |---|---|---|
 | **BeemSpec** | Planning source of truth | *What* to build and *why* |
 | **Linear** | Execution coordination | *When* and *who* |
-| **OpenCode** | AI implementation runtime | *How* (the code) |
+| **Coding agent** | Local execution runtime | *How* (the code) |
 
-BeemSpec sits at the top of this stack. It pushes structured context downstream -- to Linear for tracking, and to OpenCode for implementation. AI agents can also call back into BeemSpec during a coding session (via MCP tools) to fetch story details or report blockers.
+BeemSpec sits at the top of this stack. It syncs planning state to Linear and exposes MCP tools so any compatible coding agent can fetch context and report progress/blockers.
 
 ## Key capabilities
 
 - **Story map management**: activities, tasks, stories, and release slicing with full drag-and-drop
 - **Structured story specs**: requirements, acceptance criteria, design links, edge cases, and technical notes
-- **Build runs**: trigger AI coding sessions for an entire release or a single story, monitor progress, retry failures
+- **Agent kickoff prompts**: copy a release-targeted starter prompt that instructs agents to fetch current context through MCP
 - **Linear integration**: bidirectional sync with OAuth, webhook ingestion, and batch backfill for drift correction
-- **OpenCode integration**: session creation, context seeding, MCP server for agent-to-app communication
 - **Team collaboration**: authentication, team switching, member invites, role-based access
 - **MCP server**: exposes end-to-end story map management tools (maps, activities, tasks, releases, stories, personas) plus story context and blocker reporting for coding agents
 
@@ -46,16 +45,13 @@ BeemSpec sits at the top of this stack. It pushes structured context downstream 
 
 - **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS, Radix UI, dnd-kit
 - **Backend**: Next.js API Routes, Supabase (PostgreSQL + Auth), row-level security
-- **Integrations**: Linear SDK, OpenCode SDK, MCP SDK
+- **Integrations**: Linear SDK, MCP SDK
 - **Tooling**: Biome (lint/format), Vitest (testing)
 
 ## Documentation
 
 Detailed docs live in the `docs/` directory:
 
-- `docs/setup-and-usage.md`: setup and usage guide
-- `docs/system-flow.md`: end-to-end system flow
-- `docs/opencode-runtime-rollout.md`: OpenCode runtime integration details
-- `docs/codebase-map.md`: codebase architecture and reading guide
-- `docs/sync-cron.md`: Linear sync cron setup
+- `docs/linear-oauth-setup.md`: Linear OAuth app setup for multi-workspace onboarding
 - `docs/mcp-storymap-demo.md`: MCP setup and story map management demo flow
+- `docs/agent-kickoff.md`: release starter prompt and local-agent flow

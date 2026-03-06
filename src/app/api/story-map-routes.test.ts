@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadStoryWithStoryMap } from '@/build-runs/processor';
 import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { loadStoryWithStoryMap } from '@/storymap/story-context';
 import { DELETE as deleteActivityById, PUT as putActivityById } from './activities/[id]/route';
 import { POST as postActivities, PUT as putActivities } from './activities/route';
 import { DELETE as deleteReleaseById, PUT as putReleaseById } from './releases/[id]/route';
@@ -21,7 +21,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }));
 
-vi.mock('@/build-runs/processor', () => ({
+vi.mock('@/storymap/story-context', () => ({
   loadStoryWithStoryMap: vi.fn(),
 }));
 

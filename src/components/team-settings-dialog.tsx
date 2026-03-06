@@ -8,6 +8,7 @@ import { DeleteButton } from '@/components/ui/delete-button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -44,6 +45,10 @@ interface TeamIntegrationsTabProps {
   linearTeamId: string;
   linearProjectId: string;
   linearStateId: string;
+  linearOptionsLoading: boolean;
+  linearTeamOptions: Array<{ id: string; name: string; key: string | null }>;
+  linearProjectOptions: Array<{ id: string; name: string; teamIds: string[] }>;
+  linearStateOptions: Array<{ id: string; name: string; type: string | null; teamId: string }>;
   savingLinearSettings: boolean;
   disconnectingLinear: boolean;
   linearStatus: LinearStatus;
@@ -158,12 +163,24 @@ function LinearSettingsForm(input: {
   teamId: string;
   projectId: string;
   stateId: string;
+  optionsLoading: boolean;
+  teamOptions: Array<{ id: string; name: string; key: string | null }>;
+  projectOptions: Array<{ id: string; name: string; teamIds: string[] }>;
+  stateOptions: Array<{ id: string; name: string; type: string | null; teamId: string }>;
   saving: boolean;
   onSave: (event: React.FormEvent) => Promise<void>;
   onTeamIdChange: (value: string) => void;
   onProjectIdChange: (value: string) => void;
   onStateIdChange: (value: string) => void;
 }) {
+  const NO_SELECTION = '__none__';
+  const filteredProjectOptions = input.projectOptions.filter((project) =>
+    input.teamId ? project.teamIds.includes(input.teamId) : true,
+  );
+  const filteredStateOptions = input.stateOptions.filter((state) =>
+    input.teamId ? state.teamId === input.teamId : true,
+  );
+
   return (
     <form onSubmit={input.onSave} className="space-y-3">
       <div className="space-y-2">
@@ -171,35 +188,99 @@ function LinearSettingsForm(input: {
         <Input id="linear-workspace-id" value={input.workspaceId} disabled readOnly />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="linear-team-id">Linear team ID</Label>
-        <Input
-          id="linear-team-id"
-          value={input.teamId}
-          onChange={(event) => input.onTeamIdChange(event.target.value)}
-          disabled={!input.isOwner || input.saving}
-          placeholder="e.g. 8f4e0f2b-..."
-        />
+        <Label>Linear team</Label>
+        {input.teamOptions.length > 0 ? (
+          <Select
+            value={input.teamId || NO_SELECTION}
+            onValueChange={(value) => input.onTeamIdChange(value === NO_SELECTION ? '' : value)}
+            disabled={!input.isOwner || input.saving || input.optionsLoading}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Choose a Linear team" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_SELECTION}>No team selected</SelectItem>
+              {input.teamOptions.map((team) => (
+                <SelectItem key={team.id} value={team.id}>
+                  {team.name}
+                  {team.key ? ` (${team.key})` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Input
+            id="linear-team-id"
+            value={input.teamId}
+            onChange={(event) => input.onTeamIdChange(event.target.value)}
+            disabled={!input.isOwner || input.saving}
+            placeholder="Paste a Linear team ID"
+          />
+        )}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="linear-project-id">Linear project ID (optional)</Label>
-        <Input
-          id="linear-project-id"
-          value={input.projectId}
-          onChange={(event) => input.onProjectIdChange(event.target.value)}
-          disabled={!input.isOwner || input.saving}
-        />
+        <Label>Linear project (optional)</Label>
+        {filteredProjectOptions.length > 0 ? (
+          <Select
+            value={input.projectId || NO_SELECTION}
+            onValueChange={(value) => input.onProjectIdChange(value === NO_SELECTION ? '' : value)}
+            disabled={!input.isOwner || input.saving || input.optionsLoading}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Use team default" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_SELECTION}>Use team default</SelectItem>
+              {filteredProjectOptions.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Input
+            id="linear-project-id"
+            value={input.projectId}
+            onChange={(event) => input.onProjectIdChange(event.target.value)}
+            disabled={!input.isOwner || input.saving}
+            placeholder="Optional project ID"
+          />
+        )}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="linear-state-id">Linear state ID (optional)</Label>
-        <Input
-          id="linear-state-id"
-          value={input.stateId}
-          onChange={(event) => input.onStateIdChange(event.target.value)}
-          disabled={!input.isOwner || input.saving}
-        />
+        <Label>Linear state (optional)</Label>
+        {filteredStateOptions.length > 0 ? (
+          <Select
+            value={input.stateId || NO_SELECTION}
+            onValueChange={(value) => input.onStateIdChange(value === NO_SELECTION ? '' : value)}
+            disabled={!input.isOwner || input.saving || input.optionsLoading}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Use team default" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_SELECTION}>Use team default</SelectItem>
+              {filteredStateOptions.map((state) => (
+                <SelectItem key={state.id} value={state.id}>
+                  {state.name}
+                  {state.type ? ` (${state.type})` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Input
+            id="linear-state-id"
+            value={input.stateId}
+            onChange={(event) => input.onStateIdChange(event.target.value)}
+            disabled={!input.isOwner || input.saving}
+            placeholder="Optional state ID"
+          />
+        )}
       </div>
       {input.isOwner && (
-        <Button type="submit" disabled={input.saving}>
+        <Button type="submit" disabled={input.saving || !input.teamId.trim()}>
           {input.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Linear settings'}
         </Button>
       )}
@@ -216,6 +297,10 @@ function TeamIntegrationsTab({
   linearTeamId,
   linearProjectId,
   linearStateId,
+  linearOptionsLoading,
+  linearTeamOptions,
+  linearProjectOptions,
+  linearStateOptions,
   savingLinearSettings,
   disconnectingLinear,
   linearStatus,
@@ -231,7 +316,7 @@ function TeamIntegrationsTab({
       <div className="space-y-1">
         <h3 className="text-sm font-medium">Linear Integration</h3>
         <p className="text-sm text-muted-foreground">
-          Connect a team-scoped Linear OAuth account and configure default target IDs.
+          Connect a team-scoped Linear OAuth account and choose default targets.
         </p>
       </div>
 
@@ -251,6 +336,10 @@ function TeamIntegrationsTab({
         teamId={linearTeamId}
         projectId={linearProjectId}
         stateId={linearStateId}
+        optionsLoading={linearOptionsLoading}
+        teamOptions={linearTeamOptions}
+        projectOptions={linearProjectOptions}
+        stateOptions={linearStateOptions}
         saving={savingLinearSettings}
         onSave={onSaveLinearSettings}
         onTeamIdChange={onLinearTeamIdChange}
@@ -433,6 +522,10 @@ export function TeamSettingsDialog({
     linearConnected,
     linearScope,
     linearExpiresAt,
+    linearOptionsLoading,
+    linearTeamOptions,
+    linearProjectOptions,
+    linearStateOptions,
     error,
     handleRename,
     handleInvite,
@@ -497,6 +590,10 @@ export function TeamSettingsDialog({
               linearTeamId={linearTeamId}
               linearProjectId={linearProjectId}
               linearStateId={linearStateId}
+              linearOptionsLoading={linearOptionsLoading}
+              linearTeamOptions={linearTeamOptions}
+              linearProjectOptions={linearProjectOptions}
+              linearStateOptions={linearStateOptions}
               savingLinearSettings={savingLinearSettings}
               disconnectingLinear={disconnectingLinear}
               linearStatus={linearStatus}

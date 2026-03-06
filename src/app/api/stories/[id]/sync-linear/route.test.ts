@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadStoryWithStoryMap } from '@/build-runs/processor';
 import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { loadStoryWithStoryMap } from '@/storymap/story-context';
 import { POST } from './route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
-vi.mock('@/build-runs/processor', () => ({
+vi.mock('@/storymap/story-context', () => ({
   loadStoryWithStoryMap: vi.fn(),
 }));
 vi.mock('@/integrations/linear/helpers', () => ({ getLinearIssueSync: vi.fn() }));
