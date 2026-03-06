@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { use, useCallback, useEffect, useState } from 'react';
 import { ActivityDialog } from '@/components/story-map/ActivityDialog';
 import { AgentKickoffPanel } from '@/components/story-map/AgentKickoffPanel';
+import { LinearSyncPanel } from '@/components/story-map/LinearSyncPanel';
 import { StoryDialog } from '@/components/story-map/StoryDialog';
 import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas';
 import { TaskDialog } from '@/components/story-map/TaskDialog';
@@ -392,6 +393,7 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
             onRefresh={loadStoryMap}
             onError={setUiError}
           />
+          <LinearSyncPanel storyMapId={storyMap.id} />
           <AgentKickoffPanel storyMapId={storyMap.id} storyMapName={storyMap.name} releases={storyMap.releases} />
         </div>
         <ScrollBar orientation="horizontal" />

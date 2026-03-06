@@ -16,6 +16,13 @@ export const updateLinearIntegrationSettingsSchema = z
   })
   .refine(atLeastOneField, atLeastOneFieldMessage);
 
+export const updateStoryMapLinearSettingsSchema = z
+  .object({
+    linear_project_id: nullableString.optional(),
+    linear_state_id: nullableString.optional(),
+  })
+  .refine(atLeastOneField, atLeastOneFieldMessage);
+
 export const linearSyncStorySchema = z.object({
   story_id: uuid,
 });
@@ -34,5 +41,6 @@ export const linearSyncBatchSchema = z
   .default({});
 
 export type UpdateLinearIntegrationSettings = z.infer<typeof updateLinearIntegrationSettingsSchema>;
+export type UpdateStoryMapLinearSettings = z.infer<typeof updateStoryMapLinearSettingsSchema>;
 export type LinearSyncStoryRequest = z.infer<typeof linearSyncStorySchema>;
 export type LinearSyncBatchRequest = z.infer<typeof linearSyncBatchSchema>;

@@ -206,6 +206,22 @@ CREATE INDEX idx_integration_settings_team ON integration_settings(team_id);
 
 
 -- =============================================================================
+-- Story Map Integration Settings
+-- =============================================================================
+
+CREATE TABLE story_map_integration_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  story_map_id UUID NOT NULL UNIQUE REFERENCES story_maps(id) ON DELETE CASCADE,
+  linear_project_id TEXT,
+  linear_state_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_story_map_integration_settings_map ON story_map_integration_settings(story_map_id);
+
+
+-- =============================================================================
 -- Linear OAuth Connections
 -- =============================================================================
 

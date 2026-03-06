@@ -22,12 +22,14 @@ export type {
   LinearSyncBatchRequest,
   LinearSyncStoryRequest,
   UpdateLinearIntegrationSettings,
+  UpdateStoryMapLinearSettings,
 } from './schemas';
 // Zod validation schemas
 export {
   linearSyncBatchSchema,
   linearSyncStorySchema,
   updateLinearIntegrationSettingsSchema,
+  updateStoryMapLinearSettingsSchema,
 } from './schemas';
 
 // Status mapping

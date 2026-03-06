@@ -161,6 +161,18 @@ CREATE TRIGGER trg_integration_settings_updated_at
   BEFORE UPDATE ON integration_settings
   FOR EACH ROW EXECUTE FUNCTION update_integration_settings_updated_at();
 
+CREATE OR REPLACE FUNCTION update_story_map_integration_settings_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_story_map_integration_settings_updated_at
+  BEFORE UPDATE ON story_map_integration_settings
+  FOR EACH ROW EXECUTE FUNCTION update_story_map_integration_settings_updated_at();
+
 CREATE OR REPLACE FUNCTION update_linear_oauth_connections_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN

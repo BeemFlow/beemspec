@@ -28,9 +28,20 @@ describe('linear settings target resolution', () => {
     const settingsEq = vi.fn().mockReturnValue({ maybeSingle: settingsMaybeSingle });
     const settingsSelect = vi.fn().mockReturnValue({ eq: settingsEq });
 
+    const mapSettingsMaybeSingle = vi.fn().mockResolvedValue({
+      data: {
+        linear_project_id: 'linear_project_map',
+        linear_state_id: null,
+      },
+      error: null,
+    });
+    const mapSettingsEq = vi.fn().mockReturnValue({ maybeSingle: mapSettingsMaybeSingle });
+    const mapSettingsSelect = vi.fn().mockReturnValue({ eq: mapSettingsEq });
+
     const from = vi.fn((table: string) => {
       if (table === 'story_maps') return { select: storyMapSelect };
       if (table === 'integration_settings') return { select: settingsSelect };
+      if (table === 'story_map_integration_settings') return { select: mapSettingsSelect };
       return {};
     });
 
@@ -38,7 +49,7 @@ describe('linear settings target resolution', () => {
 
     expect(target).toEqual({
       teamId: 'linear_team_db',
-      projectId: undefined,
+      projectId: 'linear_project_map',
       stateId: undefined,
     });
   });

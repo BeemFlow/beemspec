@@ -50,6 +50,7 @@ ALTER TABLE activity_personas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE task_personas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE story_linear_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE integration_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE story_map_integration_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE linear_oauth_connections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE integration_webhook_receipts ENABLE ROW LEVEL SECURITY;
 
@@ -571,6 +572,49 @@ CREATE POLICY "Team owners can update integration settings"
 CREATE POLICY "Team owners can delete integration settings"
   ON integration_settings FOR DELETE
   USING (is_team_owner(team_id));
+
+
+-- =============================================================================
+-- RLS Policies: Story Map Integration Settings
+-- =============================================================================
+
+CREATE POLICY "Team members can view story map integration settings"
+  ON story_map_integration_settings FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM story_maps sm
+    WHERE sm.id = story_map_id
+    AND is_team_member(sm.team_id)
+  ));
+
+CREATE POLICY "Team owners can create story map integration settings"
+  ON story_map_integration_settings FOR INSERT
+  TO authenticated
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM story_maps sm
+    WHERE sm.id = story_map_id
+    AND is_team_owner(sm.team_id)
+  ));
+
+CREATE POLICY "Team owners can update story map integration settings"
+  ON story_map_integration_settings FOR UPDATE
+  USING (EXISTS (
+    SELECT 1 FROM story_maps sm
+    WHERE sm.id = story_map_id
+    AND is_team_owner(sm.team_id)
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM story_maps sm
+    WHERE sm.id = story_map_id
+    AND is_team_owner(sm.team_id)
+  ));
+
+CREATE POLICY "Team owners can delete story map integration settings"
+  ON story_map_integration_settings FOR DELETE
+  USING (EXISTS (
+    SELECT 1 FROM story_maps sm
+    WHERE sm.id = story_map_id
+    AND is_team_owner(sm.team_id)
+  ));
 
 -- =============================================================================
 -- Auto-create Personal Team on Signup
