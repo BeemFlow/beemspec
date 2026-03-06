@@ -57,17 +57,17 @@ export function parseLinearWebhookEvent(rawBody: string, headers: Headers): Webh
   const type = getString(record.type, 'type');
   const action = getString(record.action, 'action');
   const createdAt = getString(record.createdAt, 'createdAt');
-  getString(record.webhookTimestamp, 'webhookTimestamp');
+  const webhookTimestamp = getString(record.webhookTimestamp, 'webhookTimestamp');
 
   const deliveryId = headers.get('Linear-Delivery');
   const webhookId = typeof record.webhookId === 'string' ? record.webhookId : null;
-  const idempotencyKey = deliveryId ?? webhookId ?? `${type}:${action}:${createdAt}`;
+  const idempotencyKey = deliveryId ?? webhookId ?? `${type}:${action}:${webhookTimestamp}`;
 
   return {
     idempotencyKey,
     type,
     action,
-    createdAt,
+    createdAt: webhookTimestamp,
     payload: record.data ?? record,
   };
 }
