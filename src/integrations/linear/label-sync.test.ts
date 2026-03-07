@@ -28,6 +28,14 @@ describe('linear label sync helpers', () => {
     expect(getLinearIssueLabelNames(payload)).toEqual(['Story', 'Todo']);
   });
 
+  it('extracts label names when payload uses labels array shape', () => {
+    const payload = {
+      labels: [{ name: 'Story' }, { name: 'Bug' }],
+    };
+
+    expect(getLinearIssueLabelNames(payload)).toEqual(['Story', 'Bug']);
+  });
+
   it('reads team and project ids from direct or nested payload fields', () => {
     expect(getLinearIssueTeamIdFromPayload({ teamId: 'team_1' })).toBe('team_1');
     expect(getLinearIssueTeamIdFromPayload({ team: 'team_3' })).toBe('team_3');

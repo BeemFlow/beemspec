@@ -48,8 +48,8 @@ export function linearPayloadHasLabel(payload: Record<string, unknown> | null, l
 
 export function getLinearIssueLabelNames(payload: Record<string, unknown> | null): string[] {
   if (!payload) return [];
-  const labels = asRecord(payload.labels);
-  const nodesRaw = labels?.nodes;
+  const labelsRaw = payload.labels;
+  const nodesRaw = Array.isArray(labelsRaw) ? labelsRaw : asRecord(labelsRaw)?.nodes;
   if (!Array.isArray(nodesRaw)) return [];
 
   const names = nodesRaw
