@@ -297,6 +297,52 @@ describe('linear webhook route', () => {
     });
   });
 
+  it('imports unlinked labeled issues on restore action', async () => {
+    const admin = createWebhookAdminClient({ existingLink: null });
+    vi.mocked(createAdminClient).mockReturnValue(admin.client as never);
+    vi.mocked(getLinearIssueTeamIdFromPayload).mockReturnValue('team_1');
+    vi.mocked(getLinearIssueProjectIdFromPayload).mockReturnValue('project_1');
+    vi.mocked(getLinearIssueLabelNames).mockReturnValue(['Story']);
+    vi.mocked(findStoryMapImportCandidate).mockResolvedValue({
+      storyMapId: 'map_1',
+    });
+    vi.mocked(importLinearIssueIntoStoryMap).mockResolvedValue({ storyId: 'story_imported_restore_1' });
+
+    const createdAt = new Date().toISOString();
+    const rawBody = JSON.stringify({
+      action: 'restore',
+      type: 'Issue',
+      createdAt,
+      webhookTimestamp: Date.now(),
+      data: {
+        id: 'lin_1',
+        identifier: 'ENG-101',
+        title: 'Restored issue',
+        labels: [{ name: 'Story' }],
+      },
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/integrations/linear/webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Linear-Signature': sign(rawBody, 'webhook_secret'),
+          'Linear-Delivery': 'delivery_restore_1',
+        },
+        body: rawBody,
+      }),
+    );
+
+    expect(importLinearIssueIntoStoryMap).toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      applied: true,
+      story_id: 'story_imported_restore_1',
+    });
+  });
+
   it('hard-deletes linked story when linear issue is removed', async () => {
     const admin = createWebhookAdminClient();
     vi.mocked(createAdminClient).mockReturnValue(admin.client as never);

@@ -92,7 +92,7 @@ async function persistIgnoredReceipt(
 }
 
 function isSupportedIssueEvent(event: WebhookEvent): boolean {
-  return event.type === 'Issue' && ['create', 'update', 'remove'].includes(event.action);
+  return event.type === 'Issue' && ['create', 'update', 'remove', 'restore'].includes(event.action);
 }
 
 function parseAndVerifyEvent(request: Request, rawBody: string): WebhookEvent | null {
