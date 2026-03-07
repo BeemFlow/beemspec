@@ -122,12 +122,7 @@ export async function findStoryMapImportCandidate(
     .filter((candidate): candidate is StoryMapImportCandidate => candidate !== null);
 
   if (candidates.length === 0) return null;
-  if (candidates.length > 1) {
-    const createdAtById = new Map(mapRows.map((row) => [row.id, row.created_at]));
-    candidates.sort((a, b) =>
-      (createdAtById.get(a.storyMapId) ?? '').localeCompare(createdAtById.get(b.storyMapId) ?? ''),
-    );
-  }
+  if (candidates.length > 1) return null;
   return candidates[0] ?? null;
 }
 

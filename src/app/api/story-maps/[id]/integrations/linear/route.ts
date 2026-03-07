@@ -19,6 +19,7 @@ interface TeamSettingsRow {
 }
 
 interface StoryMapSettingsRow {
+  team_id: string;
   story_map_id: string;
   linear_project_id: string | null;
   linear_state_id: string | null;
@@ -67,7 +68,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     supabase
       .from('story_map_integration_settings')
       .select(
-        'story_map_id, linear_project_id, linear_state_id, auto_import_labeled_issues, import_label_name, updated_at',
+        'team_id, story_map_id, linear_project_id, linear_state_id, auto_import_labeled_issues, import_label_name, updated_at',
       )
       .eq('story_map_id', storyMapId)
       .maybeSingle<StoryMapSettingsRow>(),
@@ -138,6 +139,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     .from('story_map_integration_settings')
     .upsert(
       {
+        team_id: storyMap.team_id,
         story_map_id: storyMapId,
         linear_project_id: linearProjectId,
         linear_state_id: linearStateId,
@@ -147,11 +149,20 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       { onConflict: 'story_map_id' },
     )
     .select(
-      'story_map_id, linear_project_id, linear_state_id, auto_import_labeled_issues, import_label_name, updated_at',
+      'team_id, story_map_id, linear_project_id, linear_state_id, auto_import_labeled_issues, import_label_name, updated_at',
     )
     .single<StoryMapSettingsRow>();
 
-  if (error) return serverErrorResponse('Failed to save story map Linear settings', error);
+  if (error) {
+    const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : null;
+    if (code === '23505' && linearProjectId) {
+      return NextResponse.json(
+        { error: 'This Linear project is already linked to another story map in this team' },
+        { status: 409 },
+      );
+    }
+    return serverErrorResponse('Failed to save story map Linear settings', error);
+  }
 
   return NextResponse.json(data);
 }

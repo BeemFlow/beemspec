@@ -275,10 +275,8 @@ export async function deleteStory(supabase: Supabase, storyId: string) {
       const issueSync = context.linearIssueSync ?? linearIssueSync;
 
       if (!issueSync) {
-        return {
-          data: null,
-          error: new Error('Linear issue sync is unavailable for deleting linked story'),
-        };
+        // Proceed with local delete when remote sync is unavailable.
+        return supabase.from('stories').delete().eq('id', storyId).select().single();
       }
 
       try {
@@ -286,18 +284,16 @@ export async function deleteStory(supabase: Supabase, storyId: string) {
       } catch (error) {
         const status = typeof error === 'object' && error && 'status' in error ? Number(error.status) : null;
         if (status !== 404) {
-          return {
-            data: null,
-            error: error instanceof Error ? error : new Error('Failed to delete linked Linear issue'),
-          };
+          // best-effort remote delete; local story delete proceeds
+          // biome-ignore lint/suspicious/noConsole: operational visibility for remote delete failures
+          console.warn('Failed to delete linked Linear issue; proceeding with local delete', error);
         }
       }
     }
   } catch (error) {
-    return {
-      data: null,
-      error: error instanceof Error ? error : new Error('Failed to load linked Linear issue for deletion'),
-    };
+    // best-effort link lookup; local story delete proceeds
+    // biome-ignore lint/suspicious/noConsole: operational visibility for lookup failures
+    console.warn('Failed to load linked Linear issue for deletion; proceeding with local delete', error);
   }
 
   return supabase.from('stories').delete().eq('id', storyId).select().single();

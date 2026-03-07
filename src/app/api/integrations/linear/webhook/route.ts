@@ -324,11 +324,6 @@ export async function POST(request: Request) {
   }
 
   const rawBody = await request.text();
-  logLinearWebhook('info', 'raw_webhook_payload', {
-    linear_event: request.headers.get('Linear-Event') ?? null,
-    linear_delivery: request.headers.get('Linear-Delivery') ?? null,
-    raw_body: rawBody,
-  });
   let event: WebhookEvent;
 
   try {

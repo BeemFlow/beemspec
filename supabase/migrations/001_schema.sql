@@ -210,6 +210,7 @@ CREATE INDEX idx_integration_settings_team ON integration_settings(team_id);
 
 CREATE TABLE story_map_integration_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   story_map_id UUID NOT NULL UNIQUE REFERENCES story_maps(id) ON DELETE CASCADE,
   linear_project_id TEXT,
   linear_state_id TEXT,
@@ -220,6 +221,10 @@ CREATE TABLE story_map_integration_settings (
 );
 
 CREATE INDEX idx_story_map_integration_settings_map ON story_map_integration_settings(story_map_id);
+CREATE INDEX idx_story_map_integration_settings_team ON story_map_integration_settings(team_id);
+CREATE UNIQUE INDEX uq_story_map_integration_settings_team_project
+  ON story_map_integration_settings(team_id, linear_project_id)
+  WHERE linear_project_id IS NOT NULL;
 
 
 -- =============================================================================

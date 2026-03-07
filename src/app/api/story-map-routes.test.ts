@@ -642,5 +642,26 @@ describe('story map API routes', () => {
       expect(remove).toHaveBeenCalled();
       await expect(response.json()).resolves.toMatchObject({ success: true });
     });
+
+    it('still deletes local story when linked linear delete fails', async () => {
+      const { client, remove } = createDeleteClient({ id: VALID_ID }, { linkedLinearIssueId: 'lin_issue_1' });
+      vi.mocked(createClient).mockResolvedValue(client as never);
+
+      const deleteIssue = vi.fn().mockRejectedValue(new Error('linear delete failed'));
+      vi.mocked(getLinearIssueSync).mockReturnValue({
+        getIssueById: vi.fn(),
+        createIssue: vi.fn(),
+        updateIssue: vi.fn(),
+        deleteIssue,
+      });
+
+      const response = await deleteStoryById(new Request('http://localhost/api/test'), {
+        params: Promise.resolve({ id: VALID_ID }),
+      });
+
+      expect(deleteIssue).toHaveBeenCalledWith('lin_issue_1');
+      expect(remove).toHaveBeenCalled();
+      await expect(response.json()).resolves.toMatchObject({ success: true });
+    });
   });
 });
