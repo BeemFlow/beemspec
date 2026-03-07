@@ -115,16 +115,38 @@ function createUpdateClient(returnData: unknown) {
   };
 }
 
-function createDeleteClient(returnData: unknown) {
+function createDeleteClient(returnData: unknown, options: { linkedLinearIssueId?: string | null } = {}) {
   const single = vi.fn().mockResolvedValue({ data: returnData, error: null });
   const select = vi.fn().mockReturnValue({ single });
   const eq = vi.fn().mockReturnValue({ select });
   const remove = vi.fn().mockReturnValue({ eq });
-  const from = vi.fn().mockReturnValue({ delete: remove });
+
+  const linkMaybeSingle = vi.fn().mockResolvedValue({
+    data: options.linkedLinearIssueId
+      ? {
+          story_id: VALID_ID,
+          linear_issue_id: options.linkedLinearIssueId,
+          linear_issue_identifier: 'ENG-101',
+          last_local_updated_at: null,
+          last_linear_updated_at: null,
+        }
+      : null,
+    error: null,
+  });
+  const linkEq = vi.fn().mockReturnValue({ maybeSingle: linkMaybeSingle });
+  const linkSelect = vi.fn().mockReturnValue({ eq: linkEq });
+
+  const from = vi.fn((table: string) => {
+    if (table === 'story_linear_links') {
+      return { select: linkSelect };
+    }
+    return { delete: remove };
+  });
 
   return {
     client: { from },
     remove,
+    linkMaybeSingle,
   };
 }
 
@@ -415,6 +437,7 @@ describe('story map API routes', () => {
         getIssueById: vi.fn(),
         createIssue: vi.fn(),
         updateIssue: vi.fn(),
+        deleteIssue: vi.fn(),
       };
       vi.mocked(getLinearIssueSync).mockReturnValue(linearIssueSync);
 
@@ -525,6 +548,7 @@ describe('story map API routes', () => {
         getIssueById: vi.fn(),
         createIssue: vi.fn(),
         updateIssue: vi.fn(),
+        deleteIssue: vi.fn(),
       };
       vi.mocked(getLinearIssueSync).mockReturnValue(linearIssueSync);
 
@@ -594,6 +618,27 @@ describe('story map API routes', () => {
         params: Promise.resolve({ id: VALID_ID }),
       });
 
+      expect(remove).toHaveBeenCalled();
+      await expect(response.json()).resolves.toMatchObject({ success: true });
+    });
+
+    it('hard-deletes linked linear issue before deleting story', async () => {
+      const { client, remove } = createDeleteClient({ id: VALID_ID }, { linkedLinearIssueId: 'lin_issue_1' });
+      vi.mocked(createClient).mockResolvedValue(client as never);
+
+      const deleteIssue = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(getLinearIssueSync).mockReturnValue({
+        getIssueById: vi.fn(),
+        createIssue: vi.fn(),
+        updateIssue: vi.fn(),
+        deleteIssue,
+      });
+
+      const response = await deleteStoryById(new Request('http://localhost/api/test'), {
+        params: Promise.resolve({ id: VALID_ID }),
+      });
+
+      expect(deleteIssue).toHaveBeenCalledWith('lin_issue_1');
       expect(remove).toHaveBeenCalled();
       await expect(response.json()).resolves.toMatchObject({ success: true });
     });

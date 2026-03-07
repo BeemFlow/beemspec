@@ -30,7 +30,7 @@ describe('story manual linear sync route', () => {
       data: { story: { id: STORY_ID }, storyMapId: 'story_map_1' },
     } as never);
 
-    const linearIssueSync = { getIssueById: vi.fn(), createIssue: vi.fn(), updateIssue: vi.fn() };
+    const linearIssueSync = { getIssueById: vi.fn(), createIssue: vi.fn(), updateIssue: vi.fn(), deleteIssue: vi.fn() };
     vi.mocked(getLinearIssueSync).mockReturnValue(linearIssueSync);
     vi.mocked(processStoryLinearSyncById).mockResolvedValue({
       id: 'lin_issue_1',

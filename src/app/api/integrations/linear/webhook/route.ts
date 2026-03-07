@@ -92,7 +92,7 @@ async function persistIgnoredReceipt(
 }
 
 function isSupportedIssueEvent(event: WebhookEvent): boolean {
-  return event.type === 'Issue' && ['create', 'update'].includes(event.action);
+  return event.type === 'Issue' && ['create', 'update', 'remove'].includes(event.action);
 }
 
 function parseAndVerifyEvent(request: Request, rawBody: string): WebhookEvent | null {
@@ -147,6 +147,36 @@ async function processIssueEvent(
   }
 
   const link = await getStoryLinearLinkByLinearIssueId(supabase, linearIssueId);
+
+  if (event.action === 'remove') {
+    if (!link) {
+      logLinearWebhook('info', 'ignored_remove_without_link', {
+        delivery_id: event.idempotencyKey,
+        issue_id: linearIssueId,
+      });
+      return persistIgnoredReceipt(supabase, event, 'No story link found for removed issue');
+    }
+
+    const { error: deleteError } = await supabase.from('stories').delete().eq('id', link.storyId);
+    if (deleteError) throw deleteError;
+
+    const receipt = await insertWebhookReceipt(supabase, {
+      idempotencyKey: event.idempotencyKey,
+      type: event.type,
+      action: event.action,
+      payload: event.payload,
+      status: 'processed',
+    });
+
+    logLinearWebhook('info', 'deleted_story_from_removed_issue', {
+      delivery_id: event.idempotencyKey,
+      issue_id: linearIssueId,
+      story_id: link.storyId,
+    });
+
+    return successResponse({ duplicate: receipt.duplicate, applied: true, storyId: link.storyId });
+  }
+
   if (!link) {
     if (!teamId) {
       logLinearWebhook('warn', 'ignored_missing_team_id_unlinked', {

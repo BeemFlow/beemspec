@@ -55,7 +55,7 @@ describe('processStoryLinearSyncById', () => {
       teamId: 'team_1',
       targetConfigured: true,
       target: { teamId: 'linear_team_1' },
-      linearIssueSync: { createIssue: vi.fn(), getIssueById: vi.fn(), updateIssue: vi.fn() },
+      linearIssueSync: { createIssue: vi.fn(), getIssueById: vi.fn(), updateIssue: vi.fn(), deleteIssue: vi.fn() },
     });
 
     vi.mocked(getStoryLinearLink).mockResolvedValue(null);
@@ -78,7 +78,7 @@ describe('processStoryLinearSyncById', () => {
   it('applies sync label after successful remote sync', async () => {
     await processStoryLinearSyncById({} as never, {
       storyId: 'story_1',
-      linearIssueSync: { createIssue: vi.fn(), getIssueById: vi.fn(), updateIssue: vi.fn() },
+      linearIssueSync: { createIssue: vi.fn(), getIssueById: vi.fn(), updateIssue: vi.fn(), deleteIssue: vi.fn() },
     });
 
     expect(upsertStoryLinearLink).toHaveBeenCalled();
@@ -96,7 +96,7 @@ describe('processStoryLinearSyncById', () => {
     await expect(
       processStoryLinearSyncById({} as never, {
         storyId: 'story_1',
-        linearIssueSync: { createIssue: vi.fn(), getIssueById: vi.fn(), updateIssue: vi.fn() },
+        linearIssueSync: { createIssue: vi.fn(), getIssueById: vi.fn(), updateIssue: vi.fn(), deleteIssue: vi.fn() },
       }),
     ).resolves.toMatchObject({
       id: 'lin_1',

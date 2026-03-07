@@ -16,8 +16,9 @@ import type {
   UpdateStoryMap,
   UpdateTask,
 } from '@beemspec/storymap';
-import { isLinearSyncAvailableForStoryMap } from '@/integrations/linear/auth';
+import { isLinearSyncAvailableForStoryMap, resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
 import { getLinearIssueSync } from '@/integrations/linear/helpers';
+import { getStoryLinearLink } from '@/integrations/linear/story-links';
 import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
 import type { Supabase } from '@/lib/supabase/types';
 import { pickDefined } from '@/lib/validations';
@@ -263,6 +264,42 @@ export async function updateStory(supabase: Supabase, storyId: string, changes: 
 }
 
 export async function deleteStory(supabase: Supabase, storyId: string) {
+  try {
+    const link = await getStoryLinearLink(supabase, storyId);
+    if (link) {
+      const linearIssueSync = getLinearIssueSync();
+      const context = await resolveLinearSyncContextForStory(supabase, {
+        storyId,
+        fallbackIssueSync: linearIssueSync,
+      });
+      const issueSync = context.linearIssueSync ?? linearIssueSync;
+
+      if (!issueSync) {
+        return {
+          data: null,
+          error: new Error('Linear issue sync is unavailable for deleting linked story'),
+        };
+      }
+
+      try {
+        await issueSync.deleteIssue(link.linearIssueId);
+      } catch (error) {
+        const status = typeof error === 'object' && error && 'status' in error ? Number(error.status) : null;
+        if (status !== 404) {
+          return {
+            data: null,
+            error: error instanceof Error ? error : new Error('Failed to delete linked Linear issue'),
+          };
+        }
+      }
+    }
+  } catch (error) {
+    return {
+      data: null,
+      error: error instanceof Error ? error : new Error('Failed to load linked Linear issue for deletion'),
+    };
+  }
+
   return supabase.from('stories').delete().eq('id', storyId).select().single();
 }
 

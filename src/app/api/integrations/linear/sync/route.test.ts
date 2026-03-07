@@ -126,6 +126,7 @@ describe('linear sync route', () => {
       }),
       createIssue: vi.fn(),
       updateIssue: vi.fn(),
+      deleteIssue: vi.fn(),
     };
 
     vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
@@ -182,6 +183,7 @@ describe('linear sync route', () => {
         }),
         createIssue: vi.fn(),
         updateIssue,
+        deleteIssue: vi.fn(),
       },
     });
 
@@ -222,6 +224,7 @@ describe('linear sync route', () => {
         }),
         createIssue: vi.fn(),
         updateIssue,
+        deleteIssue: vi.fn(),
       },
     });
 

@@ -13,7 +13,9 @@ const BASE_BACKOFF_MS = 250;
 
 type SleepFn = (ms: number) => Promise<void>;
 
-type LinearClientLike = Pick<LinearClient, 'issue' | 'createIssue' | 'updateIssue'>;
+type LinearClientLike = Pick<LinearClient, 'issue' | 'createIssue' | 'updateIssue'> & {
+  deleteIssue?: (issueId: string) => Promise<unknown>;
+};
 
 /** Options for creating a Linear IssueSync client. Credentials are injected. */
 export interface LinearClientOptions {
@@ -263,6 +265,13 @@ export function createLinearClient(enabled: boolean, options: LinearClientOption
       );
       const issue = await getIssueFromPayload(payload, 'updateIssue');
       return toSnapshot(issue);
+    },
+
+    async deleteIssue(issueId: string): Promise<void> {
+      if (typeof client.deleteIssue !== 'function') {
+        throw new Error('Linear client does not support deleteIssue');
+      }
+      await withRetry(() => client.deleteIssue!(issueId), maxRetries, sleep);
     },
   };
 }

@@ -32,6 +32,7 @@ describe('story map linear sync route', () => {
       getIssueById: vi.fn(),
       createIssue: vi.fn(),
       updateIssue: vi.fn(),
+      deleteIssue: vi.fn(),
     });
   });
 

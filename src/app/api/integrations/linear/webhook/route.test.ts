@@ -96,6 +96,8 @@ function createWebhookAdminClient(
 
   const storyEq = vi.fn().mockResolvedValue({ error: null });
   const storyUpdate = vi.fn().mockReturnValue({ eq: storyEq });
+  const storyDeleteEq = vi.fn().mockResolvedValue({ error: null });
+  const storyDelete = vi.fn().mockReturnValue({ eq: storyDeleteEq });
 
   const from = vi.fn((table: string) => {
     if (table === 'integration_webhook_receipts') {
@@ -111,6 +113,7 @@ function createWebhookAdminClient(
       return {
         select: storySelect,
         update: storyUpdate,
+        delete: storyDelete,
       };
     }
     return {};
@@ -120,6 +123,7 @@ function createWebhookAdminClient(
     client: { from },
     receiptInsert,
     storyUpdate,
+    storyDelete,
   };
 }
 
@@ -290,6 +294,42 @@ describe('linear webhook route', () => {
       success: true,
       applied: true,
       story_id: 'story_imported_1',
+    });
+  });
+
+  it('hard-deletes linked story when linear issue is removed', async () => {
+    const admin = createWebhookAdminClient();
+    vi.mocked(createAdminClient).mockReturnValue(admin.client as never);
+
+    const createdAt = new Date().toISOString();
+    const rawBody = JSON.stringify({
+      action: 'remove',
+      type: 'Issue',
+      createdAt,
+      webhookTimestamp: Date.now(),
+      data: {
+        id: 'lin_1',
+      },
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/integrations/linear/webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Linear-Signature': sign(rawBody, 'webhook_secret'),
+          'Linear-Delivery': 'delivery_remove_1',
+        },
+        body: rawBody,
+      }),
+    );
+
+    expect(admin.storyDelete).toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      applied: true,
+      story_id: 'story_1',
     });
   });
 

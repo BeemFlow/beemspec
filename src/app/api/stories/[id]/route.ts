@@ -59,7 +59,8 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const { data, error } = await deleteStory(supabase, id);
 
   if (error) {
-    if (error.code === DbErrorCode.NOT_FOUND) {
+    const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : null;
+    if (code === DbErrorCode.NOT_FOUND) {
       return notFoundResponse('Story');
     }
     return serverErrorResponse('Failed to delete story', error);

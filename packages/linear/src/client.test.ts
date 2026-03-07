@@ -20,13 +20,20 @@ function makePayload(issue: Issue): IssuePayload {
   } as unknown as IssuePayload;
 }
 
-function makeClient(overrides: Partial<Pick<LinearClient, 'issue' | 'createIssue' | 'updateIssue'>> = {}) {
+function makeClient(
+  overrides: Partial<
+    Pick<LinearClient, 'issue' | 'createIssue' | 'updateIssue'> & { deleteIssue: (issueId: string) => Promise<unknown> }
+  > = {},
+) {
   return {
     issue: vi.fn(async () => makeIssue()),
     createIssue: vi.fn(async () => makePayload(makeIssue())),
     updateIssue: vi.fn(async () => makePayload(makeIssue())),
+    deleteIssue: vi.fn(async () => ({ success: true })),
     ...overrides,
-  } as Pick<LinearClient, 'issue' | 'createIssue' | 'updateIssue'>;
+  } as Pick<LinearClient, 'issue' | 'createIssue' | 'updateIssue'> & {
+    deleteIssue: (issueId: string) => Promise<unknown>;
+  };
 }
 
 describe('linear client (issue sync port)', () => {
@@ -100,5 +107,17 @@ describe('linear client (issue sync port)', () => {
 
     expect(issue?.id).toBe('lin_issue_1');
     expect(client.issue).toHaveBeenCalledTimes(1);
+  });
+
+  it('deletes issue via sdk client', async () => {
+    const client = makeClient();
+    const sync = createLinearClient(true, {
+      apiKey: 'linear_api_key',
+      client,
+    });
+
+    await sync?.deleteIssue('lin_issue_1');
+
+    expect(client.deleteIssue).toHaveBeenCalledWith('lin_issue_1');
   });
 });

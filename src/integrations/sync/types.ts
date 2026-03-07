@@ -28,6 +28,7 @@ export interface IssueSync {
   getIssueById(issueId: string): Promise<IssueSnapshot | null>;
   createIssue(input: IssueUpsertInput): Promise<IssueSnapshot>;
   updateIssue(issueId: string, input: Partial<IssueUpsertInput>): Promise<IssueSnapshot>;
+  deleteIssue(issueId: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
