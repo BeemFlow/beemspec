@@ -15,6 +15,27 @@ function tokenError(error: string, description: string, status = 400) {
   );
 }
 
+function logMcpToken(level: 'info' | 'warn' | 'error', message: string, data: Record<string, unknown>) {
+  const logger = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+  logger('[mcp-oauth-token]', message, data);
+}
+
+async function parseTokenPayload(request: Request): Promise<FormData> {
+  const contentType = request.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    const body = (await request.json()) as Record<string, unknown>;
+    const form = new FormData();
+    for (const [key, value] of Object.entries(body)) {
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        form.set(key, String(value));
+      }
+    }
+    return form;
+  }
+
+  return request.formData();
+}
+
 async function handleAuthorizationCodeGrant(form: FormData) {
   const code = String(form.get('code') ?? '');
   const clientId = String(form.get('client_id') ?? '');
@@ -40,6 +61,9 @@ async function handleAuthorizationCodeGrant(form: FormData) {
 
   const refreshed = await refreshSupabaseAccessToken(record.refreshToken);
   if (refreshed.error || !refreshed.data) {
+    logMcpToken('warn', 'auth_code_refresh_failed', {
+      reason: refreshed.error instanceof Error ? refreshed.error.message : 'unknown',
+    });
     return tokenError('invalid_grant', 'Failed to exchange refresh token', 401);
   }
 
@@ -54,6 +78,9 @@ async function handleRefreshTokenGrant(form: FormData) {
 
   const refreshed = await refreshSupabaseAccessToken(refreshToken);
   if (refreshed.error || !refreshed.data) {
+    logMcpToken('warn', 'refresh_grant_failed', {
+      reason: refreshed.error instanceof Error ? refreshed.error.message : 'unknown',
+    });
     return tokenError('invalid_grant', 'Refresh token is invalid', 401);
   }
 
@@ -61,8 +88,15 @@ async function handleRefreshTokenGrant(form: FormData) {
 }
 
 export async function POST(request: Request) {
-  const form = await request.formData();
+  const form = await parseTokenPayload(request);
   const grantType = String(form.get('grant_type') ?? '');
+
+  logMcpToken('info', 'token_request', {
+    grant_type: grantType || null,
+    has_code: Boolean(form.get('code')),
+    has_refresh_token: Boolean(form.get('refresh_token')),
+    has_client_id: Boolean(form.get('client_id')),
+  });
 
   if (grantType === 'authorization_code') {
     return handleAuthorizationCodeGrant(form);
