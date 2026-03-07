@@ -26,9 +26,20 @@ interface StoryMapIntegrationSettingsTable {
   };
 }
 
+interface IntegrationSettingsRow {
+  team_id: string;
+}
+
+interface IntegrationSettingsTable {
+  select(columns: string): {
+    eq(column: string, value: string): Promise<{ data: IntegrationSettingsRow[] | null; error: unknown }>;
+  };
+}
+
 interface StoryMapsTable {
   select(columns: string): {
     eq(column: string, value: string): Promise<{ data: StoryMapRow[] | null; error: unknown }>;
+    in(column: string, values: string[]): Promise<{ data: StoryMapRow[] | null; error: unknown }>;
   };
 }
 
@@ -62,10 +73,19 @@ export async function findStoryMapImportCandidate(
   supabase: SupabaseLike,
   input: { teamId: string; linearProjectId: string | null; labelNames: string[] },
 ): Promise<StoryMapImportCandidate | null> {
+  const integrationSettingsTable = supabase.from('integration_settings') as IntegrationSettingsTable;
+  const { data: teamMappings, error: teamMappingsError } = await integrationSettingsTable
+    .select('team_id')
+    .eq('linear_team_id', input.teamId);
+  if (teamMappingsError) throw teamMappingsError;
+
+  const beemTeamIds = [...new Set((teamMappings ?? []).map((row) => row.team_id).filter(Boolean))];
+  if (beemTeamIds.length === 0) return null;
+
   const storyMapsTable = supabase.from('story_maps') as StoryMapsTable;
   const { data: maps, error: mapError } = await storyMapsTable
     .select('id, team_id, created_at')
-    .eq('team_id', input.teamId);
+    .in('team_id', beemTeamIds);
   if (mapError) throw mapError;
 
   const mapRows = (maps ?? []) as StoryMapRow[];

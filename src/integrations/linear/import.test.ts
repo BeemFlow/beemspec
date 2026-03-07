@@ -3,14 +3,20 @@ import { ensureUntriagedTaskId, findStoryMapImportCandidate } from './import';
 
 describe('linear import candidate resolution', () => {
   it('matches story map by label + effective project', async () => {
-    const storyMapsEq = vi.fn().mockResolvedValue({
+    const teamMappingsEq = vi.fn().mockResolvedValue({
+      data: [{ team_id: 'beem_team_1' }],
+      error: null,
+    });
+    const teamMappingsSelect = vi.fn().mockReturnValue({ eq: teamMappingsEq });
+
+    const storyMapsIn = vi.fn().mockResolvedValue({
       data: [
-        { id: 'map_1', team_id: 'team_1', created_at: '2026-01-01T00:00:00.000Z' },
-        { id: 'map_2', team_id: 'team_1', created_at: '2026-01-02T00:00:00.000Z' },
+        { id: 'map_1', team_id: 'beem_team_1', created_at: '2026-01-01T00:00:00.000Z' },
+        { id: 'map_2', team_id: 'beem_team_1', created_at: '2026-01-02T00:00:00.000Z' },
       ],
       error: null,
     });
-    const storyMapsSelect = vi.fn().mockReturnValue({ eq: storyMapsEq });
+    const storyMapsSelect = vi.fn().mockReturnValue({ in: storyMapsIn });
 
     const mapSettingsIn = vi.fn().mockResolvedValue({
       data: [
@@ -27,6 +33,7 @@ describe('linear import candidate resolution', () => {
     const mapSettingsSelect = vi.fn().mockReturnValue({ in: mapSettingsIn });
 
     const from = vi.fn((table: string) => {
+      if (table === 'integration_settings') return { select: teamMappingsSelect };
       if (table === 'story_maps') return { select: storyMapsSelect };
       if (table === 'story_map_integration_settings') return { select: mapSettingsSelect };
       return {};
@@ -34,18 +41,24 @@ describe('linear import candidate resolution', () => {
 
     const candidate = await findStoryMapImportCandidate(
       { from },
-      { teamId: 'team_1', linearProjectId: 'project_match', labelNames: ['Story'] },
+      { teamId: 'linear_team_1', linearProjectId: 'project_match', labelNames: ['Story'] },
     );
 
     expect(candidate?.storyMapId).toBe('map_1');
   });
 
   it('returns null when issue has no project id', async () => {
-    const storyMapsEq = vi.fn().mockResolvedValue({
-      data: [{ id: 'map_1', team_id: 'team_1', created_at: '2026-01-01T00:00:00.000Z' }],
+    const teamMappingsEq = vi.fn().mockResolvedValue({
+      data: [{ team_id: 'beem_team_1' }],
       error: null,
     });
-    const storyMapsSelect = vi.fn().mockReturnValue({ eq: storyMapsEq });
+    const teamMappingsSelect = vi.fn().mockReturnValue({ eq: teamMappingsEq });
+
+    const storyMapsIn = vi.fn().mockResolvedValue({
+      data: [{ id: 'map_1', team_id: 'beem_team_1', created_at: '2026-01-01T00:00:00.000Z' }],
+      error: null,
+    });
+    const storyMapsSelect = vi.fn().mockReturnValue({ in: storyMapsIn });
 
     const mapSettingsIn = vi.fn().mockResolvedValue({
       data: [
@@ -62,6 +75,7 @@ describe('linear import candidate resolution', () => {
     const mapSettingsSelect = vi.fn().mockReturnValue({ in: mapSettingsIn });
 
     const from = vi.fn((table: string) => {
+      if (table === 'integration_settings') return { select: teamMappingsSelect };
       if (table === 'story_maps') return { select: storyMapsSelect };
       if (table === 'story_map_integration_settings') return { select: mapSettingsSelect };
       return {};
@@ -69,7 +83,7 @@ describe('linear import candidate resolution', () => {
 
     const candidate = await findStoryMapImportCandidate(
       { from },
-      { teamId: 'team_1', linearProjectId: null, labelNames: ['Story'] },
+      { teamId: 'linear_team_1', linearProjectId: null, labelNames: ['Story'] },
     );
     expect(candidate).toBeNull();
   });
