@@ -56,16 +56,19 @@ export function StoryMapSettingsDialog({
   onOpenChange,
   storyMapId,
   storyMapName,
+  onSyncComplete,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   storyMapId: string;
   storyMapName: string;
+  onSyncComplete?: () => void;
 }) {
   const NO_SELECTION = '__none__';
   const [loading, setLoading] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
@@ -197,6 +200,33 @@ export function StoryMapSettingsDialog({
     }
   }
 
+  async function handleManualSync() {
+    setSyncing(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const result = await fetchJson<{ considered: number; succeeded: number; failed: number }>(
+        `/api/story-maps/${storyMapId}/integrations/linear/sync`,
+        { method: 'POST' },
+        'Failed to sync story map with Linear',
+      );
+
+      if (result.failed > 0) {
+        setError(
+          `Manual sync completed with ${result.failed} failures (${result.succeeded}/${result.considered} succeeded).`,
+        );
+      } else {
+        setNotice(`Manual sync complete: ${result.succeeded}/${result.considered} stories synced.`);
+      }
+      onSyncComplete?.();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -310,6 +340,21 @@ export function StoryMapSettingsDialog({
             <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
               Effective project: {effectiveProjectId ?? 'none'} | Effective state: {effectiveStateId ?? 'none'} |
               Auto-import: {effectiveAutoImportLabeledIssues ? 'on' : 'off'} | Sync label: {effectiveImportLabelName}
+            </div>
+
+            <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+              <Label>Manual sync</Label>
+              <p className="text-xs text-muted-foreground">
+                Run a one-time reconciliation sync for all stories in this map.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleManualSync}
+                disabled={!canEdit || !teamLinearTeamId || !asNullable(projectId) || syncing}
+              >
+                {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Run manual sync'}
+              </Button>
             </div>
 
             {canEdit ? (
