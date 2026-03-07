@@ -64,6 +64,8 @@ export function getLinearIssueTeamIdFromPayload(payload: Record<string, unknown>
   if (!payload) return null;
   const direct = getString(payload.teamId);
   if (direct) return direct;
+  const directTeam = getString(payload.team);
+  if (directTeam) return directTeam;
   const team = asRecord(payload.team);
   return getString(team?.id);
 }
@@ -72,6 +74,8 @@ export function getLinearIssueProjectIdFromPayload(payload: Record<string, unkno
   if (!payload) return null;
   const direct = getString(payload.projectId);
   if (direct) return direct;
+  const directProject = getString(payload.project);
+  if (directProject) return directProject;
   const project = asRecord(payload.project);
   return getString(project?.id);
 }

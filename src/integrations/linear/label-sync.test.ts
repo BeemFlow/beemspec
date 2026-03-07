@@ -30,10 +30,12 @@ describe('linear label sync helpers', () => {
 
   it('reads team and project ids from direct or nested payload fields', () => {
     expect(getLinearIssueTeamIdFromPayload({ teamId: 'team_1' })).toBe('team_1');
+    expect(getLinearIssueTeamIdFromPayload({ team: 'team_3' })).toBe('team_3');
     expect(getLinearIssueTeamIdFromPayload({ team: { id: 'team_2' } })).toBe('team_2');
     expect(getLinearIssueTeamIdFromPayload({})).toBeNull();
 
     expect(getLinearIssueProjectIdFromPayload({ projectId: 'project_1' })).toBe('project_1');
+    expect(getLinearIssueProjectIdFromPayload({ project: 'project_3' })).toBe('project_3');
     expect(getLinearIssueProjectIdFromPayload({ project: { id: 'project_2' } })).toBe('project_2');
     expect(getLinearIssueProjectIdFromPayload({})).toBeNull();
   });
