@@ -24,6 +24,11 @@ function getString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function logLinearWebhook(level: 'info' | 'warn' | 'error', message: string, data: Record<string, unknown>) {
+  const logger = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+  logger('[linear-webhook]', message, data);
+}
+
 function successResponse(input: {
   duplicate?: boolean;
   ignored?: boolean;
@@ -118,29 +123,61 @@ async function processIssueEvent(
 ): Promise<NextResponse> {
   const payload = asRecord(event.payload);
   const linearIssueId = getString(payload?.id);
+  const teamId = getLinearIssueTeamIdFromPayload(payload);
+  const projectId = getLinearIssueProjectIdFromPayload(payload);
+  const labelNames = getLinearIssueLabelNames(payload);
+
+  logLinearWebhook('info', 'received_issue_event', {
+    delivery_id: event.idempotencyKey,
+    action: event.action,
+    type: event.type,
+    issue_id: linearIssueId,
+    team_id: teamId,
+    project_id: projectId,
+    labels: labelNames,
+  });
+
   if (!linearIssueId) {
+    logLinearWebhook('warn', 'ignored_missing_issue_id', {
+      delivery_id: event.idempotencyKey,
+      action: event.action,
+      type: event.type,
+    });
     return persistIgnoredReceipt(supabase, event, 'Missing issue id');
   }
 
   const link = await getStoryLinearLinkByLinearIssueId(supabase, linearIssueId);
   if (!link) {
-    const teamId = getLinearIssueTeamIdFromPayload(payload);
     if (!teamId) {
+      logLinearWebhook('warn', 'ignored_missing_team_id_unlinked', {
+        delivery_id: event.idempotencyKey,
+        issue_id: linearIssueId,
+      });
       return persistIgnoredReceipt(supabase, event, 'Missing team id for unlinked issue import');
     }
 
-    const labelNames = getLinearIssueLabelNames(payload);
     if (labelNames.length === 0) {
+      logLinearWebhook('info', 'ignored_unlinked_without_labels', {
+        delivery_id: event.idempotencyKey,
+        issue_id: linearIssueId,
+      });
       return persistIgnoredReceipt(supabase, event, 'No story link found for issue');
     }
 
     const candidate = await findStoryMapImportCandidate(supabase, {
       teamId,
-      linearProjectId: getLinearIssueProjectIdFromPayload(payload),
+      linearProjectId: projectId,
       labelNames,
     });
 
     if (!candidate) {
+      logLinearWebhook('info', 'ignored_no_import_candidate', {
+        delivery_id: event.idempotencyKey,
+        issue_id: linearIssueId,
+        team_id: teamId,
+        project_id: projectId,
+        labels: labelNames,
+      });
       return persistIgnoredReceipt(supabase, event, 'No matching story map import candidate for labeled issue');
     }
 
@@ -161,6 +198,13 @@ async function processIssueEvent(
       action: event.action,
       payload: event.payload,
       status: 'processed',
+    });
+
+    logLinearWebhook('info', 'imported_unlinked_issue', {
+      delivery_id: event.idempotencyKey,
+      issue_id: linearIssueId,
+      story_id: imported.storyId,
+      story_map_id: candidate.storyMapId,
     });
 
     return successResponse({ duplicate: receipt.duplicate, applied: true, storyId: imported.storyId });
@@ -185,6 +229,13 @@ async function processIssueEvent(
       lastLocalUpdatedAt: localUpdatedAt,
       lastLinearUpdatedAt: remoteUpdatedAt,
     });
+    logLinearWebhook('info', 'ignored_stale_remote_update', {
+      delivery_id: event.idempotencyKey,
+      issue_id: linearIssueId,
+      story_id: link.storyId,
+      remote_updated_at: remoteUpdatedAt,
+      local_updated_at: localUpdatedAt,
+    });
     return persistIgnoredReceipt(supabase, event, 'Ignored stale remote update (local is newer)');
   }
 
@@ -195,6 +246,11 @@ async function processIssueEvent(
     updatedAt: remoteUpdatedAt,
   });
   if (!hasMutableStoryFields(patch)) {
+    logLinearWebhook('info', 'ignored_no_mutable_fields', {
+      delivery_id: event.idempotencyKey,
+      issue_id: linearIssueId,
+      story_id: link.storyId,
+    });
     return persistIgnoredReceipt(supabase, event, 'No supported fields for writeback');
   }
 
@@ -224,6 +280,11 @@ async function processIssueEvent(
     payload: event.payload,
     status: 'processed',
   });
+  logLinearWebhook('info', 'applied_issue_writeback', {
+    delivery_id: event.idempotencyKey,
+    issue_id: linearIssueId,
+    story_id: link.storyId,
+  });
   return successResponse({ duplicate: receipt.duplicate, applied: true, storyId: link.storyId });
 }
 
@@ -238,11 +299,19 @@ export async function POST(request: Request) {
   try {
     const parsed = parseAndVerifyEvent(request, rawBody);
     if (!parsed) {
+      logLinearWebhook('warn', 'invalid_webhook_payload', {
+        linear_event: request.headers.get('Linear-Event') ?? null,
+        linear_delivery: request.headers.get('Linear-Delivery') ?? null,
+      });
       return NextResponse.json({ error: 'Invalid webhook payload' }, { status: 400 });
     }
     event = parsed;
   } catch (error) {
     if (error instanceof Error && error.message === 'Invalid signature') {
+      logLinearWebhook('warn', 'invalid_signature', {
+        linear_event: request.headers.get('Linear-Event') ?? null,
+        linear_delivery: request.headers.get('Linear-Delivery') ?? null,
+      });
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
     return serverErrorResponse('Linear webhook secret is not configured');
@@ -250,12 +319,23 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
   if (!isSupportedIssueEvent(event)) {
+    logLinearWebhook('info', 'ignored_unsupported_event', {
+      delivery_id: event.idempotencyKey,
+      action: event.action,
+      type: event.type,
+    });
     return persistIgnoredReceipt(supabase, event);
   }
 
   try {
     return await processIssueEvent(supabase, event);
   } catch (error) {
+    logLinearWebhook('error', 'failed_processing_webhook', {
+      delivery_id: event.idempotencyKey,
+      action: event.action,
+      type: event.type,
+      error: error instanceof Error ? error.message : 'unknown_error',
+    });
     try {
       await insertWebhookReceipt(supabase, {
         idempotencyKey: event.idempotencyKey,
