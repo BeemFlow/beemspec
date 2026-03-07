@@ -14,6 +14,7 @@ describe('linear webhook verifier', () => {
     });
 
     expect(verifier?.verify({ rawBody: body, signature, timestamp: '2026-02-14T11:58:00.000Z' })).toBe(true);
+    expect(verifier?.verify({ rawBody: body, signature, timestamp: String(nowMs - 30_000) })).toBe(true);
   });
 
   it('rejects stale timestamp or invalid signature', () => {
@@ -44,7 +45,7 @@ describe('linear webhook ingest contracts', () => {
         action: 'update',
         type: 'Issue',
         createdAt: '2026-02-13T00:00:00.000Z',
-        webhookTimestamp: '2026-02-13T00:00:00.000Z',
+        webhookTimestamp: 1770000000000,
         data: { id: 'issue-1', title: 'Story title' },
       }),
       headers,
@@ -54,7 +55,7 @@ describe('linear webhook ingest contracts', () => {
       idempotencyKey: 'delivery-123',
       type: 'Issue',
       action: 'update',
-      createdAt: '2026-02-13T00:00:00.000Z',
+      createdAt: '1770000000000',
       payload: { id: 'issue-1', title: 'Story title' },
     });
   });

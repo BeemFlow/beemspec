@@ -4,14 +4,23 @@ import type { SupabaseLike } from '@/lib/supabase/types';
 
 interface IntegrationSettingsRow {
   linear_team_id: string | null;
-  linear_project_id: string | null;
   linear_state_id: string | null;
 }
 
 interface StoryMapIntegrationSettingsRow {
   linear_project_id: string | null;
   linear_state_id: string | null;
+  auto_import_labeled_issues?: boolean | null;
+  import_label_name?: string | null;
 }
+
+export interface StoryMapLinearImportSettings {
+  autoImportLabeledIssues: boolean;
+  importLabelName: string;
+}
+
+export const DEFAULT_LINEAR_IMPORT_LABEL = 'Story';
+export const DEFAULT_AUTO_IMPORT_LABELED_ISSUES = true;
 
 interface StoriesTable {
   select(columns: string): {
@@ -72,15 +81,20 @@ function toLinearTarget(row: IntegrationSettingsRow | null): SyncTarget | null {
 
   return {
     teamId,
-    projectId: normalize(row.linear_project_id) ?? undefined,
     stateId: normalize(row.linear_state_id) ?? undefined,
   };
 }
 
-function applyStoryMapOverrides(target: SyncTarget, overrides: StoryMapIntegrationSettingsRow | null): SyncTarget {
+function applyStoryMapOverrides(
+  target: SyncTarget,
+  overrides: StoryMapIntegrationSettingsRow | null,
+): SyncTarget | null {
+  const mapProjectId = normalize(overrides?.linear_project_id);
+  if (!mapProjectId) return null;
+
   return {
     teamId: target.teamId,
-    projectId: normalize(overrides?.linear_project_id) ?? target.projectId,
+    projectId: mapProjectId,
     stateId: normalize(overrides?.linear_state_id) ?? target.stateId,
   };
 }
@@ -92,7 +106,7 @@ async function getStoryMapLinearOverrides(
   try {
     const table = supabase.from('story_map_integration_settings') as StoryMapIntegrationSettingsTable;
     const { data, error } = await table
-      .select('linear_project_id, linear_state_id')
+      .select('linear_project_id, linear_state_id, auto_import_labeled_issues, import_label_name')
       .eq('story_map_id', storyMapId)
       .maybeSingle();
 
@@ -103,12 +117,29 @@ async function getStoryMapLinearOverrides(
   }
 }
 
+export function toStoryMapLinearImportSettings(
+  row: StoryMapIntegrationSettingsRow | null | undefined,
+): StoryMapLinearImportSettings {
+  return {
+    autoImportLabeledIssues:
+      typeof row?.auto_import_labeled_issues === 'boolean'
+        ? row.auto_import_labeled_issues
+        : DEFAULT_AUTO_IMPORT_LABELED_ISSUES,
+    importLabelName: normalize(row?.import_label_name) ?? DEFAULT_LINEAR_IMPORT_LABEL,
+  };
+}
+
+export async function getStoryMapLinearImportSettings(
+  supabase: SupabaseLike,
+  storyMapId: string,
+): Promise<StoryMapLinearImportSettings> {
+  const row = await getStoryMapLinearOverrides(supabase, storyMapId);
+  return toStoryMapLinearImportSettings(row);
+}
+
 async function getSettingsForTeamId(supabase: SupabaseLike, teamId: string): Promise<SyncTarget | null> {
   const table = supabase.from('integration_settings') as IntegrationSettingsTable;
-  const { data, error } = await table
-    .select('linear_team_id, linear_project_id, linear_state_id')
-    .eq('team_id', teamId)
-    .maybeSingle();
+  const { data, error } = await table.select('linear_team_id, linear_state_id').eq('team_id', teamId).maybeSingle();
 
   if (error) throw error;
   return toLinearTarget(data);

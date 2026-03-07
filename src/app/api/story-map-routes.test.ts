@@ -64,7 +64,6 @@ function createInsertClient(returnData: unknown, options: { includeLinearSetting
   const settingsMaybeSingle = vi.fn().mockResolvedValue({
     data: {
       linear_team_id: 'team_1',
-      linear_project_id: null,
       linear_state_id: null,
     },
     error: null,
@@ -156,7 +155,6 @@ function createStoryUpdateWithLinkClient(
   const settingsMaybeSingle = vi.fn().mockResolvedValue({
     data: {
       linear_team_id: 'team_1',
-      linear_project_id: null,
       linear_state_id: null,
     },
     error: null,

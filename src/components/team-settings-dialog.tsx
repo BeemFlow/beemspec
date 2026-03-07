@@ -43,11 +43,9 @@ interface TeamIntegrationsTabProps {
   linearExpiresAt: string | null;
   linearWorkspaceId: string;
   linearTeamId: string;
-  linearProjectId: string;
   linearStateId: string;
   linearOptionsLoading: boolean;
   linearTeamOptions: Array<{ id: string; name: string; key: string | null }>;
-  linearProjectOptions: Array<{ id: string; name: string; teamIds: string[] }>;
   linearStateOptions: Array<{ id: string; name: string; type: string | null; teamId: string }>;
   savingLinearSettings: boolean;
   disconnectingLinear: boolean;
@@ -56,7 +54,6 @@ interface TeamIntegrationsTabProps {
   onDisconnectLinear: () => Promise<void>;
   onSaveLinearSettings: (event: React.FormEvent) => Promise<void>;
   onLinearTeamIdChange: (value: string) => void;
-  onLinearProjectIdChange: (value: string) => void;
   onLinearStateIdChange: (value: string) => void;
 }
 
@@ -161,22 +158,16 @@ function LinearSettingsForm(input: {
   isOwner: boolean;
   workspaceId: string;
   teamId: string;
-  projectId: string;
   stateId: string;
   optionsLoading: boolean;
   teamOptions: Array<{ id: string; name: string; key: string | null }>;
-  projectOptions: Array<{ id: string; name: string; teamIds: string[] }>;
   stateOptions: Array<{ id: string; name: string; type: string | null; teamId: string }>;
   saving: boolean;
   onSave: (event: React.FormEvent) => Promise<void>;
   onTeamIdChange: (value: string) => void;
-  onProjectIdChange: (value: string) => void;
   onStateIdChange: (value: string) => void;
 }) {
   const NO_SELECTION = '__none__';
-  const filteredProjectOptions = input.projectOptions.filter((project) =>
-    input.teamId ? project.teamIds.includes(input.teamId) : true,
-  );
   const filteredStateOptions = input.stateOptions.filter((state) =>
     input.teamId ? state.teamId === input.teamId : true,
   );
@@ -215,36 +206,6 @@ function LinearSettingsForm(input: {
             onChange={(event) => input.onTeamIdChange(event.target.value)}
             disabled={!input.isOwner || input.saving}
             placeholder="Paste a Linear team ID"
-          />
-        )}
-      </div>
-      <div className="space-y-2">
-        <Label>Default Linear project (optional)</Label>
-        {filteredProjectOptions.length > 0 ? (
-          <Select
-            value={input.projectId || NO_SELECTION}
-            onValueChange={(value) => input.onProjectIdChange(value === NO_SELECTION ? '' : value)}
-            disabled={!input.isOwner || input.saving || input.optionsLoading}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="No default project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_SELECTION}>No default project</SelectItem>
-              {filteredProjectOptions.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <Input
-            id="linear-project-id"
-            value={input.projectId}
-            onChange={(event) => input.onProjectIdChange(event.target.value)}
-            disabled={!input.isOwner || input.saving}
-            placeholder="Optional project ID"
           />
         )}
       </div>
@@ -295,11 +256,9 @@ function TeamIntegrationsTab({
   linearExpiresAt,
   linearWorkspaceId,
   linearTeamId,
-  linearProjectId,
   linearStateId,
   linearOptionsLoading,
   linearTeamOptions,
-  linearProjectOptions,
   linearStateOptions,
   savingLinearSettings,
   disconnectingLinear,
@@ -308,7 +267,6 @@ function TeamIntegrationsTab({
   onDisconnectLinear,
   onSaveLinearSettings,
   onLinearTeamIdChange,
-  onLinearProjectIdChange,
   onLinearStateIdChange,
 }: TeamIntegrationsTabProps) {
   return (
@@ -334,16 +292,13 @@ function TeamIntegrationsTab({
         isOwner={isOwner}
         workspaceId={linearWorkspaceId}
         teamId={linearTeamId}
-        projectId={linearProjectId}
         stateId={linearStateId}
         optionsLoading={linearOptionsLoading}
         teamOptions={linearTeamOptions}
-        projectOptions={linearProjectOptions}
         stateOptions={linearStateOptions}
         saving={savingLinearSettings}
         onSave={onSaveLinearSettings}
         onTeamIdChange={onLinearTeamIdChange}
-        onProjectIdChange={onLinearProjectIdChange}
         onStateIdChange={onLinearStateIdChange}
       />
 
@@ -515,8 +470,6 @@ export function TeamSettingsDialog({
     linearWorkspaceId,
     linearTeamId,
     setLinearTeamId,
-    linearProjectId,
-    setLinearProjectId,
     linearStateId,
     setLinearStateId,
     linearConnected,
@@ -524,7 +477,6 @@ export function TeamSettingsDialog({
     linearExpiresAt,
     linearOptionsLoading,
     linearTeamOptions,
-    linearProjectOptions,
     linearStateOptions,
     error,
     handleRename,
@@ -588,11 +540,9 @@ export function TeamSettingsDialog({
               linearExpiresAt={linearExpiresAt}
               linearWorkspaceId={linearWorkspaceId}
               linearTeamId={linearTeamId}
-              linearProjectId={linearProjectId}
               linearStateId={linearStateId}
               linearOptionsLoading={linearOptionsLoading}
               linearTeamOptions={linearTeamOptions}
-              linearProjectOptions={linearProjectOptions}
               linearStateOptions={linearStateOptions}
               savingLinearSettings={savingLinearSettings}
               disconnectingLinear={disconnectingLinear}
@@ -601,7 +551,6 @@ export function TeamSettingsDialog({
               onDisconnectLinear={handleDisconnectLinear}
               onSaveLinearSettings={handleSaveLinearSettings}
               onLinearTeamIdChange={setLinearTeamId}
-              onLinearProjectIdChange={setLinearProjectId}
               onLinearStateIdChange={setLinearStateId}
             />
           </TabsContent>

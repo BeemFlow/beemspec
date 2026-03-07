@@ -11,7 +11,6 @@ export const updateLinearIntegrationSettingsSchema = z
   .object({
     linear_workspace_id: nullableString.optional(),
     linear_team_id: nullableString.optional(),
-    linear_project_id: nullableString.optional(),
     linear_state_id: nullableString.optional(),
   })
   .refine(atLeastOneField, atLeastOneFieldMessage);
@@ -20,6 +19,8 @@ export const updateStoryMapLinearSettingsSchema = z
   .object({
     linear_project_id: nullableString.optional(),
     linear_state_id: nullableString.optional(),
+    auto_import_labeled_issues: z.boolean().optional(),
+    import_label_name: z.string().trim().min(1).max(100).optional(),
   })
   .refine(atLeastOneField, atLeastOneFieldMessage);
 

@@ -2,6 +2,12 @@ import { createHmac } from 'node:crypto';
 import { createLinearWebhookSignatureVerifier, parseLinearWebhookEvent } from '@beemspec/linear';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getLinearWebhookIngest, getLinearWebhookSignatureVerifier } from '@/integrations/linear/helpers';
+import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
+import {
+  getLinearIssueLabelNames,
+  getLinearIssueProjectIdFromPayload,
+  getLinearIssueTeamIdFromPayload,
+} from '@/integrations/linear/label-sync';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { POST } from './route';
 
@@ -12,6 +18,17 @@ vi.mock('@/lib/supabase/admin', () => ({
 vi.mock('@/integrations/linear/helpers', () => ({
   getLinearWebhookIngest: vi.fn(),
   getLinearWebhookSignatureVerifier: vi.fn(),
+}));
+
+vi.mock('@/integrations/linear/import', () => ({
+  findStoryMapImportCandidate: vi.fn(),
+  importLinearIssueIntoStoryMap: vi.fn(),
+}));
+
+vi.mock('@/integrations/linear/label-sync', () => ({
+  getLinearIssueLabelNames: vi.fn(),
+  getLinearIssueProjectIdFromPayload: vi.fn(),
+  getLinearIssueTeamIdFromPayload: vi.fn(),
 }));
 
 function sign(body: string, secret: string): string {
@@ -34,13 +51,16 @@ function createWebhookAdminClient(
   );
 
   const linkMaybeSingle = vi.fn().mockResolvedValue({
-    data: options.existingLink ?? {
-      story_id: 'story_1',
-      linear_issue_id: 'lin_1',
-      linear_issue_identifier: 'ENG-101',
-      last_local_updated_at: null,
-      last_linear_updated_at: null,
-    },
+    data:
+      options.existingLink !== undefined
+        ? options.existingLink
+        : {
+            story_id: 'story_1',
+            linear_issue_id: 'lin_1',
+            linear_issue_identifier: 'ENG-101',
+            last_local_updated_at: null,
+            last_linear_updated_at: null,
+          },
     error: null,
   });
   const linkEq = vi.fn().mockReturnValue({ maybeSingle: linkMaybeSingle });
@@ -113,6 +133,11 @@ describe('linear webhook route', () => {
     vi.mocked(getLinearWebhookSignatureVerifier).mockReturnValue(
       createLinearWebhookSignatureVerifier({ secret: 'webhook_secret' }),
     );
+    vi.mocked(findStoryMapImportCandidate).mockResolvedValue(null);
+    vi.mocked(importLinearIssueIntoStoryMap).mockResolvedValue({ storyId: 'story_imported_1' });
+    vi.mocked(getLinearIssueLabelNames).mockReturnValue([]);
+    vi.mocked(getLinearIssueProjectIdFromPayload).mockReturnValue(null);
+    vi.mocked(getLinearIssueTeamIdFromPayload).mockReturnValue(null);
   });
 
   it('returns 401 for invalid signature', async () => {
@@ -220,6 +245,52 @@ describe('linear webhook route', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ success: true, duplicate: true });
+  });
+
+  it('imports unlinked labeled issues into story map', async () => {
+    const admin = createWebhookAdminClient({ existingLink: null });
+    vi.mocked(createAdminClient).mockReturnValue(admin.client as never);
+    vi.mocked(getLinearIssueTeamIdFromPayload).mockReturnValue('team_1');
+    vi.mocked(getLinearIssueProjectIdFromPayload).mockReturnValue('project_1');
+    vi.mocked(getLinearIssueLabelNames).mockReturnValue(['Story']);
+    vi.mocked(findStoryMapImportCandidate).mockResolvedValue({
+      storyMapId: 'map_1',
+    });
+    vi.mocked(importLinearIssueIntoStoryMap).mockResolvedValue({ storyId: 'story_imported_1' });
+
+    const createdAt = new Date().toISOString();
+    const rawBody = JSON.stringify({
+      action: 'update',
+      type: 'Issue',
+      createdAt,
+      webhookTimestamp: Date.now(),
+      data: {
+        id: 'lin_1',
+        identifier: 'ENG-101',
+        title: 'Imported issue',
+        labels: { nodes: [{ name: 'Story' }] },
+      },
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/integrations/linear/webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Linear-Signature': sign(rawBody, 'webhook_secret'),
+          'Linear-Delivery': 'delivery_import_1',
+        },
+        body: rawBody,
+      }),
+    );
+
+    expect(importLinearIssueIntoStoryMap).toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      applied: true,
+      story_id: 'story_imported_1',
+    });
   });
 
   it('ignores stale remote updates when local is newer', async () => {

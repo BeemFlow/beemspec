@@ -68,7 +68,7 @@ export async function GET(request: Request) {
 
     const { data: current } = await admin
       .from('integration_settings')
-      .select('linear_workspace_id, linear_team_id, linear_project_id, linear_state_id')
+      .select('linear_workspace_id, linear_team_id, linear_state_id')
       .eq('team_id', cookie.teamId)
       .maybeSingle();
 
@@ -78,7 +78,6 @@ export async function GET(request: Request) {
           {
             linearWorkspaceId: current?.linear_workspace_id ?? viewerInfo.organizationId ?? null,
             linearTeamId: current?.linear_team_id ?? null,
-            linearProjectId: current?.linear_project_id ?? null,
             linearStateId: current?.linear_state_id ?? null,
           },
           workspaceOptions,
@@ -91,7 +90,6 @@ export async function GET(request: Request) {
         linear_workspace_id:
           suggested?.linearWorkspaceId ?? current?.linear_workspace_id ?? viewerInfo.organizationId ?? null,
         linear_team_id: suggested?.linearTeamId ?? current?.linear_team_id ?? null,
-        linear_project_id: suggested?.linearProjectId ?? current?.linear_project_id ?? null,
         linear_state_id: suggested?.linearStateId ?? current?.linear_state_id ?? null,
       },
       { onConflict: 'team_id' },

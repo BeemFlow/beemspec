@@ -27,7 +27,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const membersPromise = supabase.rpc('get_team_members', { p_team_id: teamId });
   const integrationPromise = supabase
     .from('integration_settings')
-    .select('team_id, linear_workspace_id, linear_team_id, linear_project_id, linear_state_id, updated_at')
+    .select('team_id, linear_workspace_id, linear_team_id, linear_state_id, updated_at')
     .eq('team_id', teamId)
     .maybeSingle();
 

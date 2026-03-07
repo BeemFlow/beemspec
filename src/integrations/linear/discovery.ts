@@ -12,7 +12,6 @@ const PREFERRED_STATE_TYPES = ['unstarted', 'backlog', 'triage'];
 export interface LinearSettingsSnapshot {
   linearWorkspaceId: string | null;
   linearTeamId: string | null;
-  linearProjectId: string | null;
   linearStateId: string | null;
 }
 
@@ -30,13 +29,6 @@ export interface SuggestedLinearSettings extends LinearSettingsSnapshot {
 function chooseDefaultTeamId(options: LinearResolvedOptions): string | null {
   if (options.teams.length !== 1) return null;
   return options.teams[0]?.id ?? null;
-}
-
-function chooseDefaultProjectId(options: LinearResolvedOptions, teamId: string | null): string | null {
-  if (!teamId) return null;
-  const candidates = options.projects.filter((project) => project.teamIds.includes(teamId));
-  if (candidates.length !== 1) return null;
-  return candidates[0]?.id ?? null;
 }
 
 function chooseDefaultStateId(options: LinearResolvedOptions, teamId: string | null): string | null {
@@ -73,9 +65,6 @@ export function applySuggestedLinearSettings(
   const defaultTeamId = chooseDefaultTeamId(options);
   const linearTeamId = withFallback(current.linearTeamId, defaultTeamId);
 
-  const defaultProjectId = chooseDefaultProjectId(options, linearTeamId);
-  const linearProjectId = withFallback(current.linearProjectId, defaultProjectId);
-
   const defaultStateId = chooseDefaultStateId(options, linearTeamId);
   const linearStateId = withFallback(current.linearStateId, defaultStateId);
 
@@ -84,13 +73,11 @@ export function applySuggestedLinearSettings(
   const changed =
     linearWorkspaceId !== normalize(current.linearWorkspaceId) ||
     linearTeamId !== normalize(current.linearTeamId) ||
-    linearProjectId !== normalize(current.linearProjectId) ||
     linearStateId !== normalize(current.linearStateId);
 
   return {
     linearWorkspaceId,
     linearTeamId,
-    linearProjectId,
     linearStateId,
     changed,
   };

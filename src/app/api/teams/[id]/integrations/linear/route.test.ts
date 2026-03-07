@@ -32,7 +32,6 @@ describe('team linear integration settings route', () => {
       data: {
         team_id: TEAM_ID,
         linear_team_id: 'team_linear_1',
-        linear_project_id: 'project_linear_1',
       },
       error: null,
     });
@@ -62,7 +61,6 @@ describe('team linear integration settings route', () => {
         team_id: TEAM_ID,
         linear_workspace_id: null,
         linear_team_id: 'team_linear_1',
-        linear_project_id: null,
         linear_state_id: null,
       },
       error: null,
@@ -85,7 +83,6 @@ describe('team linear integration settings route', () => {
         team_id: TEAM_ID,
         linear_workspace_id: null,
         linear_team_id: 'team_linear_1',
-        linear_project_id: null,
         linear_state_id: null,
       },
       { onConflict: 'team_id' },

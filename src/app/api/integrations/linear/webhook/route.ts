@@ -1,6 +1,12 @@
 import { buildStoryPatchFromLinearIssue } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
 import { getLinearWebhookIngest, getLinearWebhookSignatureVerifier } from '@/integrations/linear/helpers';
+import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
+import {
+  getLinearIssueLabelNames,
+  getLinearIssueProjectIdFromPayload,
+  getLinearIssueTeamIdFromPayload,
+} from '@/integrations/linear/label-sync';
 import { getStoryLinearLinkByLinearIssueId, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import type { WebhookEvent } from '@/integrations/sync';
 import { buildDbUpdateFromPatch, hasMutableStoryFields, shouldApplyRemoteUpdate } from '@/integrations/sync';
@@ -118,7 +124,46 @@ async function processIssueEvent(
 
   const link = await getStoryLinearLinkByLinearIssueId(supabase, linearIssueId);
   if (!link) {
-    return persistIgnoredReceipt(supabase, event, 'No story link found for issue');
+    const teamId = getLinearIssueTeamIdFromPayload(payload);
+    if (!teamId) {
+      return persistIgnoredReceipt(supabase, event, 'Missing team id for unlinked issue import');
+    }
+
+    const labelNames = getLinearIssueLabelNames(payload);
+    if (labelNames.length === 0) {
+      return persistIgnoredReceipt(supabase, event, 'No story link found for issue');
+    }
+
+    const candidate = await findStoryMapImportCandidate(supabase, {
+      teamId,
+      linearProjectId: getLinearIssueProjectIdFromPayload(payload),
+      labelNames,
+    });
+
+    if (!candidate) {
+      return persistIgnoredReceipt(supabase, event, 'No matching story map import candidate for labeled issue');
+    }
+
+    const imported = await importLinearIssueIntoStoryMap({
+      supabase,
+      storyMapId: candidate.storyMapId,
+      linearIssueId,
+      linearIssueIdentifier: getString(payload?.identifier),
+      title: getString(payload?.title),
+      description: getString(payload?.description),
+      stateName: getString(asRecord(payload?.state)?.name),
+      updatedAt: getString(payload?.updatedAt) ?? event.createdAt,
+    });
+
+    const receipt = await insertWebhookReceipt(supabase, {
+      idempotencyKey: event.idempotencyKey,
+      type: event.type,
+      action: event.action,
+      payload: event.payload,
+      status: 'processed',
+    });
+
+    return successResponse({ duplicate: receipt.duplicate, applied: true, storyId: imported.storyId });
   }
 
   const { data: story, error: storyError } = await supabase

@@ -17,7 +17,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('integration_settings')
-    .select('team_id, linear_workspace_id, linear_team_id, linear_project_id, linear_state_id, updated_at')
+    .select('team_id, linear_workspace_id, linear_team_id, linear_state_id, updated_at')
     .eq('team_id', teamId)
     .maybeSingle();
 
@@ -48,14 +48,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     team_id: teamId,
     linear_workspace_id: normalize(validation.data.linear_workspace_id),
     linear_team_id: normalize(validation.data.linear_team_id),
-    linear_project_id: normalize(validation.data.linear_project_id),
     linear_state_id: normalize(validation.data.linear_state_id),
   };
 
   const { data, error } = await supabase
     .from('integration_settings')
     .upsert(payload, { onConflict: 'team_id' })
-    .select('team_id, linear_workspace_id, linear_team_id, linear_project_id, linear_state_id, updated_at')
+    .select('team_id, linear_workspace_id, linear_team_id, linear_state_id, updated_at')
     .single();
 
   if (error) {

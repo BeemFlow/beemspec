@@ -196,7 +196,6 @@ CREATE TABLE integration_settings (
   team_id UUID NOT NULL UNIQUE REFERENCES teams(id) ON DELETE CASCADE,
   linear_workspace_id TEXT,
   linear_team_id TEXT,
-  linear_project_id TEXT,
   linear_state_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -214,6 +213,8 @@ CREATE TABLE story_map_integration_settings (
   story_map_id UUID NOT NULL UNIQUE REFERENCES story_maps(id) ON DELETE CASCADE,
   linear_project_id TEXT,
   linear_state_id TEXT,
+  auto_import_labeled_issues BOOLEAN NOT NULL DEFAULT TRUE,
+  import_label_name TEXT NOT NULL DEFAULT 'Story',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

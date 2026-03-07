@@ -50,12 +50,31 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   const [dialog, setDialog] = useState<DialogState>(CLOSED);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [syncingLinear, setSyncingLinear] = useState(false);
+  const [syncProjectConfigured, setSyncProjectConfigured] = useState(false);
+
+  const loadSyncEligibility = useCallback(async () => {
+    try {
+      const data = await fetchJson<{ effective_settings?: { linear_project_id?: string | null } }>(
+        `/api/story-maps/${id}/integrations/linear`,
+        undefined,
+        'Failed to load story map Linear settings',
+      );
+      setSyncProjectConfigured(Boolean(data.effective_settings?.linear_project_id));
+    } catch {
+      setSyncProjectConfigured(false);
+    }
+  }, [id]);
 
   async function request(input: RequestInfo | URL, init: RequestInit | undefined, fallback: string) {
     await fetchJson(input, init, fallback);
   }
 
   async function handleSyncLinear() {
+    if (!syncProjectConfigured) {
+      setUiError('Select a Linear project in story map settings before running sync.');
+      return;
+    }
+
     setSyncingLinear(true);
     setUiError(null);
     setUiNotice(null);
@@ -96,7 +115,14 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
 
   useEffect(() => {
     loadStoryMap();
-  }, [loadStoryMap]);
+    loadSyncEligibility();
+  }, [loadStoryMap, loadSyncEligibility]);
+
+  useEffect(() => {
+    if (!settingsOpen) {
+      loadSyncEligibility();
+    }
+  }, [settingsOpen, loadSyncEligibility]);
 
   const closeDialog = () => setDialog(CLOSED);
 
@@ -398,7 +424,12 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         </Link>
         <h1 className="truncate text-base font-semibold sm:text-xl">{storyMap.name}</h1>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleSyncLinear} disabled={syncingLinear}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncLinear}
+            disabled={syncingLinear || !syncProjectConfigured}
+          >
             <RefreshCw className={`mr-1 h-4 w-4 ${syncingLinear ? 'animate-spin' : ''}`} />
             Sync
           </Button>

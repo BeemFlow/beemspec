@@ -1,5 +1,6 @@
 import { createLinearClient } from '@beemspec/linear';
 import type { IssueSync, SyncTarget } from '@/integrations/sync';
+import { env } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { SupabaseLike } from '@/lib/supabase/types';
 import {
@@ -47,6 +48,42 @@ async function resolveOAuthIssueSync(teamId: string): Promise<IssueSync | null> 
   } catch {
     return null;
   }
+}
+
+async function resolveOAuthAccessToken(teamId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  try {
+    const connection = await getLinearOAuthConnectionForTeam(admin, teamId);
+    if (!connection) return null;
+
+    if (!isExpired(connection.expiresAt)) {
+      return connection.accessToken;
+    }
+
+    if (!connection.refreshToken) {
+      return null;
+    }
+
+    const refreshed = await refreshLinearOAuthAccessToken(connection.refreshToken);
+    await upsertLinearOAuthConnection(admin, {
+      teamId,
+      accessToken: refreshed.accessToken,
+      refreshToken: refreshed.refreshToken ?? connection.refreshToken,
+      tokenType: refreshed.tokenType,
+      scope: refreshed.scope,
+      expiresAt: toExpiresAt(refreshed.expiresIn),
+    });
+
+    return refreshed.accessToken;
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveLinearAuthTokenForTeam(teamId: string): Promise<string | null> {
+  const oauthToken = await resolveOAuthAccessToken(teamId);
+  if (oauthToken) return oauthToken;
+  return env.linearApiKey();
 }
 
 async function resolveContextFromStoryMap(

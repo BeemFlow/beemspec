@@ -16,17 +16,20 @@ interface StoryMapLinearSettingsResponse {
   can_edit: boolean;
   team_settings: {
     linear_team_id: string | null;
-    linear_project_id: string | null;
     linear_state_id: string | null;
   };
   story_map_settings: {
     linear_project_id: string | null;
     linear_state_id: string | null;
+    auto_import_labeled_issues: boolean;
+    import_label_name: string;
     updated_at: string | null;
   };
   effective_settings: {
     linear_project_id: string | null;
     linear_state_id: string | null;
+    auto_import_labeled_issues: boolean;
+    import_label_name: string;
   };
 }
 
@@ -70,8 +73,12 @@ export function StoryMapSettingsDialog({
   const [canEdit, setCanEdit] = useState(false);
   const [projectId, setProjectId] = useState('');
   const [stateId, setStateId] = useState('');
+  const [autoImportLabeledIssues, setAutoImportLabeledIssues] = useState(true);
+  const [importLabelName, setImportLabelName] = useState('Story');
   const [effectiveProjectId, setEffectiveProjectId] = useState<string | null>(null);
   const [effectiveStateId, setEffectiveStateId] = useState<string | null>(null);
+  const [effectiveAutoImportLabeledIssues, setEffectiveAutoImportLabeledIssues] = useState(true);
+  const [effectiveImportLabelName, setEffectiveImportLabelName] = useState('Story');
   const [projectOptions, setProjectOptions] = useState<Array<{ id: string; name: string; teamIds: string[] }>>([]);
   const [stateOptions, setStateOptions] = useState<
     Array<{ id: string; name: string; type: string | null; teamId: string }>
@@ -94,8 +101,12 @@ export function StoryMapSettingsDialog({
       setTeamLinearTeamId(data.team_settings.linear_team_id);
       setProjectId(asInputValue(data.story_map_settings.linear_project_id));
       setStateId(asInputValue(data.story_map_settings.linear_state_id));
+      setAutoImportLabeledIssues(data.story_map_settings.auto_import_labeled_issues);
+      setImportLabelName(data.story_map_settings.import_label_name);
       setEffectiveProjectId(data.effective_settings.linear_project_id ?? null);
       setEffectiveStateId(data.effective_settings.linear_state_id ?? null);
+      setEffectiveAutoImportLabeledIssues(data.effective_settings.auto_import_labeled_issues);
+      setEffectiveImportLabelName(data.effective_settings.import_label_name);
 
       if (!data.team_settings.linear_team_id) {
         setProjectOptions([]);
@@ -170,6 +181,8 @@ export function StoryMapSettingsDialog({
           body: JSON.stringify({
             linear_project_id: asNullable(projectId),
             linear_state_id: asNullable(stateId),
+            auto_import_labeled_issues: autoImportLabeledIssues,
+            import_label_name: importLabelName.trim(),
           }),
         },
         'Failed to save story map Linear settings',
@@ -208,32 +221,28 @@ export function StoryMapSettingsDialog({
             {notice && <p className="text-sm text-emerald-700">{notice}</p>}
 
             <div className="space-y-2">
-              <Label>Default Linear project (optional)</Label>
-              {filteredProjectOptions.length > 0 ? (
-                <Select
-                  value={projectId || NO_SELECTION}
-                  onValueChange={(value) => setProjectId(value === NO_SELECTION ? '' : value)}
-                  disabled={!canEdit || !teamLinearTeamId || saving || optionsLoading}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="No default project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_SELECTION}>No default project</SelectItem>
-                    {filteredProjectOptions.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  value={projectId}
-                  onChange={(event) => setProjectId(event.target.value)}
-                  placeholder="Optional Linear project ID"
-                  disabled={!canEdit || !teamLinearTeamId || saving}
-                />
+              <Label>Linear project (required for sync)</Label>
+              <Select
+                value={projectId || NO_SELECTION}
+                onValueChange={(value) => setProjectId(value === NO_SELECTION ? '' : value)}
+                disabled={
+                  !canEdit || !teamLinearTeamId || saving || optionsLoading || filteredProjectOptions.length === 0
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_SELECTION}>No project selected</SelectItem>
+                  {filteredProjectOptions.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {teamLinearTeamId && filteredProjectOptions.length === 0 && (
+                <p className="text-xs text-muted-foreground">No Linear projects available for the selected team.</p>
               )}
             </div>
 
@@ -268,8 +277,39 @@ export function StoryMapSettingsDialog({
               )}
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="auto-import-labeled-issues">Auto-import labeled issues</Label>
+              <label className="flex items-center gap-2 text-sm" htmlFor="auto-import-labeled-issues">
+                <input
+                  id="auto-import-labeled-issues"
+                  type="checkbox"
+                  checked={autoImportLabeledIssues}
+                  onChange={(event) => setAutoImportLabeledIssues(event.target.checked)}
+                  disabled={!canEdit || !teamLinearTeamId || saving}
+                />
+                Import unlinked Linear issues into Untriaged when they include the sync label.
+              </label>
+              {!asNullable(projectId) && (
+                <p className="text-xs text-muted-foreground">
+                  Select a Linear project above to enable story sync and labeled issue imports for this map.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="import-label-name">Sync label</Label>
+              <Input
+                id="import-label-name"
+                value={importLabelName}
+                onChange={(event) => setImportLabelName(event.target.value)}
+                placeholder="Story"
+                disabled={!canEdit || !teamLinearTeamId || saving}
+              />
+            </div>
+
             <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-              Effective project: {effectiveProjectId ?? 'none'} | Effective state: {effectiveStateId ?? 'none'}
+              Effective project: {effectiveProjectId ?? 'none'} | Effective state: {effectiveStateId ?? 'none'} |
+              Auto-import: {effectiveAutoImportLabeledIssues ? 'on' : 'off'} | Sync label: {effectiveImportLabelName}
             </div>
 
             {canEdit ? (

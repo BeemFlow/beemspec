@@ -1,5 +1,7 @@
 import { mapStoryToLinearIssueInput } from '@beemspec/linear';
-import { resolveLinearSyncContextForStoryMap } from '@/integrations/linear/auth';
+import { resolveLinearAuthTokenForTeam, resolveLinearSyncContextForStoryMap } from '@/integrations/linear/auth';
+import { ensureLinearIssueHasLabel } from '@/integrations/linear/label-sync';
+import { getStoryMapLinearImportSettings } from '@/integrations/linear/settings';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import type { IssueSync } from '@/integrations/sync';
 import { syncStoryToRemote } from '@/integrations/sync';
@@ -46,6 +48,26 @@ export async function processStoryLinearSyncById(
     lastLocalUpdatedAt: null,
     lastLinearUpdatedAt: linearIssue.updatedAt,
   });
+
+  if (linearSyncContext.teamId) {
+    try {
+      const [authToken, importSettings] = await Promise.all([
+        resolveLinearAuthTokenForTeam(linearSyncContext.teamId),
+        getStoryMapLinearImportSettings(supabase, context.data.storyMapId),
+      ]);
+
+      if (authToken) {
+        await ensureLinearIssueHasLabel({
+          authToken,
+          issueId: linearIssue.id,
+          teamId: linearSyncContext.target.teamId,
+          labelName: importSettings.importLabelName,
+        });
+      }
+    } catch {
+      // best-effort label sync; primary story sync already succeeded
+    }
+  }
 
   return linearIssue;
 }
