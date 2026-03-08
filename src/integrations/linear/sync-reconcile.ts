@@ -1,9 +1,9 @@
 import { buildStoryPatchFromLinearIssue, mapStoryToLinearIssueInput } from '@beemspec/linear';
 import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import type { IssueSync } from '@/integrations/sync';
 import {
   buildDbUpdateFromPatch,
+  type IssueSync,
   SYNC_DIRECTION,
   shouldApplyRemoteUpdate,
   syncStoryToRemote,
@@ -76,11 +76,7 @@ async function syncLocalToRemote(
   return Response.json({ success: true, direction: SYNC_DIRECTION.localToRemote, story_id: story.id });
 }
 
-export async function syncStoryById(input: {
-  supabase: Supabase;
-  fallbackIssueSync: IssueSync | null;
-  storyId: string;
-}): Promise<Response> {
+export async function syncStoryById(input: { supabase: Supabase; storyId: string }): Promise<Response> {
   const { data: story, error: storyError } = await input.supabase
     .from('stories')
     .select('*')
@@ -93,7 +89,6 @@ export async function syncStoryById(input: {
 
   const linearSyncContext = await resolveLinearSyncContextForStory(input.supabase, {
     storyId: input.storyId,
-    fallbackIssueSync: input.fallbackIssueSync,
   });
   if (!linearSyncContext.targetConfigured || !linearSyncContext.target) {
     return ignored('no linear target configured for story team');
@@ -117,11 +112,7 @@ export async function syncStoryById(input: {
   return syncLocalToRemote(input.supabase, linearSyncContext.linearIssueSync, linearSyncContext.target, story, link);
 }
 
-export async function syncStoriesByIdList(input: {
-  supabase: Supabase;
-  fallbackIssueSync: IssueSync | null;
-  storyIds: string[];
-}): Promise<{
+export async function syncStoriesByIdList(input: { supabase: Supabase; storyIds: string[] }): Promise<{
   considered: number;
   succeeded: number;
   failed: number;
@@ -135,7 +126,6 @@ export async function syncStoriesByIdList(input: {
     try {
       const response = await syncStoryById({
         supabase: input.supabase,
-        fallbackIssueSync: input.fallbackIssueSync,
         storyId,
       });
       responses.push({ storyId, response });

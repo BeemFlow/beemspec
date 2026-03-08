@@ -44,7 +44,7 @@ describe('linear client (issue sync port)', () => {
   it('creates issue via sdk client', async () => {
     const client = makeClient();
     const sync = createLinearClient(true, {
-      apiKey: 'linear_api_key',
+      accessToken: 'linear_oauth_access_token',
       client,
     });
 
@@ -77,7 +77,7 @@ describe('linear client (issue sync port)', () => {
     });
 
     const sync = createLinearClient(true, {
-      apiKey: 'linear_api_key',
+      accessToken: 'linear_oauth_access_token',
       client,
       sleep,
       maxRetries: 2,
@@ -90,8 +90,8 @@ describe('linear client (issue sync port)', () => {
     expect(sleep).toHaveBeenCalledTimes(1);
   });
 
-  it('throws clear error when enabled without API key', () => {
-    expect(() => createLinearClient(true, { apiKey: '' })).toThrow(
+  it('throws clear error when enabled without auth token', () => {
+    expect(() => createLinearClient(true, {})).toThrow(
       'Linear issue sync enabled but no auth credentials are configured',
     );
   });
@@ -112,7 +112,7 @@ describe('linear client (issue sync port)', () => {
   it('deletes issue via sdk client', async () => {
     const client = makeClient();
     const sync = createLinearClient(true, {
-      apiKey: 'linear_api_key',
+      accessToken: 'linear_oauth_access_token',
       client,
     });
 

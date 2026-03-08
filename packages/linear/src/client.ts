@@ -19,7 +19,6 @@ type LinearClientLike = Pick<LinearClient, 'issue' | 'createIssue' | 'updateIssu
 
 /** Options for creating a Linear IssueSync client. Credentials are injected. */
 export interface LinearClientOptions {
-  apiKey?: string;
   accessToken?: string;
   maxRetries?: number;
   sleep?: SleepFn;
@@ -34,10 +33,9 @@ function createSdkClient(options: LinearClientOptions): LinearClientLike {
   if (options.client) return options.client;
 
   const accessToken = options.accessToken ?? null;
-  const apiKey = options.apiKey ?? '';
-  if (!accessToken && !apiKey) throw createMissingAuthError();
+  if (!accessToken) throw createMissingAuthError();
 
-  return new LinearClient(accessToken ? { accessToken } : { apiKey });
+  return new LinearClient({ accessToken });
 }
 
 function getBackoffMs(attempt: number): number {

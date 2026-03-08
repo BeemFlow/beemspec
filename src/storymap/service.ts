@@ -17,7 +17,6 @@ import type {
   UpdateTask,
 } from '@beemspec/storymap';
 import { isLinearSyncAvailableForStoryMap, resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
-import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { getStoryLinearLink } from '@/integrations/linear/story-links';
 import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
 import type { Supabase } from '@/lib/supabase/types';
@@ -167,19 +166,16 @@ export async function reorderReleases(supabase: Supabase, input: ReorderReleases
 }
 
 async function maybeSyncStoryToLinear(supabase: Supabase, storyId: string) {
-  const linearIssueSync = getLinearIssueSync();
   const context = await loadStoryWithStoryMap(supabase, storyId);
   if (!context.ok) return null;
 
   const linearSyncEnabled = await isLinearSyncAvailableForStoryMap(supabase, {
     storyMapId: context.data.storyMapId,
-    fallbackIssueSync: linearIssueSync,
   });
   if (!linearSyncEnabled) return null;
 
   return processStoryLinearSyncById(supabase, {
     storyId,
-    linearIssueSync,
   });
 }
 
@@ -267,12 +263,10 @@ export async function deleteStory(supabase: Supabase, storyId: string) {
   try {
     const link = await getStoryLinearLink(supabase, storyId);
     if (link) {
-      const linearIssueSync = getLinearIssueSync();
       const context = await resolveLinearSyncContextForStory(supabase, {
         storyId,
-        fallbackIssueSync: linearIssueSync,
       });
-      const issueSync = context.linearIssueSync ?? linearIssueSync;
+      const issueSync = context.linearIssueSync;
 
       if (!issueSync) {
         // Proceed with local delete when remote sync is unavailable.

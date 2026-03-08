@@ -3,7 +3,6 @@ import { resolveLinearAuthTokenForTeam, resolveLinearSyncContextForStoryMap } fr
 import { ensureLinearIssueHasLabel } from '@/integrations/linear/label-sync';
 import { getStoryMapLinearImportSettings } from '@/integrations/linear/settings';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import type { IssueSync } from '@/integrations/sync';
 import { syncStoryToRemote } from '@/integrations/sync';
 import type { Supabase } from '@/lib/supabase/types';
 import { loadStoryWithStoryMap } from '@/storymap/story-context';
@@ -12,7 +11,6 @@ export async function processStoryLinearSyncById(
   supabase: Supabase,
   input: {
     storyId: string;
-    linearIssueSync: IssueSync | null;
   },
 ) {
   const context = await loadStoryWithStoryMap(supabase, input.storyId);
@@ -20,7 +18,6 @@ export async function processStoryLinearSyncById(
 
   const linearSyncContext = await resolveLinearSyncContextForStoryMap(supabase, {
     storyMapId: context.data.storyMapId,
-    fallbackIssueSync: input.linearIssueSync,
   });
 
   if (!linearSyncContext.target || !linearSyncContext.targetConfigured) {

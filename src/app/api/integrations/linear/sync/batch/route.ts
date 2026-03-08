@@ -1,6 +1,5 @@
 import { linearSyncBatchSchema } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
-import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { syncStoriesByIdList } from '@/integrations/linear/sync-reconcile';
 import { requireAuth } from '@/lib/auth';
 import { env } from '@/lib/env';
@@ -21,8 +20,6 @@ export async function POST(request: Request) {
     const auth = await requireAuth();
     if (!auth.success) return auth.response;
   }
-
-  const linearIssueSync = getLinearIssueSync();
 
   const validation = await validateRequest(request, linearSyncBatchSchema);
   if (!validation.success) return validation.response;
@@ -53,7 +50,6 @@ export async function POST(request: Request) {
 
   const summary = await syncStoriesByIdList({
     supabase,
-    fallbackIssueSync: linearIssueSync,
     storyIds,
   });
 

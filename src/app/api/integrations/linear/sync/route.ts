@@ -1,5 +1,4 @@
 import { linearSyncStorySchema } from '@beemspec/linear';
-import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { syncStoriesByIdList } from '@/integrations/linear/sync-reconcile';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
@@ -15,7 +14,6 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const summary = await syncStoriesByIdList({
     supabase,
-    fallbackIssueSync: getLinearIssueSync(),
     storyIds: [validation.data.story_id],
   });
 

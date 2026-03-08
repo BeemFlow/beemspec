@@ -1,6 +1,5 @@
 import { createLinearClient } from '@beemspec/linear';
 import type { IssueSync, SyncTarget } from '@/integrations/sync';
-import { env } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { SupabaseLike } from '@/lib/supabase/types';
 import {
@@ -81,16 +80,10 @@ async function resolveOAuthAccessToken(teamId: string): Promise<string | null> {
 }
 
 export async function resolveLinearAuthTokenForTeam(teamId: string): Promise<string | null> {
-  const oauthToken = await resolveOAuthAccessToken(teamId);
-  if (oauthToken) return oauthToken;
-  return env.linearApiKey();
+  return resolveOAuthAccessToken(teamId);
 }
 
-async function resolveContextFromStoryMap(
-  supabase: SupabaseLike,
-  storyMapId: string,
-  fallbackIssueSync: IssueSync | null,
-): Promise<LinearSyncContext> {
+async function resolveContextFromStoryMap(supabase: SupabaseLike, storyMapId: string): Promise<LinearSyncContext> {
   const [target, teamId] = await Promise.all([
     getSyncTargetForStoryMap(supabase, storyMapId),
     getTeamIdForStoryMap(supabase, storyMapId),
@@ -107,29 +100,23 @@ async function resolveContextFromStoryMap(
     }
   }
 
-  return {
-    teamId,
-    target,
-    targetConfigured: true,
-    linearIssueSync: fallbackIssueSync,
-  };
+  return { teamId, target, targetConfigured: true, linearIssueSync: null };
 }
 
 export async function resolveLinearSyncContextForStoryMap(
   supabase: SupabaseLike,
   input: {
     storyMapId: string;
-    fallbackIssueSync: IssueSync | null;
   },
 ): Promise<LinearSyncContext> {
   try {
-    return await resolveContextFromStoryMap(supabase, input.storyMapId, input.fallbackIssueSync);
+    return await resolveContextFromStoryMap(supabase, input.storyMapId);
   } catch {
     return {
       teamId: null,
       target: null,
       targetConfigured: false,
-      linearIssueSync: input.fallbackIssueSync,
+      linearIssueSync: null,
     };
   }
 }
@@ -138,7 +125,6 @@ export async function resolveLinearSyncContextForStory(
   supabase: SupabaseLike,
   input: {
     storyId: string;
-    fallbackIssueSync: IssueSync | null;
   },
 ): Promise<LinearSyncContext> {
   try {
@@ -168,18 +154,13 @@ export async function resolveLinearSyncContextForStory(
       }
     }
 
-    return {
-      teamId,
-      target,
-      targetConfigured: true,
-      linearIssueSync: input.fallbackIssueSync,
-    };
+    return { teamId, target, targetConfigured: true, linearIssueSync: null };
   } catch {
     return {
       teamId: null,
       target: null,
       targetConfigured: false,
-      linearIssueSync: input.fallbackIssueSync,
+      linearIssueSync: null,
     };
   }
 }
@@ -188,11 +169,8 @@ export async function isLinearSyncAvailableForStoryMap(
   supabase: SupabaseLike,
   input: {
     storyMapId: string;
-    fallbackIssueSync: IssueSync | null;
   },
 ): Promise<boolean> {
-  if (input.fallbackIssueSync) return true;
-
   try {
     const teamId = await getTeamIdForStoryMap(supabase, input.storyMapId);
     if (!teamId) return false;

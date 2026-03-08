@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { POST } from './route';
@@ -10,10 +9,6 @@ vi.mock('@/lib/auth', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
-}));
-
-vi.mock('@/integrations/linear/helpers', () => ({
-  getLinearIssueSync: vi.fn(),
 }));
 
 vi.mock('@/integrations/linear/sync-reconcile', () => ({
@@ -28,12 +23,6 @@ describe('story map linear sync route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
-    vi.mocked(getLinearIssueSync).mockReturnValue({
-      getIssueById: vi.fn(),
-      createIssue: vi.fn(),
-      updateIssue: vi.fn(),
-      deleteIssue: vi.fn(),
-    });
   });
 
   it('syncs all stories in the story map and returns summary', async () => {
@@ -79,7 +68,6 @@ describe('story map linear sync route', () => {
     expect(syncStoriesByIdList).toHaveBeenCalledWith(
       expect.objectContaining({
         supabase: expect.anything(),
-        fallbackIssueSync: expect.anything(),
         storyIds: ['story_1', 'story_2'],
       }),
     );

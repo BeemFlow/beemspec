@@ -121,9 +121,7 @@ export async function ensureLinearIssueHasLabel(input: {
   const labelName = normalizeLabelName(input.labelName);
   if (!labelName) return;
 
-  const client = new LinearClient(
-    input.authToken.startsWith('lin_api_') ? { apiKey: input.authToken } : { accessToken: input.authToken },
-  );
+  const client = new LinearClient({ accessToken: input.authToken });
 
   const issue = await fetchIssueLabels(client, input.issueId);
   if (!issue) return;

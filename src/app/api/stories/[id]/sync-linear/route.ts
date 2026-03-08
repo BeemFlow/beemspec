@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { isLinearSyncAvailableForStoryMap } from '@/integrations/linear/auth';
-import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
@@ -11,8 +10,6 @@ import { loadStoryWithStoryMap } from '@/storymap/story-context';
 export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
-
-  const linearIssueSync = getLinearIssueSync();
 
   const { id: storyId } = await params;
   if (!isValidUuid(storyId)) return invalidIdResponse();
@@ -32,7 +29,6 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
 
   const linearSyncEnabled = await isLinearSyncAvailableForStoryMap(supabase, {
     storyMapId: context.data.storyMapId,
-    fallbackIssueSync: linearIssueSync,
   });
   if (!linearSyncEnabled) {
     return NextResponse.json({ error: 'Linear integration is not enabled' }, { status: 503 });
@@ -41,7 +37,6 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
   try {
     const linearIssue = await processStoryLinearSyncById(supabase, {
       storyId,
-      linearIssueSync,
     });
 
     return NextResponse.json({

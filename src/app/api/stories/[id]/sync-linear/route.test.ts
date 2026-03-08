@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLinearIssueSync } from '@/integrations/linear/helpers';
+import { isLinearSyncAvailableForStoryMap } from '@/integrations/linear/auth';
 import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
@@ -11,7 +11,7 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 vi.mock('@/storymap/story-context', () => ({
   loadStoryWithStoryMap: vi.fn(),
 }));
-vi.mock('@/integrations/linear/helpers', () => ({ getLinearIssueSync: vi.fn() }));
+vi.mock('@/integrations/linear/auth', () => ({ isLinearSyncAvailableForStoryMap: vi.fn() }));
 vi.mock('@/integrations/linear/sync-story-by-id', () => ({ processStoryLinearSyncById: vi.fn() }));
 
 const STORY_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
@@ -20,7 +20,7 @@ describe('story manual linear sync route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
-    vi.mocked(getLinearIssueSync).mockReturnValue(null);
+    vi.mocked(isLinearSyncAvailableForStoryMap).mockResolvedValue(true);
   });
 
   it('syncs story to linear immediately', async () => {
@@ -30,8 +30,6 @@ describe('story manual linear sync route', () => {
       data: { story: { id: STORY_ID }, storyMapId: 'story_map_1' },
     } as never);
 
-    const linearIssueSync = { getIssueById: vi.fn(), createIssue: vi.fn(), updateIssue: vi.fn(), deleteIssue: vi.fn() };
-    vi.mocked(getLinearIssueSync).mockReturnValue(linearIssueSync);
     vi.mocked(processStoryLinearSyncById).mockResolvedValue({
       id: 'lin_issue_1',
       identifier: 'ENG-101',

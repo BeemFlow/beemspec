@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
-import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { SYNC_DIRECTION } from '@/integrations/sync';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
@@ -12,10 +11,6 @@ vi.mock('@/lib/auth', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
-}));
-
-vi.mock('@/integrations/linear/helpers', () => ({
-  getLinearIssueSync: vi.fn(),
 }));
 
 vi.mock('@/integrations/linear/auth', () => ({
@@ -108,7 +103,6 @@ describe('linear sync route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
-    vi.mocked(getLinearIssueSync).mockReturnValue(null);
   });
 
   it('applies remote->local when remote is newer', async () => {

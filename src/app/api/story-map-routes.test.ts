@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLinearIssueSync } from '@/integrations/linear/helpers';
+import { isLinearSyncAvailableForStoryMap, resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
 import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
@@ -29,8 +29,9 @@ vi.mock('@/integrations/linear/sync-story-by-id', () => ({
   processStoryLinearSyncById: vi.fn(),
 }));
 
-vi.mock('@/integrations/linear/helpers', () => ({
-  getLinearIssueSync: vi.fn(),
+vi.mock('@/integrations/linear/auth', () => ({
+  isLinearSyncAvailableForStoryMap: vi.fn(),
+  resolveLinearSyncContextForStory: vi.fn(),
 }));
 
 const VALID_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
@@ -247,7 +248,13 @@ describe('story map API routes', () => {
       stateId: null,
       updatedAt: '2026-02-16T00:00:00.000Z',
     });
-    vi.mocked(getLinearIssueSync).mockReturnValue(null);
+    vi.mocked(isLinearSyncAvailableForStoryMap).mockResolvedValue(false);
+    vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
+      teamId: 'team_1',
+      targetConfigured: true,
+      target: { teamId: 'linear_team_1' },
+      linearIssueSync: null,
+    });
   });
 
   describe('reorder routes', () => {
@@ -433,13 +440,7 @@ describe('story map API routes', () => {
         status: 'backlog',
       });
       vi.mocked(createClient).mockResolvedValue(client as never);
-      const linearIssueSync = {
-        getIssueById: vi.fn(),
-        createIssue: vi.fn(),
-        updateIssue: vi.fn(),
-        deleteIssue: vi.fn(),
-      };
-      vi.mocked(getLinearIssueSync).mockReturnValue(linearIssueSync);
+      vi.mocked(isLinearSyncAvailableForStoryMap).mockResolvedValue(true);
 
       const response = await postStories(
         jsonRequest({
@@ -456,7 +457,6 @@ describe('story map API routes', () => {
         expect.anything(),
         expect.objectContaining({
           storyId: VALID_ID,
-          linearIssueSync,
         }),
       );
 
@@ -543,14 +543,7 @@ describe('story map API routes', () => {
 
       const { client } = createStoryUpdateWithLinkClient(story, 'lin_issue_1');
       vi.mocked(createClient).mockResolvedValue(client as never);
-
-      const linearIssueSync = {
-        getIssueById: vi.fn(),
-        createIssue: vi.fn(),
-        updateIssue: vi.fn(),
-        deleteIssue: vi.fn(),
-      };
-      vi.mocked(getLinearIssueSync).mockReturnValue(linearIssueSync);
+      vi.mocked(isLinearSyncAvailableForStoryMap).mockResolvedValue(true);
 
       const response = await putStoryById(jsonRequest({ title: 'Story edited', status: 'ready' }), {
         params: Promise.resolve({ id: VALID_ID }),
@@ -560,7 +553,6 @@ describe('story map API routes', () => {
         expect.anything(),
         expect.objectContaining({
           storyId: VALID_ID,
-          linearIssueSync,
         }),
       );
 
@@ -627,11 +619,16 @@ describe('story map API routes', () => {
       vi.mocked(createClient).mockResolvedValue(client as never);
 
       const deleteIssue = vi.fn().mockResolvedValue(undefined);
-      vi.mocked(getLinearIssueSync).mockReturnValue({
-        getIssueById: vi.fn(),
-        createIssue: vi.fn(),
-        updateIssue: vi.fn(),
-        deleteIssue,
+      vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
+        teamId: 'team_1',
+        targetConfigured: true,
+        target: { teamId: 'linear_team_1' },
+        linearIssueSync: {
+          getIssueById: vi.fn(),
+          createIssue: vi.fn(),
+          updateIssue: vi.fn(),
+          deleteIssue,
+        },
       });
 
       const response = await deleteStoryById(new Request('http://localhost/api/test'), {
@@ -648,11 +645,16 @@ describe('story map API routes', () => {
       vi.mocked(createClient).mockResolvedValue(client as never);
 
       const deleteIssue = vi.fn().mockRejectedValue(new Error('linear delete failed'));
-      vi.mocked(getLinearIssueSync).mockReturnValue({
-        getIssueById: vi.fn(),
-        createIssue: vi.fn(),
-        updateIssue: vi.fn(),
-        deleteIssue,
+      vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
+        teamId: 'team_1',
+        targetConfigured: true,
+        target: { teamId: 'linear_team_1' },
+        linearIssueSync: {
+          getIssueById: vi.fn(),
+          createIssue: vi.fn(),
+          updateIssue: vi.fn(),
+          deleteIssue,
+        },
       });
 
       const response = await deleteStoryById(new Request('http://localhost/api/test'), {
@@ -660,6 +662,24 @@ describe('story map API routes', () => {
       });
 
       expect(deleteIssue).toHaveBeenCalledWith('lin_issue_1');
+      expect(remove).toHaveBeenCalled();
+      await expect(response.json()).resolves.toMatchObject({ success: true });
+    });
+
+    it('deletes local story when no linear issue sync client exists', async () => {
+      const { client, remove } = createDeleteClient({ id: VALID_ID }, { linkedLinearIssueId: 'lin_issue_1' });
+      vi.mocked(createClient).mockResolvedValue(client as never);
+      vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
+        teamId: 'team_1',
+        targetConfigured: true,
+        target: { teamId: 'linear_team_1' },
+        linearIssueSync: null,
+      });
+
+      const response = await deleteStoryById(new Request('http://localhost/api/test'), {
+        params: Promise.resolve({ id: VALID_ID }),
+      });
+
       expect(remove).toHaveBeenCalled();
       await expect(response.json()).resolves.toMatchObject({ success: true });
     });

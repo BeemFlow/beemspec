@@ -17,10 +17,6 @@ export const env = {
     return readEnv('SUPABASE_SECRET_KEY');
   },
 
-  linearApiKey(): string | null {
-    return readEnv('LINEAR_API_KEY');
-  },
-
   linearClientId(): string | null {
     return readEnv('LINEAR_CLIENT_ID');
   },

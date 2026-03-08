@@ -1,15 +1,6 @@
-import { createLinearClient, createLinearWebhookIngest, createLinearWebhookSignatureVerifier } from '@beemspec/linear';
-import type { IssueSync, WebhookIngest, WebhookSignatureVerifier } from '@/integrations/sync';
+import { createLinearWebhookIngest, createLinearWebhookSignatureVerifier } from '@beemspec/linear';
+import type { WebhookIngest, WebhookSignatureVerifier } from '@/integrations/sync';
 import { env } from '@/lib/env';
-
-/**
- * Create a Linear IssueSync instance using the configured API key.
- * Returns null when no API key is set.
- */
-export function getLinearIssueSync(): IssueSync | null {
-  const apiKey = env.linearApiKey();
-  return createLinearClient(Boolean(apiKey), { apiKey: apiKey ?? undefined });
-}
 
 /**
  * Create a Linear WebhookIngest instance using the configured webhook secret.

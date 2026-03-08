@@ -1,7 +1,6 @@
 import { listLinearProjectIssuesForImport } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
 import { resolveLinearAuthTokenForTeam } from '@/integrations/linear/auth';
-import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
 import { getTeamIdForStoryMap } from '@/integrations/linear/settings';
 import { getStoryLinearLinkByLinearIssueId } from '@/integrations/linear/story-links';
@@ -101,7 +100,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     if (storyIds.length > 0) {
       summary = await syncStoriesByIdList({
         supabase,
-        fallbackIssueSync: getLinearIssueSync(),
         storyIds,
       });
     }

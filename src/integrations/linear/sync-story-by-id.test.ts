@@ -76,10 +76,7 @@ describe('processStoryLinearSyncById', () => {
   });
 
   it('applies sync label after successful remote sync', async () => {
-    await processStoryLinearSyncById({} as never, {
-      storyId: 'story_1',
-      linearIssueSync: { createIssue: vi.fn(), getIssueById: vi.fn(), updateIssue: vi.fn(), deleteIssue: vi.fn() },
-    });
+    await processStoryLinearSyncById({} as never, { storyId: 'story_1' });
 
     expect(upsertStoryLinearLink).toHaveBeenCalled();
     expect(ensureLinearIssueHasLabel).toHaveBeenCalledWith({
@@ -93,12 +90,7 @@ describe('processStoryLinearSyncById', () => {
   it('does not fail story sync when label apply fails', async () => {
     vi.mocked(ensureLinearIssueHasLabel).mockRejectedValue(new Error('label apply failed'));
 
-    await expect(
-      processStoryLinearSyncById({} as never, {
-        storyId: 'story_1',
-        linearIssueSync: { createIssue: vi.fn(), getIssueById: vi.fn(), updateIssue: vi.fn(), deleteIssue: vi.fn() },
-      }),
-    ).resolves.toMatchObject({
+    await expect(processStoryLinearSyncById({} as never, { storyId: 'story_1' })).resolves.toMatchObject({
       id: 'lin_1',
       identifier: 'BEE-1',
     });
