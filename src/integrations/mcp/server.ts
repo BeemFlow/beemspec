@@ -33,7 +33,6 @@ import {
   deletePersona,
   deleteRelease,
   deleteStory,
-  deleteStoryMap,
   deleteTask,
   getStory,
   getStoryMapGraph,
@@ -404,30 +403,6 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       }
 
       return successResult(data);
-    }),
-  );
-
-  server.registerTool(
-    'storymap_delete',
-    {
-      title: 'Delete Story Map',
-      description:
-        'Destructive. Deletes the story map and all nested entities (activities, tasks, stories, releases, personas).',
-      inputSchema: {
-        story_map_id: z.string().uuid(),
-      },
-      annotations: destructiveAnnotations,
-    },
-    withToolErrorBoundary('storymap_delete', async ({ story_map_id }) => {
-      const supabase = createAdminClient();
-      const { data, error } = await deleteStoryMap(supabase, story_map_id);
-
-      if (error) {
-        if (isNotFound(error)) return errorResult('Story map not found');
-        return errorResult('Failed to delete story map', describeDbError(error));
-      }
-
-      return successResult({ deleted: data });
     }),
   );
 

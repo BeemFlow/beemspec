@@ -1,9 +1,10 @@
 'use client';
 
-import { AlertTriangle, Clock, Loader2, UserPlus } from 'lucide-react';
+import { Clock, Loader2, UserPlus } from 'lucide-react';
 import { useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { DangerZone } from '@/components/ui/danger-zone';
 import { DeleteButton } from '@/components/ui/delete-button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -418,14 +419,7 @@ function TeamDangerTab({ isOwner, teamName, deleting, onDeleteTeam }: TeamDanger
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 text-destructive">
-        <AlertTriangle className="h-4 w-4" />
-        <span className="text-sm font-medium">Danger Zone</span>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Deleting this team will permanently remove all story maps, activities, tasks, and stories.
-      </p>
+    <DangerZone description="Deleting this team will permanently remove all story maps, activities, tasks, and stories.">
       <DeleteButton
         onDelete={onDeleteTeam}
         loading={deleting}
@@ -434,7 +428,7 @@ function TeamDangerTab({ isOwner, teamName, deleting, onDeleteTeam }: TeamDanger
         confirmDescription="This action cannot be undone. All story maps and their content will be permanently deleted."
         confirmText={teamName}
       />
-    </div>
+    </DangerZone>
   );
 }
 

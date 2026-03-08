@@ -74,6 +74,7 @@ describe('mcp server', () => {
     expect(toolNames.has('storymap_workflow_guide')).toBe(true);
     expect(toolNames.has('storymap_list')).toBe(true);
     expect(toolNames.has('storymap_get')).toBe(true);
+    expect(toolNames.has('storymap_delete')).toBe(false);
     expect(toolNames.has('activity_create')).toBe(true);
     expect(toolNames.has('task_create')).toBe(true);
     expect(toolNames.has('release_create')).toBe(true);

@@ -2,6 +2,7 @@
 
 import { ArrowLeft, Settings } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { use, useCallback, useEffect, useState } from 'react';
 import { ActivityDialog } from '@/components/story-map/ActivityDialog';
 import { AgentKickoffPanel } from '@/components/story-map/AgentKickoffPanel';
@@ -42,6 +43,7 @@ type DialogState =
 const CLOSED: DialogState = { type: 'closed' };
 
 export default function StoryMapPage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter();
   const { id } = use(params);
   const [storyMap, setStoryMap] = useState<StoryMapFull | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -316,6 +318,12 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     }
   }
 
+  async function handleDeleteStoryMap() {
+    await request(`/api/story-maps/${id}`, { method: 'DELETE' }, 'Failed to delete story map');
+    setSettingsOpen(false);
+    router.push('/');
+  }
+
   // Derive prompt dialog props from state
   function getPromptProps(): { title: string; placeholder: string; defaultValue: string } {
     switch (dialog.type) {
@@ -410,6 +418,7 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         storyMapId={storyMap.id}
         storyMapName={storyMap.name}
         onSyncComplete={loadStoryMap}
+        onDeleteStoryMap={handleDeleteStoryMap}
       />
 
       <StoryDialog

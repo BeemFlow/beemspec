@@ -3,6 +3,8 @@
 import { Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { DangerZone } from '@/components/ui/danger-zone';
+import { DeleteButton } from '@/components/ui/delete-button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,18 +59,21 @@ export function StoryMapSettingsDialog({
   storyMapId,
   storyMapName,
   onSyncComplete,
+  onDeleteStoryMap,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   storyMapId: string;
   storyMapName: string;
   onSyncComplete?: () => void;
+  onDeleteStoryMap?: () => Promise<void>;
 }) {
   const NO_SELECTION = '__none__';
   const [loading, setLoading] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [deletingStoryMap, setDeletingStoryMap] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
@@ -227,6 +232,22 @@ export function StoryMapSettingsDialog({
     }
   }
 
+  async function handleDeleteStoryMap() {
+    if (!onDeleteStoryMap) return;
+    setDeletingStoryMap(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      await onDeleteStoryMap();
+      onOpenChange(false);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setDeletingStoryMap(false);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -356,6 +377,19 @@ export function StoryMapSettingsDialog({
                 {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Run manual sync'}
               </Button>
             </div>
+
+            {canEdit && onDeleteStoryMap && (
+              <DangerZone description="Deleting this story map permanently removes all activities, tasks, stories, releases, and personas in it.">
+                <DeleteButton
+                  onDelete={handleDeleteStoryMap}
+                  loading={deletingStoryMap}
+                  label="Delete story map"
+                  confirmTitle="Delete story map"
+                  confirmDescription="This action cannot be undone. All map content will be permanently deleted."
+                  confirmText={storyMapName}
+                />
+              </DangerZone>
+            )}
 
             {canEdit ? (
               <Button type="submit" disabled={!teamLinearTeamId || saving}>
