@@ -1,3 +1,4 @@
+import { listLinearProjectIssuesForImport } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
 import { syncStoriesByIdList } from '@/app/api/integrations/linear/sync/route';
 import { resolveLinearAuthTokenForTeam } from '@/integrations/linear/auth';
@@ -10,121 +11,6 @@ import { serverErrorResponse } from '@/lib/errors';
 import { normalize } from '@/lib/strings';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
-
-interface LinearIssueImportCandidate {
-  id: string;
-  teamId: string;
-  projectId: string | null;
-  labelNames: string[];
-  identifier: string | null;
-  title: string | null;
-  description: string | null;
-  stateName: string | null;
-  updatedAt: string;
-}
-
-async function listLinearProjectIssues(input: {
-  accessToken: string;
-  projectId: string;
-}): Promise<LinearIssueImportCandidate[]> {
-  const issues: LinearIssueImportCandidate[] = [];
-  let cursor: string | null = null;
-
-  const query = `
-    query ManualStoryMapImport($projectId: String!, $cursor: String) {
-      issues(first: 100, after: $cursor, filter: { project: { id: { eq: $projectId } } }) {
-        nodes {
-          id
-          team { id }
-          project { id }
-          identifier
-          title
-          description
-          labels { nodes { name } }
-          updatedAt
-          state { name }
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-      }
-    }
-  `;
-
-  do {
-    const response = await fetch('https://api.linear.app/graphql', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${input.accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query,
-        variables: {
-          projectId: input.projectId,
-          cursor,
-        },
-      }),
-      cache: 'no-store',
-    });
-
-    const payload = (await response.json()) as {
-      data?: {
-        issues?: {
-          nodes?: Array<{
-            id?: string | null;
-            team?: { id?: string | null } | null;
-            project?: { id?: string | null } | null;
-            identifier?: string | null;
-            title?: string | null;
-            description?: string | null;
-            labels?: { nodes?: Array<{ name?: string | null } | null> | null } | null;
-            updatedAt?: string | null;
-            state?: { name?: string | null } | null;
-          } | null>;
-          pageInfo?: { hasNextPage?: boolean | null; endCursor?: string | null } | null;
-        };
-      };
-      errors?: Array<{ message?: string }>;
-    };
-
-    if (!response.ok || (payload.errors && payload.errors.length > 0)) {
-      const message = payload.errors?.[0]?.message ?? `Linear query failed with status ${response.status}`;
-      throw new Error(message);
-    }
-
-    const nodes = payload.data?.issues?.nodes ?? [];
-    for (const node of nodes) {
-      const id = typeof node?.id === 'string' ? node.id : null;
-      const teamId = typeof node?.team?.id === 'string' ? node.team.id : null;
-      const updatedAt = typeof node?.updatedAt === 'string' ? node.updatedAt : null;
-      if (!id || !teamId || !updatedAt) continue;
-
-      const labelNames = (node?.labels?.nodes ?? [])
-        .map((entry) => (typeof entry?.name === 'string' ? entry.name.trim() : ''))
-        .filter((name) => name.length > 0);
-
-      issues.push({
-        id,
-        teamId,
-        projectId: typeof node?.project?.id === 'string' ? node.project.id : null,
-        labelNames,
-        identifier: typeof node?.identifier === 'string' ? node.identifier : null,
-        title: typeof node?.title === 'string' ? node.title : null,
-        description: typeof node?.description === 'string' ? node.description : null,
-        stateName: typeof node?.state?.name === 'string' ? node.state.name : null,
-        updatedAt,
-      });
-    }
-
-    const pageInfo = payload.data?.issues?.pageInfo;
-    const hasNextPage = Boolean(pageInfo?.hasNextPage);
-    cursor = hasNextPage ? (pageInfo?.endCursor ?? null) : null;
-  } while (cursor);
-
-  return issues;
-}
 
 async function runManualImportForStoryMap(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -145,7 +31,7 @@ async function runManualImportForStoryMap(
   const accessToken = await resolveLinearAuthTokenForTeam(mapTeamId);
   if (!accessToken) return { considered: 0, imported: 0, skipped: 0 };
 
-  const issues = await listLinearProjectIssues({ accessToken, projectId: linearProjectId });
+  const issues = await listLinearProjectIssuesForImport(accessToken, linearProjectId);
 
   let imported = 0;
   let skipped = 0;

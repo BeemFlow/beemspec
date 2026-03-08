@@ -30,6 +30,16 @@ function sleepMs(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function createSdkClient(options: LinearClientOptions): LinearClientLike {
+  if (options.client) return options.client;
+
+  const accessToken = options.accessToken ?? null;
+  const apiKey = options.apiKey ?? '';
+  if (!accessToken && !apiKey) throw createMissingAuthError();
+
+  return new LinearClient(accessToken ? { accessToken } : { apiKey });
+}
+
 function getBackoffMs(attempt: number): number {
   return BASE_BACKOFF_MS * 2 ** attempt;
 }
@@ -115,6 +125,18 @@ export interface LinearWorkspaceOptions {
   teams: LinearTeamOption[];
   projects: LinearProjectOption[];
   states: LinearStateOption[];
+}
+
+export interface LinearProjectIssueImportOption {
+  id: string;
+  identifier: string | null;
+  title: string | null;
+  description: string | null;
+  stateName: string | null;
+  updatedAt: string;
+  teamId: string;
+  projectId: string | null;
+  labelNames: string[];
 }
 
 interface LinearConnection<T> {
@@ -226,6 +248,47 @@ export async function getLinearWorkspaceOptions(accessToken: string): Promise<Li
   };
 }
 
+export async function listLinearProjectIssuesForImport(
+  accessToken: string,
+  projectId: string,
+): Promise<LinearProjectIssueImportOption[]> {
+  const client = new LinearClient({ accessToken });
+  const project = await client.project(projectId);
+  if (!project?.id) return [];
+
+  const results: LinearProjectIssueImportOption[] = [];
+  let page = await project.issues({ first: 100 } as never);
+
+  for (;;) {
+    for (const issue of page.nodes ?? []) {
+      if (!issue?.id || !issue.updatedAt || !issue.teamId) continue;
+
+      const labelsConnection = await issue.labels({ first: 100 } as never);
+      const labelNames = (labelsConnection.nodes ?? [])
+        .map((label) => (typeof label?.name === 'string' ? label.name.trim() : ''))
+        .filter((name) => name.length > 0);
+
+      const state = await issue.state;
+      results.push({
+        id: issue.id,
+        identifier: issue.identifier ?? null,
+        title: issue.title ?? null,
+        description: issue.description ?? null,
+        stateName: typeof state?.name === 'string' ? state.name : null,
+        updatedAt: issue.updatedAt.toISOString(),
+        teamId: issue.teamId,
+        projectId: issue.projectId ?? null,
+        labelNames,
+      });
+    }
+
+    if (!page.pageInfo?.hasNextPage) break;
+    page = await page.fetchNext();
+  }
+
+  return results;
+}
+
 /**
  * Create an IssueSync implementation backed by the Linear SDK.
  * Credentials are injected via options -- no env vars are read.
@@ -234,12 +297,7 @@ export async function getLinearWorkspaceOptions(accessToken: string): Promise<Li
  */
 export function createLinearClient(enabled: boolean, options: LinearClientOptions = {}): IssueSync | null {
   if (!enabled) return null;
-
-  const accessToken = options.accessToken ?? null;
-  const apiKey = options.apiKey ?? '';
-  if (!accessToken && !apiKey && !options.client) throw createMissingAuthError();
-
-  const client = options.client ?? new LinearClient(accessToken ? { accessToken } : { apiKey });
+  const client = createSdkClient(options);
 
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const sleep = options.sleep ?? sleepMs;

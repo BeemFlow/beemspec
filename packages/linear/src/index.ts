@@ -4,6 +4,7 @@
 
 export type {
   LinearClientOptions,
+  LinearProjectIssueImportOption,
   LinearProjectOption,
   LinearStateOption,
   LinearTeamOption,
@@ -11,7 +12,12 @@ export type {
   LinearWorkspaceOptions,
 } from './client';
 // Client (SDK wrapper with retry/backoff)
-export { createLinearClient, getLinearViewerInfo, getLinearWorkspaceOptions } from './client';
+export {
+  createLinearClient,
+  getLinearViewerInfo,
+  getLinearWorkspaceOptions,
+  listLinearProjectIssuesForImport,
+} from './client';
 export type { ParsedLinearStoryFields } from './description';
 // Description serialize/parse
 export { buildLinearDescription, mapStoryToLinearIssueInput, parseLinearDescriptionToStoryFields } from './description';

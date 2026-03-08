@@ -1,6 +1,5 @@
+import { LinearClient } from '@linear/sdk';
 import { normalize } from '@/lib/strings';
-
-const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 
 interface LinearLabelNode {
   id: string;
@@ -80,89 +79,35 @@ export function getLinearIssueProjectIdFromPayload(payload: Record<string, unkno
   return getString(project?.id);
 }
 
-async function linearGraphql<T>(authToken: string, query: string, variables: Record<string, unknown>): Promise<T> {
-  const response = await fetch(LINEAR_GRAPHQL_URL, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: authToken.startsWith('lin_api_') ? authToken : `Bearer ${authToken}`,
-    },
-    body: JSON.stringify({ query, variables }),
-    cache: 'no-store',
-  });
+async function fetchIssueLabels(client: LinearClient, issueId: string): Promise<LinearIssueLabelSnapshot | null> {
+  const issue = await client.issue(issueId);
+  if (!issue?.id) return null;
 
-  const payload = (await response.json()) as { data?: T; errors?: Array<{ message?: string }> };
-  if (!response.ok || payload.errors?.length || !payload.data) {
-    const message = payload.errors?.[0]?.message ?? `Linear GraphQL request failed (${response.status})`;
-    throw new Error(message);
-  }
-
-  return payload.data;
-}
-
-async function fetchIssueLabels(authToken: string, issueId: string): Promise<LinearIssueLabelSnapshot | null> {
-  const data = await linearGraphql<{
-    issue: { id: string; labels: { nodes: Array<{ id: string; name: string }> } } | null;
-  }>(
-    authToken,
-    `query IssueLabels($issueId: String!) {
-      issue(id: $issueId) {
-        id
-        labels {
-          nodes {
-            id
-            name
-          }
-        }
-      }
-    }`,
-    { issueId },
-  );
-
-  if (!data.issue) return null;
+  const labels = await issue.labels({ first: 100 } as never);
   return {
-    id: data.issue.id,
-    labels: { nodes: data.issue.labels?.nodes ?? [] },
+    id: issue.id,
+    labels: {
+      nodes: (labels.nodes ?? [])
+        .map((label) => ({
+          id: typeof label?.id === 'string' ? label.id : '',
+          name: typeof label?.name === 'string' ? label.name : '',
+        }))
+        .filter((label) => label.id.length > 0 && label.name.length > 0),
+    },
   };
 }
 
-async function findOrCreateLabelId(authToken: string, teamId: string, labelName: string): Promise<string> {
-  const labelsData = await linearGraphql<{
-    team: { labels: { nodes: Array<{ id: string; name: string }> } } | null;
-  }>(
-    authToken,
-    `query TeamLabels($teamId: String!) {
-      team(id: $teamId) {
-        labels {
-          nodes {
-            id
-            name
-          }
-        }
-      }
-    }`,
-    { teamId },
-  );
+async function findOrCreateLabelId(client: LinearClient, teamId: string, labelName: string): Promise<string> {
+  const team = await client.team(teamId);
+  if (!team?.id) throw new Error('Linear team not found');
 
-  const existing = labelsData.team?.labels?.nodes?.find((label) => sameLabelName(label.name, labelName));
-  if (existing?.id) return existing.id;
+  const labels = await team.labels({ first: 100 } as never);
+  const existing = (labels.nodes ?? []).find((label) => sameLabelName(label?.name, labelName));
+  if (typeof existing?.id === 'string') return existing.id;
 
-  const created = await linearGraphql<{
-    issueLabelCreate: { success: boolean; issueLabel: { id: string } | null };
-  }>(
-    authToken,
-    `mutation CreateIssueLabel($teamId: String!, $name: String!) {
-      issueLabelCreate(input: { teamId: $teamId, name: $name }) {
-        success
-        issueLabel {
-          id
-        }
-      }
-    }`,
-    { teamId, name: labelName },
-  );
-
-  const id = created.issueLabelCreate.issueLabel?.id;
+  const created = await client.createIssueLabel({ teamId, name: labelName });
+  const createdLabel = created.issueLabel ? await created.issueLabel : null;
+  const id = createdLabel?.id;
   if (!id) throw new Error('Failed to create Linear issue label');
   return id;
 }
@@ -176,22 +121,18 @@ export async function ensureLinearIssueHasLabel(input: {
   const labelName = normalizeLabelName(input.labelName);
   if (!labelName) return;
 
-  const issue = await fetchIssueLabels(input.authToken, input.issueId);
+  const client = new LinearClient(
+    input.authToken.startsWith('lin_api_') ? { apiKey: input.authToken } : { accessToken: input.authToken },
+  );
+
+  const issue = await fetchIssueLabels(client, input.issueId);
   if (!issue) return;
 
   const existing = issue.labels.nodes;
   if (existing.some((label) => sameLabelName(label.name, labelName))) return;
 
-  const labelId = await findOrCreateLabelId(input.authToken, input.teamId, labelName);
+  const labelId = await findOrCreateLabelId(client, input.teamId, labelName);
   const labelIds = [...new Set([...existing.map((label) => label.id), labelId])];
 
-  await linearGraphql(
-    input.authToken,
-    `mutation ApplyIssueLabels($issueId: String!, $labelIds: [String!]!) {
-      issueUpdate(id: $issueId, input: { labelIds: $labelIds }) {
-        success
-      }
-    }`,
-    { issueId: input.issueId, labelIds },
-  );
+  await client.updateIssue(input.issueId, { labelIds } as never);
 }
