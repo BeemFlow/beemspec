@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { buildOAuthAuthorizationServerMetadata } from '@/integrations/mcp/metadata';
-import { resolveRequestOrigin } from '@/integrations/mcp/origin';
+import { buildOAuthAuthorizationServerMetadata } from '../../../integrations/mcp/metadata';
+import { resolveRequestOrigin } from '../../../integrations/mcp/origin';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 

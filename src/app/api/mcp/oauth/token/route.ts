@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
-import { consumeAuthorizationCode, isSameMcpRedirectUri, verifyPkceS256 } from '@/integrations/mcp/oauth';
+import { buildMcpResourceUrl, MCP_DEFAULT_RESOURCE_PATH } from '@/integrations/mcp/metadata';
+import {
+  consumeAuthorizationCode,
+  isSameMcpRedirectUri,
+  isSameMcpResourceUri,
+  verifyPkceS256,
+} from '@/integrations/mcp/oauth';
+import { resolveRequestOrigin } from '@/integrations/mcp/origin';
 import { refreshSupabaseAccessToken } from '@/lib/supabase/token';
 
 export const runtime = 'nodejs';
@@ -11,13 +18,23 @@ function tokenError(error: string, description: string, status = 400) {
       error,
       error_description: description,
     },
-    { status },
+    {
+      status,
+      headers: {
+        'Cache-Control': 'no-store',
+        Pragma: 'no-cache',
+      },
+    },
   );
 }
 
-function logMcpToken(level: 'info' | 'warn' | 'error', message: string, data: Record<string, unknown>) {
-  const logger = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
-  logger('[mcp-oauth-token]', message, data);
+function tokenSuccess(payload: unknown) {
+  return NextResponse.json(payload, {
+    headers: {
+      'Cache-Control': 'no-store',
+      Pragma: 'no-cache',
+    },
+  });
 }
 
 async function parseTokenPayload(request: Request): Promise<FormData> {
@@ -36,74 +53,99 @@ async function parseTokenPayload(request: Request): Promise<FormData> {
   return request.formData();
 }
 
-async function handleAuthorizationCodeGrant(form: FormData) {
-  const code = String(form.get('code') ?? '');
-  const clientId = String(form.get('client_id') ?? '');
-  const redirectUri = String(form.get('redirect_uri') ?? '');
-  const codeVerifier = String(form.get('code_verifier') ?? '');
+function readAuthorizationCodeGrantParams(form: FormData) {
+  return {
+    code: String(form.get('code') ?? ''),
+    clientId: String(form.get('client_id') ?? ''),
+    redirectUri: String(form.get('redirect_uri') ?? ''),
+    codeVerifier: String(form.get('code_verifier') ?? ''),
+    resource: String(form.get('resource') ?? ''),
+  };
+}
 
-  if (!code || !clientId || !redirectUri || !codeVerifier) {
+function validateAuthorizationCodeGrantParams(params: ReturnType<typeof readAuthorizationCodeGrantParams>) {
+  if (!params.code || !params.clientId || !params.redirectUri || !params.codeVerifier) {
     return tokenError('invalid_request', 'Missing required authorization_code grant parameters');
   }
 
-  const record = consumeAuthorizationCode(code);
+  return null;
+}
+
+function resolveRequestedResource(resource: string, expectedResource: string): string | null {
+  const requestedResource = resource || expectedResource;
+  if (!isSameMcpResourceUri(requestedResource, expectedResource)) {
+    return null;
+  }
+
+  return requestedResource;
+}
+
+async function handleAuthorizationCodeGrant(form: FormData, expectedResource: string) {
+  const params = readAuthorizationCodeGrantParams(form);
+  const paramsError = validateAuthorizationCodeGrantParams(params);
+  if (paramsError) return paramsError;
+
+  const record = await consumeAuthorizationCode(params.code);
   if (!record) {
     return tokenError('invalid_grant', 'Authorization code is invalid or expired');
   }
 
-  if (record.clientId !== clientId || !isSameMcpRedirectUri(record.redirectUri, redirectUri)) {
+  if (record.clientId !== params.clientId || !isSameMcpRedirectUri(record.redirectUri, params.redirectUri)) {
     return tokenError('invalid_grant', 'Client or redirect mismatch');
   }
 
-  if (!verifyPkceS256(codeVerifier, record.codeChallenge)) {
+  if (!verifyPkceS256(params.codeVerifier, record.codeChallenge)) {
     return tokenError('invalid_grant', 'PKCE verification failed');
+  }
+
+  const requestedResource = resolveRequestedResource(params.resource, expectedResource);
+  if (!requestedResource) {
+    return tokenError('invalid_target', 'resource does not match this MCP server');
+  }
+
+  if (record.resource && !isSameMcpResourceUri(record.resource, requestedResource)) {
+    return tokenError('invalid_grant', 'resource mismatch');
   }
 
   const refreshed = await refreshSupabaseAccessToken(record.refreshToken);
   if (refreshed.error || !refreshed.data) {
-    logMcpToken('warn', 'auth_code_refresh_failed', {
-      reason: refreshed.error instanceof Error ? refreshed.error.message : 'unknown',
-    });
     return tokenError('invalid_grant', 'Failed to exchange refresh token', 401);
   }
 
-  return NextResponse.json(refreshed.data);
+  return tokenSuccess(refreshed.data);
 }
 
-async function handleRefreshTokenGrant(form: FormData) {
+async function handleRefreshTokenGrant(form: FormData, expectedResource: string) {
   const refreshToken = String(form.get('refresh_token') ?? '');
+  const resource = String(form.get('resource') ?? '');
   if (!refreshToken) {
     return tokenError('invalid_request', 'refresh_token is required');
   }
 
+  if (resource && !isSameMcpResourceUri(resource, expectedResource)) {
+    return tokenError('invalid_target', 'resource does not match this MCP server');
+  }
+
   const refreshed = await refreshSupabaseAccessToken(refreshToken);
   if (refreshed.error || !refreshed.data) {
-    logMcpToken('warn', 'refresh_grant_failed', {
-      reason: refreshed.error instanceof Error ? refreshed.error.message : 'unknown',
-    });
     return tokenError('invalid_grant', 'Refresh token is invalid', 401);
   }
 
-  return NextResponse.json(refreshed.data);
+  return tokenSuccess(refreshed.data);
 }
 
 export async function POST(request: Request) {
   const form = await parseTokenPayload(request);
   const grantType = String(form.get('grant_type') ?? '');
-
-  logMcpToken('info', 'token_request', {
-    grant_type: grantType || null,
-    has_code: Boolean(form.get('code')),
-    has_refresh_token: Boolean(form.get('refresh_token')),
-    has_client_id: Boolean(form.get('client_id')),
-  });
+  const origin = resolveRequestOrigin(request);
+  const expectedResource = buildMcpResourceUrl(origin, MCP_DEFAULT_RESOURCE_PATH);
 
   if (grantType === 'authorization_code') {
-    return handleAuthorizationCodeGrant(form);
+    return handleAuthorizationCodeGrant(form, expectedResource);
   }
 
   if (grantType === 'refresh_token') {
-    return handleRefreshTokenGrant(form);
+    return handleRefreshTokenGrant(form, expectedResource);
   }
 
   return tokenError('unsupported_grant_type', 'grant_type must be authorization_code or refresh_token');

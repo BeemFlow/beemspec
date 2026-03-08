@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { buildProtectedResourceMetadataUrl, MCP_DEFAULT_SCOPE } from '@/integrations/mcp/metadata';
 import { resolveRequestOrigin } from '@/integrations/mcp/origin';
 import type { AuthenticatedUser } from '@/lib/auth';
 import { createClientForAccessToken } from '@/lib/supabase/token';
@@ -6,8 +7,14 @@ import type { Supabase } from '@/lib/supabase/types';
 
 function buildWwwAuthenticateHeader(request: Request, error: 'invalid_request' | 'invalid_token'): string {
   const origin = resolveRequestOrigin(request);
-  const resourceMetadata = `${origin}/.well-known/oauth-protected-resource`;
-  return `Bearer realm="beemspec-mcp", error="${error}", resource_metadata="${resourceMetadata}"`;
+  const pathname = new URL(request.url).pathname;
+  const resourceMetadata = buildProtectedResourceMetadataUrl(origin, pathname);
+  return [
+    'Bearer realm="beemspec-mcp"',
+    `error="${error}"`,
+    `resource_metadata="${resourceMetadata}"`,
+    `scope="${MCP_DEFAULT_SCOPE}"`,
+  ].join(', ');
 }
 
 function unauthorizedResponse(request: Request, error: 'invalid_request' | 'invalid_token') {

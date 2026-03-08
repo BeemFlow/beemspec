@@ -58,4 +58,19 @@ describe('mcp route', () => {
     });
     expect(response.status).toBe(200);
   });
+
+  it('rejects requests from untrusted origin header', async () => {
+    const response = await POST(
+      new Request('http://localhost/api/mcp', {
+        method: 'POST',
+        headers: {
+          origin: 'https://evil.example.com',
+        },
+      }),
+    );
+
+    expect(authenticateMcpRequest).not.toHaveBeenCalled();
+    expect(handleMcpRequest).not.toHaveBeenCalled();
+    expect(response.status).toBe(403);
+  });
 });

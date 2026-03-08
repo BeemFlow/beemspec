@@ -1,4 +1,6 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
+import { checkResourceAllowed, resourceUrlFromServerUrl } from '@modelcontextprotocol/sdk/shared/auth-utils.js';
+import { CompactEncrypt, compactDecrypt, jwtVerify, SignJWT } from 'jose';
 import { env } from '@/lib/env';
 
 interface RegisteredClientPayload {
@@ -53,14 +55,74 @@ export function isSameMcpRedirectUri(a: string, b: string): boolean {
   return normalizedA !== null && normalizedB !== null && normalizedA === normalizedB;
 }
 
+export function isAllowedMcpRedirectUri(uri: string): boolean {
+  try {
+    const parsed = new URL(uri);
+    if (parsed.protocol === 'https:') {
+      return true;
+    }
+
+    if (parsed.protocol === 'http:') {
+      return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export function normalizeMcpResourceUri(uri: string): string | null {
+  try {
+    const normalized = resourceUrlFromServerUrl(uri);
+    const isLoopback = normalized.hostname === 'localhost' || normalized.hostname === '127.0.0.1';
+    if (isLoopback) normalized.hostname = '127.0.0.1';
+    if (
+      (normalized.protocol === 'http:' && normalized.port === '80') ||
+      (normalized.protocol === 'https:' && normalized.port === '443')
+    ) {
+      normalized.port = '';
+    }
+    if (normalized.pathname.length > 1) {
+      normalized.pathname = normalized.pathname.replace(/\/+$/, '');
+    }
+    return normalized.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function isSameMcpResourceUri(a: string, b: string): boolean {
+  const normalizedA = normalizeMcpResourceUri(a);
+  const normalizedB = normalizeMcpResourceUri(b);
+  if (!normalizedA || !normalizedB) return false;
+
+  return (
+    checkResourceAllowed({ requestedResource: normalizedA, configuredResource: normalizedB }) &&
+    checkResourceAllowed({ requestedResource: normalizedB, configuredResource: normalizedA })
+  );
+}
+
 interface AuthorizationCodePayload {
+  codeId: string;
   clientId: string;
   redirectUri: string;
   codeChallenge: string;
   codeChallengeMethod: 'S256';
   userId: string;
   refreshToken: string;
+  resource?: string;
   expiresAt: number;
+}
+
+const consumedAuthorizationCodes = new Map<string, number>();
+
+function pruneConsumedAuthorizationCodes(now = Date.now()): void {
+  for (const [codeId, expiresAt] of consumedAuthorizationCodes.entries()) {
+    if (expiresAt <= now) {
+      consumedAuthorizationCodes.delete(codeId);
+    }
+  }
 }
 
 function getSigningSecret(): string {
@@ -71,71 +133,58 @@ function getSigningSecret(): string {
   return secret;
 }
 
-function signPayload(payload: string): string {
-  return createHmac('sha256', getSigningSecret()).update(payload).digest('base64url');
+function getSigningKey(): Uint8Array {
+  return new TextEncoder().encode(getSigningSecret());
 }
 
-function getEncryptionKey(): Buffer {
+function getEncryptionKey(): Uint8Array {
   return createHash('sha256').update(getSigningSecret()).digest();
 }
 
-function encryptPayload(plaintext: string): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', getEncryptionKey(), iv);
-  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return `${iv.toString('base64url')}.${ciphertext.toString('base64url')}.${tag.toString('base64url')}`;
+async function encryptPayload(plaintext: string): Promise<string> {
+  return new CompactEncrypt(new TextEncoder().encode(plaintext))
+    .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
+    .encrypt(getEncryptionKey());
 }
 
-function decryptPayload(token: string): string | null {
-  const [ivPart, ciphertextPart, tagPart] = token.split('.');
-  if (!ivPart || !ciphertextPart || !tagPart) return null;
-
+async function decryptPayload(token: string): Promise<string | null> {
   try {
-    const decipher = createDecipheriv('aes-256-gcm', getEncryptionKey(), Buffer.from(ivPart, 'base64url'));
-    decipher.setAuthTag(Buffer.from(tagPart, 'base64url'));
-    const plaintext = Buffer.concat([
-      decipher.update(Buffer.from(ciphertextPart, 'base64url')),
-      decipher.final(),
-    ]).toString('utf8');
-    return plaintext;
+    const decrypted = await compactDecrypt(token, getEncryptionKey());
+    return new TextDecoder().decode(decrypted.plaintext);
   } catch {
     return null;
   }
 }
 
-function encodeSignedObject(input: unknown): string {
-  const data = Buffer.from(JSON.stringify(input), 'utf8').toString('base64url');
-  const signature = signPayload(data);
-  return `${data}.${signature}`;
+async function encodeSignedObject(input: unknown): Promise<string> {
+  return new SignJWT({ payload: input })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt()
+    .sign(getSigningKey());
 }
 
-function decodeSignedObject<T>(token: string): T | null {
-  const [data, signature] = token.split('.');
-  if (!data || !signature) return null;
-
-  const expected = signPayload(data);
-  const actualBuffer = Buffer.from(signature);
-  const expectedBuffer = Buffer.from(expected);
-  if (actualBuffer.length !== expectedBuffer.length) return null;
-  if (!timingSafeEqual(actualBuffer, expectedBuffer)) return null;
-
+async function decodeSignedObject<T>(token: string): Promise<T | null> {
   try {
-    return JSON.parse(Buffer.from(data, 'base64url').toString('utf8')) as T;
+    const verified = await jwtVerify(token, getSigningKey(), { algorithms: ['HS256'] });
+    const payload = verified.payload.payload;
+    if (!payload || typeof payload !== 'object') return null;
+    return payload as T;
   } catch {
     return null;
   }
 }
 
-export function registerMcpOAuthClient(input: { redirect_uris: string[]; client_name?: string }) {
+export async function registerMcpOAuthClient(input: { redirect_uris: string[]; client_name?: string }) {
   const payload: RegisteredClientPayload = {
     redirect_uris: input.redirect_uris,
     client_name: input.client_name,
     issued_at: Math.floor(Date.now() / 1000),
   };
 
+  const signed = await encodeSignedObject(payload);
+
   return {
-    client_id: `bsmcp_${encodeSignedObject(payload)}`,
+    client_id: `bsmcp_${signed}`,
     client_id_issued_at: payload.issued_at,
     redirect_uris: payload.redirect_uris,
     client_name: payload.client_name,
@@ -145,12 +194,12 @@ export function registerMcpOAuthClient(input: { redirect_uris: string[]; client_
   };
 }
 
-export function validateRegisteredClient(
+export async function validateRegisteredClient(
   clientId: string,
   redirectUri: string,
-): { valid: true } | { valid: false; reason: string } {
+): Promise<{ valid: true } | { valid: false; reason: string }> {
   if (!clientId.startsWith('bsmcp_')) return { valid: false, reason: 'unknown_client' };
-  const payload = decodeSignedObject<RegisteredClientPayload>(clientId.slice('bsmcp_'.length));
+  const payload = await decodeSignedObject<RegisteredClientPayload>(clientId.slice('bsmcp_'.length));
   if (!payload) return { valid: false, reason: 'invalid_client' };
   if (!redirectUriMatches(payload.redirect_uris, redirectUri)) {
     return { valid: false, reason: 'redirect_uri_mismatch' };
@@ -158,35 +207,46 @@ export function validateRegisteredClient(
   return { valid: true };
 }
 
-export function issueAuthorizationCode(input: {
+export async function issueAuthorizationCode(input: {
   clientId: string;
   redirectUri: string;
   codeChallenge: string;
   userId: string;
   refreshToken: string;
-}): string {
+  resource?: string;
+}): Promise<string> {
   const payload: AuthorizationCodePayload = {
+    codeId: randomBytes(16).toString('hex'),
     clientId: input.clientId,
     redirectUri: input.redirectUri,
     codeChallenge: input.codeChallenge,
     codeChallengeMethod: 'S256',
     userId: input.userId,
     refreshToken: input.refreshToken,
+    resource: input.resource,
     expiresAt: Date.now() + 5 * 60 * 1000,
   };
 
-  const encoded = encryptPayload(JSON.stringify(payload));
+  const encoded = await encryptPayload(JSON.stringify(payload));
   return `mcpc_${encoded}`;
 }
 
-export function consumeAuthorizationCode(code: string): AuthorizationCodePayload | null {
+export async function consumeAuthorizationCode(code: string): Promise<AuthorizationCodePayload | null> {
+  pruneConsumedAuthorizationCodes();
+
   if (!code.startsWith('mcpc_')) return null;
-  const plaintext = decryptPayload(code.slice('mcpc_'.length));
+  const plaintext = await decryptPayload(code.slice('mcpc_'.length));
   if (!plaintext) return null;
 
   try {
     const item = JSON.parse(plaintext) as AuthorizationCodePayload;
     if (item.expiresAt < Date.now()) return null;
+
+    if (!item.codeId || consumedAuthorizationCodes.has(item.codeId)) {
+      return null;
+    }
+
+    consumedAuthorizationCodes.set(item.codeId, item.expiresAt);
     return item;
   } catch {
     return null;

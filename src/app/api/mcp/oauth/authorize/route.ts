@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { issueAuthorizationCode, validateRegisteredClient } from '@/integrations/mcp/oauth';
+import { buildMcpResourceUrl, MCP_DEFAULT_RESOURCE_PATH } from '@/integrations/mcp/metadata';
+import { isSameMcpResourceUri, issueAuthorizationCode, validateRegisteredClient } from '@/integrations/mcp/oauth';
+import { resolveRequestOrigin } from '@/integrations/mcp/origin';
 import { createClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
@@ -15,12 +17,14 @@ function getAuthorizeParams(url: URL) {
     clientId: url.searchParams.get('client_id') ?? '',
     redirectUri: url.searchParams.get('redirect_uri') ?? '',
     state: url.searchParams.get('state') ?? '',
+    scope: url.searchParams.get('scope') ?? '',
+    resource: url.searchParams.get('resource') ?? '',
     codeChallenge: url.searchParams.get('code_challenge') ?? '',
     codeChallengeMethod: url.searchParams.get('code_challenge_method') ?? '',
   };
 }
 
-function validateAuthorizeParams(params: ReturnType<typeof getAuthorizeParams>) {
+async function validateAuthorizeParams(params: ReturnType<typeof getAuthorizeParams>, expectedResource: string) {
   if (params.responseType !== 'code') return invalidRequest('response_type must be code');
   if (!params.clientId) return invalidRequest('client_id is required');
   if (!params.redirectUri) return invalidRequest('redirect_uri is required');
@@ -28,9 +32,19 @@ function validateAuthorizeParams(params: ReturnType<typeof getAuthorizeParams>) 
     return invalidRequest('PKCE S256 is required');
   }
 
-  const clientCheck = validateRegisteredClient(params.clientId, params.redirectUri);
+  const clientCheck = await validateRegisteredClient(params.clientId, params.redirectUri);
   if (!clientCheck.valid) {
     return NextResponse.json({ error: 'invalid_client', error_description: clientCheck.reason }, { status: 400 });
+  }
+
+  if (params.resource && !isSameMcpResourceUri(params.resource, expectedResource)) {
+    return NextResponse.json(
+      {
+        error: 'invalid_target',
+        error_description: 'resource does not match this MCP server',
+      },
+      { status: 400 },
+    );
   }
 
   return null;
@@ -39,7 +53,9 @@ function validateAuthorizeParams(params: ReturnType<typeof getAuthorizeParams>) 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const params = getAuthorizeParams(url);
-  const validationError = validateAuthorizeParams(params);
+  const origin = resolveRequestOrigin(request);
+  const expectedResource = buildMcpResourceUrl(origin, MCP_DEFAULT_RESOURCE_PATH);
+  const validationError = await validateAuthorizeParams(params, expectedResource);
   if (validationError) return validationError;
 
   const supabase = await createClient();
@@ -63,12 +79,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'access_denied', error_description: 'No active refresh token' }, { status: 401 });
   }
 
-  const code = issueAuthorizationCode({
+  const code = await issueAuthorizationCode({
     clientId: params.clientId,
     redirectUri: params.redirectUri,
     codeChallenge: params.codeChallenge,
     userId: user.id,
     refreshToken: session.refresh_token,
+    resource: params.resource || expectedResource,
   });
 
   const redirect = new URL(params.redirectUri);

@@ -34,7 +34,7 @@ Preferred (automatic OAuth for MCP clients that support it):
     "beemspec": {
       "type": "remote",
       "url": "http://127.0.0.1:3000/api/mcp",
-      "oauth": true
+      "oauth": {}
     }
   }
 }
