@@ -1,11 +1,11 @@
 import { listLinearProjectIssuesForImport } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
-import { syncStoriesByIdList } from '@/app/api/integrations/linear/sync/route';
 import { resolveLinearAuthTokenForTeam } from '@/integrations/linear/auth';
 import { getLinearIssueSync } from '@/integrations/linear/helpers';
 import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
 import { getTeamIdForStoryMap } from '@/integrations/linear/settings';
 import { getStoryLinearLinkByLinearIssueId } from '@/integrations/linear/story-links';
+import { syncStoriesByIdList } from '@/integrations/linear/sync-reconcile';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { normalize } from '@/lib/strings';

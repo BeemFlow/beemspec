@@ -17,11 +17,11 @@ vi.mock('@/integrations/linear/helpers', () => ({
   getLinearIssueSync: vi.fn(),
 }));
 
-vi.mock('@/app/api/integrations/linear/sync/route', () => ({
+vi.mock('@/integrations/linear/sync-reconcile', () => ({
   syncStoriesByIdList: vi.fn(),
 }));
 
-import { syncStoriesByIdList } from '@/app/api/integrations/linear/sync/route';
+import { syncStoriesByIdList } from '@/integrations/linear/sync-reconcile';
 
 function jsonRequest(body: unknown): Request {
   return new Request('http://localhost/api/integrations/linear/sync/batch', {

@@ -16,11 +16,11 @@ vi.mock('@/integrations/linear/helpers', () => ({
   getLinearIssueSync: vi.fn(),
 }));
 
-vi.mock('@/app/api/integrations/linear/sync/route', () => ({
+vi.mock('@/integrations/linear/sync-reconcile', () => ({
   syncStoriesByIdList: vi.fn(),
 }));
 
-import { syncStoriesByIdList } from '@/app/api/integrations/linear/sync/route';
+import { syncStoriesByIdList } from '@/integrations/linear/sync-reconcile';
 
 const STORY_MAP_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 

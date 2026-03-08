@@ -1,7 +1,7 @@
 import { linearSyncBatchSchema } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
-import { syncStoriesByIdList } from '@/app/api/integrations/linear/sync/route';
 import { getLinearIssueSync } from '@/integrations/linear/helpers';
+import { syncStoriesByIdList } from '@/integrations/linear/sync-reconcile';
 import { requireAuth } from '@/lib/auth';
 import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
