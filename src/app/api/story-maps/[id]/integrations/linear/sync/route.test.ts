@@ -52,6 +52,15 @@ describe('story map linear sync route', () => {
     const from = vi.fn((table: string) => {
       if (table === 'tasks') return { select: tasksSelect };
       if (table === 'stories') return { select: storiesSelect };
+      if (table === 'story_map_integration_settings') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({ data: { linear_project_id: null }, error: null }),
+            }),
+          }),
+        };
+      }
       return {};
     });
 
@@ -84,6 +93,15 @@ describe('story map linear sync route', () => {
 
     const from = vi.fn((table: string) => {
       if (table === 'tasks') return { select: tasksSelect };
+      if (table === 'story_map_integration_settings') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({ data: { linear_project_id: null }, error: null }),
+            }),
+          }),
+        };
+      }
       return {};
     });
 
