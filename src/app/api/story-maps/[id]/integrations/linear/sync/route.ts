@@ -23,7 +23,7 @@ interface LinearIssueImportCandidate {
   updatedAt: string;
 }
 
-async function listLinearProjectIssuesByLabel(input: {
+async function listLinearProjectIssues(input: {
   accessToken: string;
   projectId: string;
 }): Promise<LinearIssueImportCandidate[]> {
@@ -32,11 +32,7 @@ async function listLinearProjectIssuesByLabel(input: {
 
   const query = `
     query ManualStoryMapImport($projectId: String!, $cursor: String) {
-      issues(
-        first: 100
-        after: $cursor
-        filter: { project: { id: { eq: $projectId } } }
-      ) {
+      issues(first: 100, after: $cursor, filter: { project: { id: { eq: $projectId } } }) {
         nodes {
           id
           team { id }
@@ -44,7 +40,6 @@ async function listLinearProjectIssuesByLabel(input: {
           identifier
           title
           description
-          archivedAt
           labels { nodes { name } }
           updatedAt
           state { name }
@@ -71,11 +66,8 @@ async function listLinearProjectIssuesByLabel(input: {
           cursor,
         },
       }),
+      cache: 'no-store',
     });
-
-    if (!response.ok) {
-      throw new Error(`Linear query failed with status ${response.status}`);
-    }
 
     const payload = (await response.json()) as {
       data?: {
@@ -87,7 +79,6 @@ async function listLinearProjectIssuesByLabel(input: {
             identifier?: string | null;
             title?: string | null;
             description?: string | null;
-            archivedAt?: string | null;
             labels?: { nodes?: Array<{ name?: string | null } | null> | null } | null;
             updatedAt?: string | null;
             state?: { name?: string | null } | null;
@@ -98,8 +89,9 @@ async function listLinearProjectIssuesByLabel(input: {
       errors?: Array<{ message?: string }>;
     };
 
-    if (Array.isArray(payload.errors) && payload.errors.length > 0) {
-      throw new Error(payload.errors[0]?.message ?? 'Linear query returned errors');
+    if (!response.ok || (payload.errors && payload.errors.length > 0)) {
+      const message = payload.errors?.[0]?.message ?? `Linear query failed with status ${response.status}`;
+      throw new Error(message);
     }
 
     const nodes = payload.data?.issues?.nodes ?? [];
@@ -108,8 +100,6 @@ async function listLinearProjectIssuesByLabel(input: {
       const teamId = typeof node?.team?.id === 'string' ? node.team.id : null;
       const updatedAt = typeof node?.updatedAt === 'string' ? node.updatedAt : null;
       if (!id || !teamId || !updatedAt) continue;
-
-      if (typeof node?.archivedAt === 'string' && node.archivedAt.length > 0) continue;
 
       const labelNames = (node?.labels?.nodes ?? [])
         .map((entry) => (typeof entry?.name === 'string' ? entry.name.trim() : ''))
@@ -147,21 +137,15 @@ async function runManualImportForStoryMap(
     .maybeSingle<{ linear_project_id: string | null }>();
 
   const linearProjectId = normalize(settings?.linear_project_id);
-  if (!linearProjectId) {
-    return { considered: 0, imported: 0, skipped: 0 };
-  }
+  if (!linearProjectId) return { considered: 0, imported: 0, skipped: 0 };
 
-  const teamId = await getTeamIdForStoryMap(supabase, storyMapId);
-  if (!teamId) {
-    return { considered: 0, imported: 0, skipped: 0 };
-  }
+  const mapTeamId = await getTeamIdForStoryMap(supabase, storyMapId);
+  if (!mapTeamId) return { considered: 0, imported: 0, skipped: 0 };
 
-  const accessToken = await resolveLinearAuthTokenForTeam(teamId);
-  if (!accessToken) {
-    return { considered: 0, imported: 0, skipped: 0 };
-  }
+  const accessToken = await resolveLinearAuthTokenForTeam(mapTeamId);
+  if (!accessToken) return { considered: 0, imported: 0, skipped: 0 };
 
-  const issues = await listLinearProjectIssuesByLabel({ accessToken, projectId: linearProjectId });
+  const issues = await listLinearProjectIssues({ accessToken, projectId: linearProjectId });
 
   let imported = 0;
   let skipped = 0;
@@ -216,11 +200,15 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   if (tasksError) return serverErrorResponse('Failed to load tasks for story map sync', tasksError);
 
   const taskIds = (tasks ?? []).map((row) => row.id as string).filter(Boolean);
-  let summary: { considered: number; succeeded: number; failed: number } = { considered: 0, succeeded: 0, failed: 0 };
+
+  let summary: { considered: number; succeeded: number; failed: number } = {
+    considered: 0,
+    succeeded: 0,
+    failed: 0,
+  };
 
   if (taskIds.length > 0) {
     const { data: stories, error: storiesError } = await supabase.from('stories').select('id').in('task_id', taskIds);
-
     if (storiesError) return serverErrorResponse('Failed to load stories for story map sync', storiesError);
 
     const storyIds = [...new Set((stories ?? []).map((row) => row.id as string).filter(Boolean))];
