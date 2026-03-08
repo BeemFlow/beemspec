@@ -143,6 +143,31 @@ interface LinearConnection<T> {
   nodes?: Array<T | null> | null;
 }
 
+interface LinearConnectionPage<T> extends LinearConnection<T> {
+  pageInfo?: { hasNextPage?: boolean | null } | null;
+  fetchNext?: () => Promise<LinearConnectionPage<T>>;
+}
+
+type LinearProjectIssueImportClientLike = Pick<LinearClient, 'project' | 'team'>;
+
+async function fetchAllConnectionNodes<T>(initial: LinearConnectionPage<T>): Promise<T[]> {
+  const results: T[] = [];
+  let page: LinearConnectionPage<T> | null = initial;
+
+  for (;;) {
+    if (!page) break;
+
+    for (const node of page.nodes ?? []) {
+      if (node) results.push(node);
+    }
+
+    if (!page.pageInfo?.hasNextPage || typeof page.fetchNext !== 'function') break;
+    page = await page.fetchNext();
+  }
+
+  return results;
+}
+
 interface LinearProjectLike {
   id?: string | null;
   name?: string | null;
@@ -251,39 +276,67 @@ export async function getLinearWorkspaceOptions(accessToken: string): Promise<Li
 export async function listLinearProjectIssuesForImport(
   accessToken: string,
   projectId: string,
+  options: { client?: LinearProjectIssueImportClientLike } = {},
 ): Promise<LinearProjectIssueImportOption[]> {
-  const client = new LinearClient({ accessToken });
+  const client = options.client ?? new LinearClient({ accessToken });
   const project = await client.project(projectId);
   if (!project?.id) return [];
 
-  const results: LinearProjectIssueImportOption[] = [];
-  let page = await project.issues({ first: 100 } as never);
+  const issuePage = (await project.issues({ first: 100 } as never)) as LinearConnectionPage<Issue>;
+  const issues = await fetchAllConnectionNodes(issuePage);
 
-  for (;;) {
-    for (const issue of page.nodes ?? []) {
-      if (!issue?.id || !issue.updatedAt || !issue.teamId) continue;
+  const teamIds = [
+    ...new Set(issues.map((issue) => issue.teamId).filter((teamId): teamId is string => Boolean(teamId))),
+  ];
+  const labelNameById = new Map<string, string>();
+  const stateNameById = new Map<string, string>();
 
-      const labelsConnection = await issue.labels({ first: 100 } as never);
-      const labelNames = (labelsConnection.nodes ?? [])
-        .map((label) => (typeof label?.name === 'string' ? label.name.trim() : ''))
-        .filter((name) => name.length > 0);
+  for (const teamId of teamIds) {
+    const team = await client.team(teamId);
+    if (!team?.id) continue;
 
-      const state = await issue.state;
-      results.push({
-        id: issue.id,
-        identifier: issue.identifier ?? null,
-        title: issue.title ?? null,
-        description: issue.description ?? null,
-        stateName: typeof state?.name === 'string' ? state.name : null,
-        updatedAt: issue.updatedAt.toISOString(),
-        teamId: issue.teamId,
-        projectId: issue.projectId ?? null,
-        labelNames,
-      });
+    const labelsPage = (await team.labels({ first: 100 } as never)) as LinearConnectionPage<{
+      id?: string;
+      name?: string;
+    }>;
+    const labels = await fetchAllConnectionNodes(labelsPage);
+    for (const label of labels) {
+      if (typeof label.id === 'string' && typeof label.name === 'string' && label.name.trim().length > 0) {
+        labelNameById.set(label.id, label.name.trim());
+      }
     }
 
-    if (!page.pageInfo?.hasNextPage) break;
-    page = await page.fetchNext();
+    const statesPage = (await team.states({ first: 100 } as never)) as LinearConnectionPage<{
+      id?: string;
+      name?: string;
+    }>;
+    const states = await fetchAllConnectionNodes(statesPage);
+    for (const state of states) {
+      if (typeof state.id === 'string' && typeof state.name === 'string' && state.name.trim().length > 0) {
+        stateNameById.set(state.id, state.name.trim());
+      }
+    }
+  }
+
+  const results: LinearProjectIssueImportOption[] = [];
+  for (const issue of issues) {
+    if (!issue?.id || !issue.updatedAt || !issue.teamId || issue.archivedAt) continue;
+
+    const labelNames = issue.labelIds
+      .map((labelId) => labelNameById.get(labelId) ?? '')
+      .filter((name) => name.length > 0);
+
+    results.push({
+      id: issue.id,
+      identifier: issue.identifier ?? null,
+      title: issue.title ?? null,
+      description: issue.description ?? null,
+      stateName: issue.stateId ? (stateNameById.get(issue.stateId) ?? null) : null,
+      updatedAt: issue.updatedAt.toISOString(),
+      teamId: issue.teamId,
+      projectId: issue.projectId ?? null,
+      labelNames,
+    });
   }
 
   return results;
