@@ -109,7 +109,7 @@ async function handleAuthorizationCodeGrant(form: FormData, expectedResource: st
 
   const refreshed = await refreshSupabaseAccessToken(record.refreshToken);
   if (refreshed.error || !refreshed.data) {
-    return tokenError('invalid_grant', 'Failed to exchange refresh token', 401);
+    return tokenError('invalid_grant', 'Failed to exchange refresh token');
   }
 
   return tokenSuccess(refreshed.data);
@@ -128,7 +128,7 @@ async function handleRefreshTokenGrant(form: FormData, expectedResource: string)
 
   const refreshed = await refreshSupabaseAccessToken(refreshToken);
   if (refreshed.error || !refreshed.data) {
-    return tokenError('invalid_grant', 'Refresh token is invalid', 401);
+    return tokenError('invalid_grant', 'Refresh token is invalid');
   }
 
   return tokenSuccess(refreshed.data);
