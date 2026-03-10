@@ -127,7 +127,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       settings,
       options: {
         workspace_id: options.workspaceId,
-        workspace_name: options.organizationName ?? null,
+        workspace_name: options.workspaceName ?? null,
         teams: options.teams,
         projects: options.projects,
         states: options.states,
