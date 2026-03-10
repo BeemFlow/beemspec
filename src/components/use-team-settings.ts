@@ -262,8 +262,25 @@ export function useTeamSettings({
 
     setActiveTab('integrations');
     setLinearStatus(resolveLinearOAuthStatus(linearOAuthNotice));
+
+    if (linearOAuthNotice.status === 'success' && teamId && isOwner) {
+      void (async () => {
+        await loadData();
+        await loadLinearOptions(teamId);
+      })();
+    }
+
     onLinearOAuthNoticeHandled?.();
-  }, [open, linearOAuthNotice, onLinearOAuthNoticeHandled, resolveLinearOAuthStatus]);
+  }, [
+    open,
+    linearOAuthNotice,
+    teamId,
+    isOwner,
+    loadData,
+    loadLinearOptions,
+    onLinearOAuthNoticeHandled,
+    resolveLinearOAuthStatus,
+  ]);
 
   async function handleRename(event: React.FormEvent) {
     event.preventDefault();
