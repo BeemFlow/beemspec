@@ -20,6 +20,7 @@ export interface LinearSettingsSnapshot {
 
 export interface LinearResolvedOptions {
   workspaceId: string | null;
+  workspaceName: string | null;
   teams: LinearTeamOption[];
   projects: LinearProjectOption[];
   states: LinearStateOption[];
@@ -92,6 +93,7 @@ export async function resolveLinearOptions(accessToken: string): Promise<LinearR
   const options: LinearWorkspaceOptions = await getLinearWorkspaceOptions(accessToken);
   return {
     workspaceId: normalize(options.organizationId),
+    workspaceName: normalize(options.organizationName),
     teams: options.teams,
     projects: options.projects,
     states: options.states,

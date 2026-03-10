@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DangerZone } from '@/components/ui/danger-zone';
@@ -95,11 +95,6 @@ export function StoryMapSettingsDialog({
     Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>
   >({});
   const [effectiveProjectId, setEffectiveProjectId] = useState<string | null>(null);
-  const [effectiveStatusMapping, setEffectiveStatusMapping] = useState<
-    Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>
-  >({});
-  const [effectiveAutoImportLabeledIssues, setEffectiveAutoImportLabeledIssues] = useState(true);
-  const [effectiveImportLabelName, setEffectiveImportLabelName] = useState('Story');
   const [projectOptions, setProjectOptions] = useState<Array<{ id: string; name: string; teamIds: string[] }>>([]);
   const [stateOptions, setStateOptions] = useState<
     Array<{ id: string; name: string; type: string | null; teamId: string }>
@@ -132,10 +127,6 @@ export function StoryMapSettingsDialog({
       setImportLabelName(data.story_map_settings.import_label_name);
       setSavedImportLabelName(data.story_map_settings.import_label_name);
       setEffectiveProjectId(data.effective_settings.linear_project_id ?? null);
-      setEffectiveStatusMapping(data.effective_settings.linear_status_mapping ?? {});
-      setEffectiveAutoImportLabeledIssues(data.effective_settings.auto_import_labeled_issues);
-      setEffectiveImportLabelName(data.effective_settings.import_label_name);
-
       if (!data.team_settings.linear_team_id) {
         setProjectOptions([]);
         setStateOptions([]);
@@ -417,12 +408,6 @@ export function StoryMapSettingsDialog({
               />
             </div>
 
-            <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-              Effective project: {effectiveProjectId ?? 'none'} | Auto-import:{' '}
-              {effectiveAutoImportLabeledIssues ? 'on' : 'off'} | Sync label: {effectiveImportLabelName} | Effective
-              mapping keys: {Object.keys(effectiveStatusMapping).join(', ') || 'none'}
-            </div>
-
             <div className="space-y-2 rounded-md border bg-muted/20 p-3">
               <Label>Manual sync</Label>
               <p className="text-xs text-muted-foreground">
@@ -433,7 +418,8 @@ export function StoryMapSettingsDialog({
                 <p className="text-xs text-muted-foreground">Choose and save a Linear project to enable sync.</p>
               )}
               <Button type="button" variant="outline" onClick={handleManualSync} disabled={manualSyncDisabled}>
-                {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Run manual sync'}
+                {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Run manual sync
               </Button>
             </div>
 

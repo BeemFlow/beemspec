@@ -60,7 +60,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({
         connected: false,
         settings: toSettingsPayload(teamId, settingsResult.data),
-        options: { workspace_id: null, teams: [], projects: [], states: [] },
+        options: { workspace_id: null, workspace_name: null, teams: [], projects: [], states: [] },
         applied_defaults: false,
       });
     }
@@ -71,7 +71,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         return NextResponse.json({
           connected: false,
           settings: toSettingsPayload(teamId, settingsResult.data),
-          options: { workspace_id: null, teams: [], projects: [], states: [] },
+          options: { workspace_id: null, workspace_name: null, teams: [], projects: [], states: [] },
           applied_defaults: false,
         });
       }
@@ -127,6 +127,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       settings,
       options: {
         workspace_id: options.workspaceId,
+        workspace_name: options.organizationName ?? null,
         teams: options.teams,
         projects: options.projects,
         states: options.states,

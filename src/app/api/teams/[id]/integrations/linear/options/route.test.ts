@@ -93,6 +93,7 @@ describe('team linear options route', () => {
     });
     vi.mocked(resolveLinearOptions).mockResolvedValue({
       workspaceId: 'workspace_1',
+      workspaceName: 'BeemFlow',
       teams: [{ id: 'team_linear_1', name: 'Engineering', key: 'ENG' }],
       projects: [],
       states: [],

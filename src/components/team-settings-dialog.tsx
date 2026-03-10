@@ -43,6 +43,7 @@ interface TeamIntegrationsTabProps {
   linearScope: string | null;
   linearExpiresAt: string | null;
   linearWorkspaceId: string;
+  linearWorkspaceName: string;
   linearTeamId: string;
   linearOptionsLoading: boolean;
   linearTeamOptions: Array<{ id: string; name: string; key: string | null }>;
@@ -54,7 +55,6 @@ interface TeamIntegrationsTabProps {
   onConnectLinear: () => void;
   onDisconnectLinear: () => Promise<void>;
   onSaveLinearSettings: (event: React.FormEvent) => Promise<void>;
-  onLinearTeamIdChange: (value: string) => void;
   onLinearStatusMappingChange: (
     status: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done',
     value: string,
@@ -160,7 +160,7 @@ function LinearConnectionActions(input: {
 
 function LinearSettingsForm(input: {
   isOwner: boolean;
-  workspaceId: string;
+  workspaceName: string;
   teamId: string;
   optionsLoading: boolean;
   teamOptions: Array<{ id: string; name: string; key: string | null }>;
@@ -168,7 +168,6 @@ function LinearSettingsForm(input: {
   statusMapping: Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>;
   saving: boolean;
   onSave: (event: React.FormEvent) => Promise<void>;
-  onTeamIdChange: (value: string) => void;
   onStatusMappingChange: (status: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', value: string) => void;
 }) {
   const NO_SELECTION = '__none__';
@@ -183,42 +182,18 @@ function LinearSettingsForm(input: {
     { key: 'done', label: 'Done' },
   ];
 
+  const selectedTeam = input.teamOptions.find((team) => team.id === input.teamId);
+  const teamDisplay = selectedTeam ? `${selectedTeam.name}${selectedTeam.key ? ` (${selectedTeam.key})` : ''}` : '';
+
   return (
     <form onSubmit={input.onSave} className="space-y-3">
       <div className="space-y-2">
-        <Label htmlFor="linear-workspace-id">Linear workspace ID</Label>
-        <Input id="linear-workspace-id" value={input.workspaceId} disabled readOnly />
+        <Label htmlFor="linear-workspace-name">Linear workspace</Label>
+        <Input id="linear-workspace-name" value={input.workspaceName} disabled readOnly placeholder="Not connected" />
       </div>
       <div className="space-y-2">
         <Label>Linear team</Label>
-        {input.teamOptions.length > 0 ? (
-          <Select
-            value={input.teamId || NO_SELECTION}
-            onValueChange={(value) => input.onTeamIdChange(value === NO_SELECTION ? '' : value)}
-            disabled={!input.isOwner || input.saving || input.optionsLoading}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Choose a Linear team" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_SELECTION}>No team selected</SelectItem>
-              {input.teamOptions.map((team) => (
-                <SelectItem key={team.id} value={team.id}>
-                  {team.name}
-                  {team.key ? ` (${team.key})` : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <Input
-            id="linear-team-id"
-            value={input.teamId}
-            onChange={(event) => input.onTeamIdChange(event.target.value)}
-            disabled={!input.isOwner || input.saving}
-            placeholder="Paste a Linear team ID"
-          />
-        )}
+        <Input id="linear-team-name" value={teamDisplay} disabled readOnly placeholder="No team selected" />
       </div>
       <div className="space-y-2">
         <Label>Status mapping</Label>
@@ -263,6 +238,7 @@ function TeamIntegrationsTab({
   linearScope,
   linearExpiresAt,
   linearWorkspaceId,
+  linearWorkspaceName,
   linearTeamId,
   linearOptionsLoading,
   linearTeamOptions,
@@ -274,7 +250,6 @@ function TeamIntegrationsTab({
   onConnectLinear,
   onDisconnectLinear,
   onSaveLinearSettings,
-  onLinearTeamIdChange,
   onLinearStatusMappingChange,
 }: TeamIntegrationsTabProps) {
   return (
@@ -298,7 +273,7 @@ function TeamIntegrationsTab({
 
       <LinearSettingsForm
         isOwner={isOwner}
-        workspaceId={linearWorkspaceId}
+        workspaceName={linearWorkspaceName || linearWorkspaceId}
         teamId={linearTeamId}
         optionsLoading={linearOptionsLoading}
         teamOptions={linearTeamOptions}
@@ -306,7 +281,6 @@ function TeamIntegrationsTab({
         statusMapping={linearStatusMapping}
         saving={savingLinearSettings}
         onSave={onSaveLinearSettings}
-        onTeamIdChange={onLinearTeamIdChange}
         onStatusMappingChange={onLinearStatusMappingChange}
       />
 
@@ -469,8 +443,8 @@ export function TeamSettingsDialog({
     savingLinearSettings,
     disconnectingLinear,
     linearWorkspaceId,
+    linearWorkspaceName,
     linearTeamId,
-    setLinearTeamId,
     linearStatusMapping,
     setLinearStatusMappingValue,
     linearConnected,
@@ -540,6 +514,7 @@ export function TeamSettingsDialog({
               linearScope={linearScope}
               linearExpiresAt={linearExpiresAt}
               linearWorkspaceId={linearWorkspaceId}
+              linearWorkspaceName={linearWorkspaceName}
               linearTeamId={linearTeamId}
               linearOptionsLoading={linearOptionsLoading}
               linearTeamOptions={linearTeamOptions}
@@ -551,7 +526,6 @@ export function TeamSettingsDialog({
               onConnectLinear={handleConnectLinear}
               onDisconnectLinear={handleDisconnectLinear}
               onSaveLinearSettings={handleSaveLinearSettings}
-              onLinearTeamIdChange={setLinearTeamId}
               onLinearStatusMappingChange={setLinearStatusMappingValue}
             />
           </TabsContent>

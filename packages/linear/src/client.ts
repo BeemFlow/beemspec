@@ -98,6 +98,7 @@ function getIssueFromPayload(payload: IssuePayload, operation: string): Promise<
 /** Information about the authenticated Linear user's organization. */
 export interface LinearViewerInfo {
   organizationId: string | undefined;
+  organizationName: string | undefined;
 }
 
 export interface LinearTeamOption {
@@ -121,6 +122,7 @@ export interface LinearStateOption {
 
 export interface LinearWorkspaceOptions {
   organizationId: string | undefined;
+  organizationName: string | undefined;
   teams: LinearTeamOption[];
   projects: LinearProjectOption[];
   states: LinearStateOption[];
@@ -287,7 +289,7 @@ export async function getLinearViewerInfo(accessToken: string): Promise<LinearVi
   const client = new LinearClient({ accessToken });
   const viewer = await client.viewer;
   const organization = await viewer.organization;
-  return { organizationId: organization?.id };
+  return { organizationId: organization?.id, organizationName: organization?.name ?? undefined };
 }
 
 export async function getLinearWorkspaceOptions(accessToken: string): Promise<LinearWorkspaceOptions> {
@@ -359,6 +361,7 @@ export async function getLinearWorkspaceOptions(accessToken: string): Promise<Li
 
   return {
     organizationId: organization?.id,
+    organizationName: organization?.name ?? undefined,
     teams,
     projects,
     states,

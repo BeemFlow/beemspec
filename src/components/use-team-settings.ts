@@ -58,6 +58,7 @@ interface LinearOptionsPayload {
   settings: LinearIntegrationSettings | null;
   options: {
     workspace_id: string | null;
+    workspace_name: string | null;
     teams: LinearTeamOption[];
     projects: LinearProjectOption[];
     states: LinearStateOption[];
@@ -107,6 +108,7 @@ export interface UseTeamSettingsReturn {
   savingLinearSettings: boolean;
   disconnectingLinear: boolean;
   linearWorkspaceId: string;
+  linearWorkspaceName: string;
   linearTeamId: string;
   setLinearTeamId: (value: string) => void;
   linearStatusMapping: Partial<Record<StoryStatus, string>>;
@@ -173,6 +175,7 @@ export function useTeamSettings({
   const [savingLinearSettings, setSavingLinearSettings] = useState(false);
   const [disconnectingLinear, setDisconnectingLinear] = useState(false);
   const [linearWorkspaceId, setLinearWorkspaceId] = useState('');
+  const [linearWorkspaceName, setLinearWorkspaceName] = useState('');
   const [linearTeamId, setLinearTeamIdState] = useState('');
   const [linearStatusMapping, setLinearStatusMapping] = useState<Partial<Record<StoryStatus, string>>>({});
   const [linearConnected, setLinearConnected] = useState(false);
@@ -193,6 +196,7 @@ export function useTeamSettings({
       );
 
       setLinearWorkspaceId(asInputValue(data.settings?.linear_workspace_id ?? data.options.workspace_id));
+      setLinearWorkspaceName(asInputValue(data.options.workspace_name));
       setLinearTeamIdState(asInputValue(data.settings?.linear_team_id));
       setLinearStatusMapping(normalizeStatusMapping(data.settings?.linear_status_mapping));
 
@@ -225,6 +229,7 @@ export function useTeamSettings({
       setMembers(data.members ?? []);
       setInvites(data.invites ?? []);
       setLinearWorkspaceId(asInputValue(data.linear.settings?.linear_workspace_id));
+      setLinearWorkspaceName('');
       setLinearTeamIdState(asInputValue(data.linear.settings?.linear_team_id));
       setLinearStatusMapping(normalizeStatusMapping(data.linear.settings?.linear_status_mapping));
       setLinearConnected(Boolean(data.linear.connection.connected));
@@ -503,6 +508,7 @@ export function useTeamSettings({
     savingLinearSettings,
     disconnectingLinear,
     linearWorkspaceId,
+    linearWorkspaceName,
     linearTeamId,
     setLinearTeamId,
     linearStatusMapping,
