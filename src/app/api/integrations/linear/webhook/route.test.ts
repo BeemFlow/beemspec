@@ -39,6 +39,7 @@ function createWebhookAdminClient(
   options: {
     existingLink?: { story_id: string; linear_issue_id: string; linear_issue_identifier: string | null } | null;
     duplicateReceipt?: boolean;
+    duplicateProcessed?: boolean;
     localStoryUpdatedAt?: string;
   } = {},
 ) {
@@ -99,6 +100,22 @@ function createWebhookAdminClient(
   const storyDeleteEq = vi.fn().mockResolvedValue({ error: null });
   const storyDelete = vi.fn().mockReturnValue({ eq: storyDeleteEq });
 
+  const applyWritebackSingle = vi
+    .fn()
+    .mockResolvedValue({ data: { duplicate: options.duplicateProcessed ?? false }, error: null });
+  const removeWithReceiptSingle = vi
+    .fn()
+    .mockResolvedValue({ data: { duplicate: options.duplicateProcessed ?? false }, error: null });
+  const rpc = vi.fn((fn: string) => {
+    if (fn === 'apply_linear_issue_writeback_with_receipt') {
+      return { single: applyWritebackSingle };
+    }
+    if (fn === 'process_linear_issue_remove_with_receipt') {
+      return { single: removeWithReceiptSingle };
+    }
+    return {};
+  });
+
   const from = vi.fn((table: string) => {
     if (table === 'integration_webhook_receipts') {
       return { insert: receiptInsert };
@@ -120,10 +137,11 @@ function createWebhookAdminClient(
   });
 
   return {
-    client: { from },
+    client: { from, rpc },
     receiptInsert,
     storyUpdate,
     storyDelete,
+    rpc,
   };
 }
 
@@ -204,23 +222,19 @@ describe('linear webhook route', () => {
       }),
     );
 
-    expect(admin.storyUpdate).toHaveBeenCalledWith(
+    expect(admin.rpc).toHaveBeenCalledWith(
+      'apply_linear_issue_writeback_with_receipt',
       expect.objectContaining({
-        title: 'Story title updated from Linear',
-        content: expect.objectContaining({
-          requirements: 'Updated req',
-          acceptance_criteria: '- [ ] Updated AC',
-        }),
-        status: 'in_progress',
+        p_story_id: 'story_1',
+        p_linear_issue_id: 'lin_1',
       }),
     );
-    expect(admin.receiptInsert).toHaveBeenCalled();
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ success: true, applied: true });
   });
 
   it('handles duplicate delivery idempotently', async () => {
-    const admin = createWebhookAdminClient({ duplicateReceipt: true });
+    const admin = createWebhookAdminClient({ duplicateProcessed: true });
     vi.mocked(createAdminClient).mockReturnValue(admin.client as never);
 
     const createdAt = new Date().toISOString();
@@ -370,7 +384,10 @@ describe('linear webhook route', () => {
       }),
     );
 
-    expect(admin.storyDelete).toHaveBeenCalled();
+    expect(admin.rpc).toHaveBeenCalledWith(
+      'process_linear_issue_remove_with_receipt',
+      expect.objectContaining({ p_story_id: 'story_1' }),
+    );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       success: true,
@@ -408,7 +425,7 @@ describe('linear webhook route', () => {
       }),
     );
 
-    expect(admin.storyUpdate).not.toHaveBeenCalled();
+    expect(admin.rpc).not.toHaveBeenCalledWith('apply_linear_issue_writeback_with_receipt', expect.anything());
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ success: true, ignored: true });
   });
@@ -442,7 +459,7 @@ describe('linear webhook route', () => {
       }),
     );
 
-    expect(admin.storyUpdate).not.toHaveBeenCalled();
+    expect(admin.rpc).not.toHaveBeenCalledWith('apply_linear_issue_writeback_with_receipt', expect.anything());
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ success: true, ignored: true });
   });

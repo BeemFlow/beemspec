@@ -40,27 +40,9 @@ export async function POST(request: Request) {
   if (!validation.success) return validation.response;
 
   const supabase = await createClient();
-
-  // Create team
-  const { data: team, error: teamError } = await supabase
-    .from('teams')
-    .insert({ name: validation.data.name })
-    .select()
-    .single();
-
-  if (teamError) {
-    return serverErrorResponse('Failed to create team', teamError);
-  }
-
-  // Add creator as owner
-  const { error: memberError } = await supabase
-    .from('team_members')
-    .insert({ team_id: team.id, user_id: auth.user.id, role: 'owner' });
-
-  if (memberError) {
-    // Rollback team creation
-    await supabase.from('teams').delete().eq('id', team.id);
-    return serverErrorResponse('Failed to add owner', memberError);
+  const { data: team, error } = await supabase.rpc('create_team_with_owner', { p_name: validation.data.name }).single();
+  if (error || !team) {
+    return serverErrorResponse('Failed to create team', error);
   }
 
   return NextResponse.json(team, { status: 201 });

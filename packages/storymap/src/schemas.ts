@@ -117,6 +117,11 @@ export const reorderTasksSchema = z.object({
   order: z.array(uuid).min(1, 'Order array cannot be empty'),
 });
 
+export const moveTaskSchema = z.object({
+  target_activity_id: uuid,
+  target_order: z.array(uuid).min(1, 'Order array cannot be empty'),
+});
+
 // ---------------------------------------------------------------------------
 // Story
 // ---------------------------------------------------------------------------
@@ -145,6 +150,12 @@ export const reorderStoriesSchema = z.object({
   task_id: uuid,
   release_id: uuid.nullable(),
   order: z.array(uuid).min(1, 'Order array cannot be empty'),
+});
+
+export const moveStorySchema = z.object({
+  target_task_id: uuid,
+  target_release_id: uuid.nullable(),
+  target_order: z.array(uuid).min(1, 'Order array cannot be empty'),
 });
 
 // ---------------------------------------------------------------------------
@@ -187,10 +198,12 @@ export type ReorderActivities = z.infer<typeof reorderActivitiesSchema>;
 export type CreateTask = z.infer<typeof createTaskSchema>;
 export type UpdateTask = z.infer<typeof updateTaskSchema>;
 export type ReorderTasks = z.infer<typeof reorderTasksSchema>;
+export type MoveTask = z.infer<typeof moveTaskSchema>;
 
 export type CreateStory = z.infer<typeof createStorySchema>;
 export type UpdateStory = z.infer<typeof updateStorySchema>;
 export type ReorderStories = z.infer<typeof reorderStoriesSchema>;
+export type MoveStory = z.infer<typeof moveStorySchema>;
 
 export type CreatePersona = z.infer<typeof createPersonaSchema>;
 export type UpdatePersona = z.infer<typeof updatePersonaSchema>;

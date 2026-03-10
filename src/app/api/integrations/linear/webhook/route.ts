@@ -25,6 +25,7 @@ function getString(value: unknown): string | null {
 }
 
 function logLinearWebhook(level: 'info' | 'warn' | 'error', message: string, data: Record<string, unknown>) {
+  // biome-ignore lint/suspicious/noConsole: structured operational logs for webhook observability
   const logger = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
   logger('[linear-webhook]', message, data);
 }
@@ -117,6 +118,7 @@ function parseAndVerifyEvent(request: Request, rawBody: string): WebhookEvent | 
   return event;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: webhook event orchestration is intentionally centralized
 async function processIssueEvent(
   supabase: ReturnType<typeof createAdminClient>,
   event: WebhookEvent,
@@ -157,16 +159,16 @@ async function processIssueEvent(
       return persistIgnoredReceipt(supabase, event, 'No story link found for removed issue');
     }
 
-    const { error: deleteError } = await supabase.from('stories').delete().eq('id', link.storyId);
-    if (deleteError) throw deleteError;
-
-    const receipt = await insertWebhookReceipt(supabase, {
-      idempotencyKey: event.idempotencyKey,
-      type: event.type,
-      action: event.action,
-      payload: event.payload,
-      status: 'processed',
-    });
+    const { data: removeResult, error: removeError } = await supabase
+      .rpc('process_linear_issue_remove_with_receipt', {
+        p_story_id: link.storyId,
+        p_idempotency_key: event.idempotencyKey,
+        p_event_type: event.type,
+        p_event_action: event.action,
+        p_payload: event.payload,
+      })
+      .single<{ duplicate: boolean }>();
+    if (removeError) throw removeError;
 
     logLinearWebhook('info', 'deleted_story_from_removed_issue', {
       delivery_id: event.idempotencyKey,
@@ -174,7 +176,7 @@ async function processIssueEvent(
       story_id: link.storyId,
     });
 
-    return successResponse({ duplicate: receipt.duplicate, applied: true, storyId: link.storyId });
+    return successResponse({ duplicate: removeResult?.duplicate ?? false, applied: true, storyId: link.storyId });
   }
 
   if (!link) {
@@ -292,30 +294,32 @@ async function processIssueEvent(
   }
   const dbUpdate = buildDbUpdateFromPatch(patch, currentContent);
 
-  const { error: updateError } = await supabase.from('stories').update(dbUpdate).eq('id', link.storyId);
-  if (updateError) throw updateError;
+  const { data: writebackResult, error: writebackError } = await supabase
+    .rpc('apply_linear_issue_writeback_with_receipt', {
+      p_story_id: link.storyId,
+      p_linear_issue_id: linearIssueId,
+      p_linear_issue_identifier: getString(payload?.identifier) ?? link.linearIssueIdentifier,
+      p_last_local_updated_at: remoteUpdatedAt,
+      p_last_linear_updated_at: remoteUpdatedAt,
+      p_story_updated_at: String(dbUpdate.updated_at),
+      p_story_title: typeof dbUpdate.title === 'string' ? dbUpdate.title : null,
+      p_story_status: typeof dbUpdate.status === 'string' ? dbUpdate.status : null,
+      p_story_content:
+        dbUpdate.content && typeof dbUpdate.content === 'object' ? (dbUpdate.content as Record<string, unknown>) : null,
+      p_idempotency_key: event.idempotencyKey,
+      p_event_type: event.type,
+      p_event_action: event.action,
+      p_payload: event.payload,
+    })
+    .single<{ duplicate: boolean }>();
+  if (writebackError) throw writebackError;
 
-  await upsertStoryLinearLink(supabase, {
-    storyId: link.storyId,
-    linearIssueId,
-    linearIssueIdentifier: getString(payload?.identifier) ?? link.linearIssueIdentifier,
-    lastLocalUpdatedAt: remoteUpdatedAt,
-    lastLinearUpdatedAt: remoteUpdatedAt,
-  });
-
-  const receipt = await insertWebhookReceipt(supabase, {
-    idempotencyKey: event.idempotencyKey,
-    type: event.type,
-    action: event.action,
-    payload: event.payload,
-    status: 'processed',
-  });
   logLinearWebhook('info', 'applied_issue_writeback', {
     delivery_id: event.idempotencyKey,
     issue_id: linearIssueId,
     story_id: link.storyId,
   });
-  return successResponse({ duplicate: receipt.duplicate, applied: true, storyId: link.storyId });
+  return successResponse({ duplicate: writebackResult?.duplicate ?? false, applied: true, storyId: link.storyId });
 }
 
 export async function POST(request: Request) {

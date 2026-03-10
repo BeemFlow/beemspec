@@ -5,6 +5,8 @@ import type {
   CreateStory,
   CreateStoryMap,
   CreateTask,
+  MoveStory,
+  MoveTask,
   ReorderActivities,
   ReorderReleases,
   ReorderStories,
@@ -69,15 +71,7 @@ export async function createStoryMap(supabase: Supabase, input: CreateStoryMap) 
 }
 
 export async function updateStoryMap(supabase: Supabase, storyMapId: string, changes: UpdateStoryMap) {
-  return supabase
-    .from('story_maps')
-    .update({
-      ...pickDefined(changes),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', storyMapId)
-    .select()
-    .single();
+  return supabase.from('story_maps').update(pickDefined(changes)).eq('id', storyMapId).select().single();
 }
 
 export async function deleteStoryMap(supabase: Supabase, storyMapId: string) {
@@ -135,6 +129,14 @@ export async function reorderTasks(supabase: Supabase, input: ReorderTasks) {
   return supabase.rpc('reorder_tasks', {
     p_activity_id: input.activity_id,
     p_order: input.order,
+  });
+}
+
+export async function moveTask(supabase: Supabase, taskId: string, input: MoveTask) {
+  return supabase.rpc('move_task_and_reorder', {
+    p_task_id: taskId,
+    p_target_activity_id: input.target_activity_id,
+    p_target_order: input.target_order,
   });
 }
 
@@ -223,15 +225,7 @@ export async function createStory(supabase: Supabase, input: CreateStory) {
 }
 
 export async function updateStory(supabase: Supabase, storyId: string, changes: UpdateStory) {
-  const updated = await supabase
-    .from('stories')
-    .update({
-      ...pickDefined(changes),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', storyId)
-    .select()
-    .single();
+  const updated = await supabase.from('stories').update(pickDefined(changes)).eq('id', storyId).select().single();
 
   if (updated.error || !updated.data) {
     return { data: updated.data, error: updated.error };
@@ -298,6 +292,15 @@ export async function reorderStories(supabase: Supabase, input: ReorderStories) 
     p_task_id: input.task_id,
     p_release_id: input.release_id,
     p_order: input.order,
+  });
+}
+
+export async function moveStory(supabase: Supabase, storyId: string, input: MoveStory) {
+  return supabase.rpc('move_story_and_reorder', {
+    p_story_id: storyId,
+    p_target_task_id: input.target_task_id,
+    p_target_release_id: input.target_release_id,
+    p_target_order: input.target_order,
   });
 }
 

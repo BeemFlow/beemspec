@@ -34,19 +34,15 @@ export default async function AcceptInvitePage() {
     return clearInviteAndRedirect(supabase);
   }
 
-  // Add user to team (ignore duplicate key error code 23505)
-  const { error: memberError } = await supabase.from('team_members').insert({
-    team_id: invite.team_id,
-    user_id: user.id,
-    role: 'member',
+  const { error: acceptError } = await supabase.rpc('accept_team_invite_member', {
+    p_invite_id: invite.id,
+    p_team_id: invite.team_id,
+    p_user_id: user.id,
   });
 
-  if (memberError && memberError.code !== '23505') {
+  if (acceptError) {
     return clearInviteAndRedirect(supabase);
   }
-
-  // Mark invite as accepted
-  await supabase.from('team_invites').update({ accepted_at: new Date().toISOString() }).eq('id', inviteId);
 
   return clearInviteAndRedirect(supabase);
 }

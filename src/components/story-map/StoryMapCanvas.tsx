@@ -240,26 +240,14 @@ export function StoryMapCanvas({
             overParsed.id,
           );
 
-          if (activeTask.activityId !== targetActivityId) {
-            await performRequest(
-              `/api/tasks/${activeParsed.id}`,
-              {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ activity_id: targetActivityId }),
-              },
-              'Failed to move task to target activity',
-            );
-          }
-
           await performRequest(
-            '/api/tasks',
+            `/api/tasks/${activeParsed.id}/move`,
             {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ activity_id: targetActivityId, order: newOrder }),
+              body: JSON.stringify({ target_activity_id: targetActivityId, target_order: newOrder }),
             },
-            'Failed to reorder tasks',
+            'Failed to move task',
           );
 
           setDragError(null);
@@ -275,26 +263,14 @@ export function StoryMapCanvas({
             activeParsed.id,
           );
 
-          if (activeTask.activityId !== targetActivityId) {
-            await performRequest(
-              `/api/tasks/${activeParsed.id}`,
-              {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ activity_id: targetActivityId }),
-              },
-              'Failed to move task to target activity',
-            );
-          }
-
           await performRequest(
-            '/api/tasks',
+            `/api/tasks/${activeParsed.id}/move`,
             {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ activity_id: targetActivityId, order: newOrder }),
+              body: JSON.stringify({ target_activity_id: targetActivityId, target_order: newOrder }),
             },
-            'Failed to reorder tasks',
+            'Failed to move task',
           );
 
           setDragError(null);
@@ -319,30 +295,18 @@ export function StoryMapCanvas({
             overParsed.id,
           );
 
-          if (activeStory.task_id !== overStory.task_id || activeStory.release_id !== overStory.release_id) {
-            await performRequest(
-              `/api/stories/${activeParsed.id}`,
-              {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_id: overStory.task_id, release_id: overStory.release_id }),
-              },
-              'Failed to move story to target cell',
-            );
-          }
-
           await performRequest(
-            '/api/stories',
+            `/api/stories/${activeParsed.id}/move`,
             {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                task_id: overStory.task_id,
-                release_id: overStory.release_id,
-                order: newOrder,
+                target_task_id: overStory.task_id,
+                target_release_id: overStory.release_id,
+                target_order: newOrder,
               }),
             },
-            'Failed to reorder stories',
+            'Failed to move story',
           );
 
           setDragError(null);
@@ -358,26 +322,18 @@ export function StoryMapCanvas({
             activeParsed.id,
           );
 
-          if (activeStory.task_id !== taskId || activeStory.release_id !== releaseId) {
-            await performRequest(
-              `/api/stories/${activeParsed.id}`,
-              {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_id: taskId, release_id: releaseId }),
-              },
-              'Failed to move story to target cell',
-            );
-          }
-
           await performRequest(
-            '/api/stories',
+            `/api/stories/${activeParsed.id}/move`,
             {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ task_id: taskId, release_id: releaseId, order: newOrder }),
+              body: JSON.stringify({
+                target_task_id: taskId,
+                target_release_id: releaseId,
+                target_order: newOrder,
+              }),
             },
-            'Failed to reorder stories',
+            'Failed to move story',
           );
 
           setDragError(null);

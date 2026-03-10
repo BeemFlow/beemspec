@@ -26,7 +26,12 @@
   "linter": {
     "rules": {
       "complexity": {
-        "noExcessiveCognitiveComplexity": "warn"
+        "noExcessiveCognitiveComplexity": {
+          "level": "warn",
+          "options": {
+            "maxAllowedComplexity": 30
+          }
+        }
       },
       "suspicious": {
         "noConsole": "warn"

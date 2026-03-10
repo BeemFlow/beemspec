@@ -32,12 +32,14 @@ CREATE TABLE team_invites (
   email TEXT NOT NULL,
   invited_by UUID NOT NULL REFERENCES auth.users(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  accepted_at TIMESTAMPTZ,
-  UNIQUE(team_id, email)
+  accepted_at TIMESTAMPTZ
 );
 
 CREATE INDEX idx_team_invites_team ON team_invites(team_id);
 CREATE INDEX idx_team_invites_email ON team_invites(email);
+CREATE UNIQUE INDEX uq_team_invites_team_email_lower
+  ON team_invites(team_id, lower(email))
+  WHERE accepted_at IS NULL;
 
 
 -- =============================================================================
@@ -46,7 +48,7 @@ CREATE INDEX idx_team_invites_email ON team_invites(email);
 
 CREATE TABLE story_maps (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
+  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -54,6 +56,7 @@ CREATE TABLE story_maps (
 );
 
 CREATE INDEX idx_story_maps_team ON story_maps(team_id);
+CREATE UNIQUE INDEX uq_story_maps_id_team ON story_maps(id, team_id);
 
 
 -- =============================================================================
@@ -71,6 +74,9 @@ CREATE TABLE personas (
 );
 
 CREATE INDEX idx_personas_story_map ON personas(story_map_id);
+CREATE UNIQUE INDEX uq_personas_story_map_sort
+  ON personas(story_map_id, sort_order)
+  WHERE sort_order IS NOT NULL;
 
 
 -- =============================================================================
@@ -87,6 +93,9 @@ CREATE TABLE activities (
 );
 
 CREATE INDEX idx_activities_story_map ON activities(story_map_id);
+CREATE UNIQUE INDEX uq_activities_story_map_sort
+  ON activities(story_map_id, sort_order)
+  WHERE sort_order IS NOT NULL;
 
 
 -- =============================================================================
@@ -103,6 +112,9 @@ CREATE TABLE tasks (
 );
 
 CREATE INDEX idx_tasks_activity ON tasks(activity_id);
+CREATE UNIQUE INDEX uq_tasks_activity_sort
+  ON tasks(activity_id, sort_order)
+  WHERE sort_order IS NOT NULL;
 
 
 -- =============================================================================
@@ -119,6 +131,9 @@ CREATE TABLE releases (
 );
 
 CREATE INDEX idx_releases_story_map ON releases(story_map_id);
+CREATE UNIQUE INDEX uq_releases_story_map_sort
+  ON releases(story_map_id, sort_order)
+  WHERE sort_order IS NOT NULL;
 
 
 -- =============================================================================
@@ -140,6 +155,12 @@ CREATE TABLE stories (
 CREATE INDEX idx_stories_task ON stories(task_id);
 CREATE INDEX idx_stories_release ON stories(release_id);
 CREATE INDEX idx_stories_status ON stories(status);
+CREATE UNIQUE INDEX uq_stories_task_backlog_sort
+  ON stories(task_id, sort_order)
+  WHERE release_id IS NULL AND sort_order IS NOT NULL;
+CREATE UNIQUE INDEX uq_stories_task_release_sort
+  ON stories(task_id, release_id, sort_order)
+  WHERE release_id IS NOT NULL AND sort_order IS NOT NULL;
 
 
 -- =============================================================================
@@ -211,13 +232,17 @@ CREATE INDEX idx_integration_settings_team ON integration_settings(team_id);
 CREATE TABLE story_map_integration_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  story_map_id UUID NOT NULL UNIQUE REFERENCES story_maps(id) ON DELETE CASCADE,
+  story_map_id UUID NOT NULL UNIQUE,
   linear_project_id TEXT,
   linear_state_id TEXT,
   auto_import_labeled_issues BOOLEAN NOT NULL DEFAULT TRUE,
   import_label_name TEXT NOT NULL DEFAULT 'Story',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_story_map_integration_settings_story_map_team
+    FOREIGN KEY (story_map_id, team_id)
+    REFERENCES story_maps(id, team_id)
+    ON DELETE CASCADE
 );
 
 CREATE INDEX idx_story_map_integration_settings_map ON story_map_integration_settings(story_map_id);

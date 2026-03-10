@@ -77,8 +77,10 @@ describe('mcp server', () => {
     expect(toolNames.has('storymap_delete')).toBe(false);
     expect(toolNames.has('activity_create')).toBe(true);
     expect(toolNames.has('task_create')).toBe(true);
+    expect(toolNames.has('task_move')).toBe(true);
     expect(toolNames.has('release_create')).toBe(true);
     expect(toolNames.has('story_create')).toBe(true);
+    expect(toolNames.has('story_move')).toBe(true);
     expect(toolNames.has('persona_create')).toBe(true);
     expect(toolNames.has('story_context_get')).toBe(true);
     expect(toolNames.has('story_mark_blocked')).toBe(false);
@@ -124,9 +126,26 @@ describe('mcp server', () => {
       data: [{ id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4', name: 'Core Product' }],
       error: null,
     });
-    const eq = vi.fn().mockReturnValue({ order });
-    const select = vi.fn().mockReturnValue({ eq });
-    const from = vi.fn().mockReturnValue({ select });
+    const storyMapsEq = vi.fn().mockReturnValue({ order });
+    const storyMapsSelect = vi.fn().mockReturnValue({ eq: storyMapsEq });
+
+    const teamMembersEq = vi.fn().mockResolvedValue({
+      data: [{ team_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4', role: 'owner' }],
+      error: null,
+    });
+    const teamMembersSelect = vi.fn().mockReturnValue({ eq: teamMembersEq });
+
+    const teamsIn = vi.fn().mockResolvedValue({
+      data: [{ id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4', name: 'Core Product' }],
+      error: null,
+    });
+    const teamsSelect = vi.fn().mockReturnValue({ in: teamsIn });
+
+    const from = vi.fn((table: string) => {
+      if (table === 'team_members') return { select: teamMembersSelect };
+      if (table === 'teams') return { select: teamsSelect };
+      return { select: storyMapsSelect };
+    });
     const fakeSupabase = { from, rpc: vi.fn() } as never;
 
     const response = await handleMcpRequest(
@@ -146,9 +165,11 @@ describe('mcp server', () => {
     );
 
     expect(response.status).toBe(200);
+    expect(from).toHaveBeenCalledWith('team_members');
+    expect(from).toHaveBeenCalledWith('teams');
     expect(from).toHaveBeenCalledWith('story_maps');
-    expect(select).toHaveBeenCalledWith('*');
-    expect(eq).toHaveBeenCalledWith('team_id', 'd7f34189-5d27-4dc0-b2c5-23d11796add4');
+    expect(storyMapsSelect).toHaveBeenCalledWith('*');
+    expect(storyMapsEq).toHaveBeenCalledWith('team_id', 'd7f34189-5d27-4dc0-b2c5-23d11796add4');
     expect(order).toHaveBeenCalledWith('updated_at', { ascending: false });
 
     const payload = (await response.json()) as {
@@ -297,5 +318,73 @@ describe('mcp server', () => {
     };
     expect(payload.result.structuredContent.ok).toBe(true);
     expect(payload.result.structuredContent.data.reordered).toBe(2);
+  });
+
+  it('calls task_move through shared service path', async () => {
+    const fakeSupabase = { from: vi.fn(), rpc: vi.fn() } as never;
+
+    const moveTaskSpy = vi.spyOn(storymapService, 'moveTask').mockResolvedValue({
+      data: null,
+      error: null,
+    } as never);
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 8,
+        method: 'tools/call',
+        params: {
+          name: 'task_move',
+          arguments: {
+            task_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+            target_activity_id: '34e8bb98-8f40-4331-8df2-8f83fd8c7af4',
+            target_order: ['d7f34189-5d27-4dc0-b2c5-23d11796add4'],
+          },
+        },
+      }),
+      fakeSupabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+    expect(moveTaskSpy).toHaveBeenCalledWith(fakeSupabase, 'd7f34189-5d27-4dc0-b2c5-23d11796add4', {
+      target_activity_id: '34e8bb98-8f40-4331-8df2-8f83fd8c7af4',
+      target_order: ['d7f34189-5d27-4dc0-b2c5-23d11796add4'],
+    });
+  });
+
+  it('calls story_move through shared service path', async () => {
+    const fakeSupabase = { from: vi.fn(), rpc: vi.fn() } as never;
+
+    const moveStorySpy = vi.spyOn(storymapService, 'moveStory').mockResolvedValue({
+      data: null,
+      error: null,
+    } as never);
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 9,
+        method: 'tools/call',
+        params: {
+          name: 'story_move',
+          arguments: {
+            story_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+            target_task_id: '34e8bb98-8f40-4331-8df2-8f83fd8c7af4',
+            target_release_id: null,
+            target_order: ['d7f34189-5d27-4dc0-b2c5-23d11796add4'],
+          },
+        },
+      }),
+      fakeSupabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+    expect(moveStorySpy).toHaveBeenCalledWith(fakeSupabase, 'd7f34189-5d27-4dc0-b2c5-23d11796add4', {
+      target_task_id: '34e8bb98-8f40-4331-8df2-8f83fd8c7af4',
+      target_release_id: null,
+      target_order: ['d7f34189-5d27-4dc0-b2c5-23d11796add4'],
+    });
   });
 });

@@ -5,7 +5,7 @@ import { handleMcpRequest } from '@/integrations/mcp/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-async function handle(request: Request): Promise<Response> {
+async function handleMcpHttpRequest(request: Request): Promise<Response> {
   if (!isTrustedRequestOrigin(request)) {
     return Response.json({ error: 'Forbidden origin' }, { status: 403 });
   }
@@ -19,15 +19,15 @@ async function handle(request: Request): Promise<Response> {
 }
 
 export async function GET(request: Request) {
-  return handle(request);
+  return handleMcpHttpRequest(request);
 }
 
 export async function POST(request: Request) {
-  return handle(request);
+  return handleMcpHttpRequest(request);
 }
 
 export async function DELETE(request: Request) {
-  return handle(request);
+  return handleMcpHttpRequest(request);
 }
 
 export async function OPTIONS() {

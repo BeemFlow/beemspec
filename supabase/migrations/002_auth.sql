@@ -8,24 +8,24 @@
 -- RLS Helper Functions
 -- =============================================================================
 
-CREATE OR REPLACE FUNCTION is_team_member(check_team_id UUID)
+CREATE OR REPLACE FUNCTION is_team_member(p_team_id UUID)
 RETURNS BOOLEAN
-LANGUAGE SQL STABLE SECURITY DEFINER
+LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = ''
 AS $$
   SELECT EXISTS (
-    SELECT 1 FROM team_members
-    WHERE team_id = check_team_id
+    SELECT 1 FROM public.team_members
+    WHERE team_id = p_team_id
     AND user_id = (SELECT auth.uid())
   )
 $$;
 
-CREATE OR REPLACE FUNCTION is_team_owner(check_team_id UUID)
+CREATE OR REPLACE FUNCTION is_team_owner(p_team_id UUID)
 RETURNS BOOLEAN
-LANGUAGE SQL STABLE SECURITY DEFINER
+LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = ''
 AS $$
   SELECT EXISTS (
-    SELECT 1 FROM team_members
-    WHERE team_id = check_team_id
+    SELECT 1 FROM public.team_members
+    WHERE team_id = p_team_id
     AND user_id = (SELECT auth.uid())
     AND role = 'owner'
   )
@@ -724,5 +724,95 @@ BEGIN
   WHERE team_id = p_team_id AND user_id = p_user_id;
 
   RETURN json_build_object('success', true);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION create_team_with_owner(p_name TEXT)
+RETURNS TABLE (
+  id UUID,
+  name TEXT,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  v_team_id UUID := gen_random_uuid();
+  v_user_id UUID := (SELECT auth.uid());
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  INSERT INTO public.teams (id, name)
+  VALUES (v_team_id, p_name);
+
+  INSERT INTO public.team_members (team_id, user_id, role)
+  VALUES (v_team_id, v_user_id, 'owner');
+
+  RETURN QUERY
+  SELECT t.id, t.name, t.created_at, t.updated_at
+  FROM public.teams t
+  WHERE t.id = v_team_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION accept_team_invite_member(
+  p_invite_id UUID,
+  p_team_id UUID,
+  p_user_id UUID
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  v_auth_user_id UUID := (SELECT auth.uid());
+  v_auth_email TEXT;
+  v_invite_email TEXT;
+BEGIN
+  IF v_auth_user_id IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'Invalid user id';
+  END IF;
+
+  SELECT email
+  INTO v_invite_email
+  FROM public.team_invites
+  WHERE id = p_invite_id
+    AND team_id = p_team_id
+    AND accepted_at IS NULL;
+
+  IF v_invite_email IS NULL THEN
+    RAISE EXCEPTION 'Invite not found';
+  END IF;
+
+  IF v_auth_user_id <> p_user_id AND NOT public.is_team_owner(p_team_id) THEN
+    RAISE EXCEPTION 'Only team owners can accept invites for other users';
+  END IF;
+
+  IF v_auth_user_id = p_user_id THEN
+    SELECT email
+    INTO v_auth_email
+    FROM auth.users
+    WHERE id = v_auth_user_id;
+
+    IF v_auth_email IS NULL OR lower(v_auth_email) <> lower(v_invite_email) THEN
+      RAISE EXCEPTION 'Invite email does not match authenticated user';
+    END IF;
+  END IF;
+
+  INSERT INTO public.team_members (team_id, user_id, role)
+  VALUES (p_team_id, p_user_id, 'member')
+  ON CONFLICT (team_id, user_id) DO NOTHING;
+
+  UPDATE public.team_invites
+  SET accepted_at = NOW()
+  WHERE id = p_invite_id
+    AND team_id = p_team_id;
 END;
 $$;

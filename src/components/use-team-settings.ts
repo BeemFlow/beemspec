@@ -37,6 +37,12 @@ interface LinearTeamOption {
   key: string | null;
 }
 
+interface LinearProjectOption {
+  id: string;
+  name: string;
+  teamId: string;
+}
+
 interface LinearStateOption {
   id: string;
   name: string;
@@ -50,6 +56,7 @@ interface LinearOptionsPayload {
   options: {
     workspace_id: string | null;
     teams: LinearTeamOption[];
+    projects: LinearProjectOption[];
     states: LinearStateOption[];
   };
   applied_defaults: boolean;

@@ -16,7 +16,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
   const supabase = await createClient();
 
-  const { mapResult, activitiesResult, releasesResult } = await getStoryMapGraph(supabase, id);
+  const { mapResult, activitiesResult, releasesResult, personasResult } = await getStoryMapGraph(supabase, id, {
+    includePersonas: true,
+  });
 
   // Check main map first
   if (mapResult.error) {
@@ -33,10 +35,14 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   if (releasesResult.error) {
     return serverErrorResponse('Failed to load releases', releasesResult.error);
   }
+  if (personasResult.error) {
+    return serverErrorResponse('Failed to load personas', personasResult.error);
+  }
   const fullMap: StoryMapFull = {
     ...mapResult.data,
     activities: activitiesResult.data,
     releases: releasesResult.data,
+    personas: personasResult.data,
   };
 
   return NextResponse.json(fullMap);

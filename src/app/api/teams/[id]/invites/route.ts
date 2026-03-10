@@ -94,18 +94,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // Check if user already exists (empty identities array)
   if (inviteResult.user?.identities?.length === 0) {
     // User exists - add directly to team
-    const { error: memberError } = await supabase.from('team_members').insert({
-      team_id: teamId,
-      user_id: inviteResult.user.id,
-      role: 'member',
+    const { error: memberError } = await supabase.rpc('accept_team_invite_member', {
+      p_invite_id: invite.id,
+      p_team_id: teamId,
+      p_user_id: inviteResult.user.id,
     });
 
     if (memberError) {
       return serverErrorResponse('Failed to add member', memberError);
     }
-
-    // Mark invite as accepted
-    await supabase.from('team_invites').update({ accepted_at: new Date().toISOString() }).eq('id', invite.id);
 
     return NextResponse.json({ status: 'added', message: 'User added to team' }, { status: 201 });
   }

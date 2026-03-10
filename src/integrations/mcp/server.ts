@@ -5,6 +5,8 @@ import {
   createStoryMapSchema,
   createStorySchema,
   createTaskSchema,
+  moveStorySchema,
+  moveTaskSchema,
   reorderActivitiesSchema,
   reorderReleasesSchema,
   reorderStoriesSchema,
@@ -22,6 +24,7 @@ import { z } from 'zod';
 import type { AuthenticatedUser } from '@/lib/auth';
 import { DbErrorCode } from '@/lib/errors';
 import type { Supabase } from '@/lib/supabase/types';
+import { listTeamsForUser } from '@/lib/teams';
 import {
   createActivity,
   createPersona,
@@ -38,6 +41,8 @@ import {
   getStoryMapGraph,
   listPersonas,
   listStoryMaps,
+  moveStory,
+  moveTask,
   reorderActivities,
   reorderReleases,
   reorderStories,
@@ -134,41 +139,24 @@ const destructiveAnnotations = {
   destructiveHint: true,
 } as const;
 
-interface TeamMembership {
-  team_id: string;
-  role: string;
-}
-
-async function listTeamsForUser(supabase: Supabase, userId: string) {
-  const membershipsResult = await supabase.from('team_members').select('team_id, role').eq('user_id', userId);
-  if (membershipsResult.error) return { data: null, error: membershipsResult.error };
-
-  const memberships = (membershipsResult.data ?? []) as TeamMembership[];
-  if (memberships.length === 0) return { data: [], error: null };
-
-  const teamIds = memberships.map((row) => row.team_id);
-  const teamsResult = await supabase.from('teams').select('id, name').in('id', teamIds);
-  if (teamsResult.error) return { data: null, error: teamsResult.error };
-
-  const teams = (teamsResult.data ?? []) as Array<{ id: string; name: string }>;
-  const byId = new Map(teams.map((team) => [team.id, team]));
-
-  return {
-    data: memberships.map((membership) => ({
-      team_id: membership.team_id,
-      role: membership.role,
-      name: byId.get(membership.team_id)?.name ?? null,
-    })),
-    error: null,
-  };
-}
-
-async function resolveTeamId(
+async function resolveAccessibleTeamId(
   supabase: Supabase,
   userId: string,
   teamId: string | undefined,
 ): Promise<{ ok: true; teamId: string } | { ok: false; response: ReturnType<typeof errorResult> }> {
-  if (teamId) return { ok: true, teamId };
+  if (teamId) {
+    const teamsResult = await listTeamsForUser(supabase, userId);
+    if (teamsResult.error || !teamsResult.data) {
+      return { ok: false, response: errorResult('Failed to resolve team', describeDbError(teamsResult.error)) };
+    }
+
+    const isMember = teamsResult.data.some((team) => team.team_id === teamId);
+    if (!isMember) {
+      return { ok: false, response: errorResult('Provided team_id is not accessible to authenticated user') };
+    }
+
+    return { ok: true, teamId };
+  }
 
   const teamsResult = await listTeamsForUser(supabase, userId);
   if (teamsResult.error || !teamsResult.data) {
@@ -225,7 +213,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     name: 'beemspec',
     version: '0.1.0',
   });
-  const createAdminClient = () => supabase;
+  const getUserScopedClient = () => supabase;
 
   server.registerTool(
     'team_list',
@@ -235,7 +223,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: readAnnotations,
     },
     withToolErrorBoundary('team_list', async () => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await listTeamsForUser(supabase, user.id);
       if (error || !data) return errorResult('Failed to load teams', describeDbError(error));
       return successResult(data);
@@ -280,8 +268,8 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: readAnnotations,
     },
     withToolErrorBoundary('storymap_list', async ({ team_id }) => {
-      const supabase = createAdminClient();
-      const resolvedTeam = await resolveTeamId(supabase, user.id, team_id);
+      const supabase = getUserScopedClient();
+      const resolvedTeam = await resolveAccessibleTeamId(supabase, user.id, team_id);
       if (!resolvedTeam.ok) return resolvedTeam.response;
 
       const { data, error } = await listStoryMaps(supabase, resolvedTeam.teamId);
@@ -308,7 +296,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: readAnnotations,
     },
     withToolErrorBoundary('storymap_get', async ({ story_map_id, story_map_name, team_id }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       let resolvedStoryMapId = story_map_id;
 
       if (!resolvedStoryMapId && story_map_name) {
@@ -366,8 +354,8 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('storymap_create', async (input) => {
-      const supabase = createAdminClient();
-      const resolvedTeam = await resolveTeamId(supabase, user.id, input.team_id);
+      const supabase = getUserScopedClient();
+      const resolvedTeam = await resolveAccessibleTeamId(supabase, user.id, input.team_id);
       if (!resolvedTeam.ok) return resolvedTeam.response;
 
       const { data, error } = await createStoryMap(supabase, {
@@ -394,7 +382,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('storymap_update', async ({ story_map_id, ...changes }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await updateStoryMap(supabase, story_map_id, changes);
 
       if (error) {
@@ -415,7 +403,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('activity_create', async (input) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await createActivity(supabase, input);
 
       if (error) return errorResult('Failed to create activity', describeDbError(error));
@@ -435,7 +423,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('activity_update', async ({ activity_id, ...changes }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await updateActivity(supabase, activity_id, changes);
 
       if (error) {
@@ -457,7 +445,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('activity_delete', async ({ activity_id }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await deleteActivity(supabase, activity_id);
 
       if (error) {
@@ -477,7 +465,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('activity_reorder', async ({ story_map_id, order }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { error } = await reorderActivities(supabase, { story_map_id, order });
 
       if (error) return errorResult('Failed to reorder activities', describeDbError(error));
@@ -494,7 +482,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('task_create', async (input) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await createTask(supabase, input);
 
       if (error) return errorResult('Failed to create task', describeDbError(error));
@@ -514,7 +502,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('task_update', async ({ task_id, ...changes }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await updateTask(supabase, task_id, changes);
 
       if (error) {
@@ -536,7 +524,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('task_delete', async ({ task_id }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await deleteTask(supabase, task_id);
 
       if (error) {
@@ -556,11 +544,31 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('task_reorder', async ({ activity_id, order }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { error } = await reorderTasks(supabase, { activity_id, order });
 
       if (error) return errorResult('Failed to reorder tasks', describeDbError(error));
       return successResult({ reordered: order.length });
+    }),
+  );
+
+  server.registerTool(
+    'task_move',
+    {
+      title: 'Move Task',
+      description: 'Atomically move a task to another activity and set full target order in one operation.',
+      inputSchema: {
+        task_id: z.string().uuid(),
+        ...moveTaskSchema.shape,
+      },
+      annotations: mutateAnnotations,
+    },
+    withToolErrorBoundary('task_move', async ({ task_id, ...input }) => {
+      const supabase = getUserScopedClient();
+      const { error } = await moveTask(supabase, task_id, input);
+
+      if (error) return errorResult('Failed to move task', describeDbError(error));
+      return successResult({ moved: task_id });
     }),
   );
 
@@ -573,7 +581,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('release_create', async (input) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await createRelease(supabase, input);
 
       if (error) return errorResult('Failed to create release', describeDbError(error));
@@ -593,7 +601,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('release_update', async ({ release_id, ...changes }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await updateRelease(supabase, release_id, changes);
 
       if (error) {
@@ -615,7 +623,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('release_delete', async ({ release_id }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await deleteRelease(supabase, release_id);
 
       if (error) {
@@ -635,7 +643,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('release_reorder', async ({ story_map_id, order }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { error } = await reorderReleases(supabase, { story_map_id, order });
 
       if (error) return errorResult('Failed to reorder releases', describeDbError(error));
@@ -654,7 +662,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: readAnnotations,
     },
     withToolErrorBoundary('story_get', async ({ story_id }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await getStory(supabase, story_id);
 
       if (error) {
@@ -674,7 +682,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('story_create', async (input) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await createStory(supabase, input);
 
       if (error) return errorResult('Failed to create story', describeDbError(error));
@@ -694,7 +702,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('story_update', async ({ story_id, ...changes }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await updateStory(supabase, story_id, changes);
 
       if (error) {
@@ -716,7 +724,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('story_delete', async ({ story_id }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await deleteStory(supabase, story_id);
 
       if (error) {
@@ -737,11 +745,31 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('story_reorder', async ({ task_id, release_id, order }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { error } = await reorderStories(supabase, { task_id, release_id, order });
 
       if (error) return errorResult('Failed to reorder stories', describeDbError(error));
       return successResult({ reordered: order.length });
+    }),
+  );
+
+  server.registerTool(
+    'story_move',
+    {
+      title: 'Move Story',
+      description: 'Atomically move a story to another task/release cell and set full target order in one operation.',
+      inputSchema: {
+        story_id: z.string().uuid(),
+        ...moveStorySchema.shape,
+      },
+      annotations: mutateAnnotations,
+    },
+    withToolErrorBoundary('story_move', async ({ story_id, ...input }) => {
+      const supabase = getUserScopedClient();
+      const { error } = await moveStory(supabase, story_id, input);
+
+      if (error) return errorResult('Failed to move story', describeDbError(error));
+      return successResult({ moved: story_id });
     }),
   );
 
@@ -756,7 +784,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: readAnnotations,
     },
     withToolErrorBoundary('persona_list', async ({ story_map_id }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await listPersonas(supabase, story_map_id);
 
       if (error) return errorResult('Failed to load personas', describeDbError(error));
@@ -773,7 +801,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('persona_create', async (input) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await createPersona(supabase, input);
 
       if (error) return errorResult('Failed to create persona', describeDbError(error));
@@ -793,7 +821,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('persona_update', async ({ persona_id, ...changes }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await updatePersona(supabase, persona_id, changes);
 
       if (error) {
@@ -816,7 +844,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('persona_delete', async ({ persona_id }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const { data, error } = await deletePersona(supabase, persona_id);
 
       if (error) {
@@ -840,7 +868,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: readAnnotations,
     },
     withToolErrorBoundary('story_context_get', async ({ story_id }) => {
-      const supabase = createAdminClient();
+      const supabase = getUserScopedClient();
       const context = await getStoryContext(supabase, story_id);
 
       if (!context) {

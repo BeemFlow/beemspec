@@ -37,10 +37,18 @@ function createStoryMapGetClient() {
   const releasesEq = vi.fn().mockReturnValue({ order: releasesOrder });
   const releasesSelect = vi.fn().mockReturnValue({ eq: releasesEq });
 
+  const personasOrder = vi.fn().mockResolvedValue({
+    data: [{ id: 'p1', name: 'Admin' }],
+    error: null,
+  });
+  const personasEq = vi.fn().mockReturnValue({ order: personasOrder });
+  const personasSelect = vi.fn().mockReturnValue({ eq: personasEq });
+
   const from = vi.fn((table: string) => {
     if (table === 'story_maps') return { select: storyMapSelect };
     if (table === 'activities') return { select: activitiesSelect };
     if (table === 'releases') return { select: releasesSelect };
+    if (table === 'personas') return { select: personasSelect };
     throw new Error(`Unexpected table: ${table}`);
   });
 
@@ -53,7 +61,7 @@ describe('story maps [id] route', () => {
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user' } } as never);
   });
 
-  it('returns full story map payload without personas query', async () => {
+  it('returns full story map payload including personas', async () => {
     const { client, from } = createStoryMapGetClient();
     vi.mocked(createClient).mockResolvedValue(client as never);
 
@@ -67,11 +75,12 @@ describe('story maps [id] route', () => {
       name: 'Map A',
       activities: [{ id: 'a1', tasks: [] }],
       releases: [{ id: 'r1', name: 'Release 1' }],
+      personas: [{ id: 'p1', name: 'Admin' }],
     });
     expect(from).toHaveBeenCalledWith('story_maps');
     expect(from).toHaveBeenCalledWith('activities');
     expect(from).toHaveBeenCalledWith('releases');
-    expect(from).not.toHaveBeenCalledWith('personas');
+    expect(from).toHaveBeenCalledWith('personas');
   });
 
   it('returns 400 for invalid story map id', async () => {
