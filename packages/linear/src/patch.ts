@@ -51,8 +51,7 @@ export function buildStoryPatchFromLinearIssue(input: LinearIssueForSync): Story
   }
 
   const mappedFromState = mapLinearStatusToStoryStatus(input.stateName);
-  const mappedFromDescription = mapLinearStatusToStoryStatus(fromDescription.status ?? null);
-  patch.status = mappedFromState ?? mappedFromDescription ?? undefined;
+  patch.status = mappedFromState ?? undefined;
 
   return patch;
 }

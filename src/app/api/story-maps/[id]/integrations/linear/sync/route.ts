@@ -77,6 +77,23 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const supabase = await createClient();
 
+  const { data: mapSettings, error: mapSettingsError } = await supabase
+    .from('story_map_integration_settings')
+    .select('linear_project_id')
+    .eq('story_map_id', storyMapId)
+    .maybeSingle<{ linear_project_id: string | null }>();
+
+  if (mapSettingsError) {
+    return serverErrorResponse('Failed to load story map Linear settings', mapSettingsError);
+  }
+
+  if (!normalize(mapSettings?.linear_project_id)) {
+    return NextResponse.json(
+      { error: 'Manual sync requires a saved Linear project for this story map' },
+      { status: 422 },
+    );
+  }
+
   const { data: tasks, error: tasksError } = await supabase
     .from('tasks')
     .select('id, activities!inner(story_map_id)')

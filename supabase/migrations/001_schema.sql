@@ -145,7 +145,7 @@ CREATE TABLE stories (
   task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   release_id UUID REFERENCES releases(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
-  status TEXT DEFAULT 'backlog' CHECK(status IN ('backlog', 'ready', 'in_progress', 'review', 'done')),
+  status TEXT DEFAULT 'backlog' CHECK(status IN ('backlog', 'todo', 'in_progress', 'in_review', 'done')),
   content JSONB NOT NULL DEFAULT '{"_version": 1, "requirements": "", "acceptance_criteria": ""}',
   sort_order INTEGER DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -217,7 +217,7 @@ CREATE TABLE integration_settings (
   team_id UUID NOT NULL UNIQUE REFERENCES teams(id) ON DELETE CASCADE,
   linear_workspace_id TEXT,
   linear_team_id TEXT,
-  linear_state_id TEXT,
+  linear_status_mapping JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -234,7 +234,8 @@ CREATE TABLE story_map_integration_settings (
   team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   story_map_id UUID NOT NULL UNIQUE,
   linear_project_id TEXT,
-  linear_state_id TEXT,
+  use_team_status_mapping BOOLEAN NOT NULL DEFAULT TRUE,
+  linear_status_mapping JSONB,
   auto_import_labeled_issues BOOLEAN NOT NULL DEFAULT TRUE,
   import_label_name TEXT NOT NULL DEFAULT 'Story',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

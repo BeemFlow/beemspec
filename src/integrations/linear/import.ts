@@ -15,7 +15,6 @@ interface StoryMapRow {
 interface StoryMapSettingsRow {
   story_map_id: string;
   linear_project_id: string | null;
-  linear_state_id: string | null;
   auto_import_labeled_issues: boolean | null;
   import_label_name: string | null;
 }
@@ -96,7 +95,7 @@ export async function findStoryMapImportCandidate(
   const mapIds = mapRows.map((row) => row.id);
   const storyMapSettingsTable = supabase.from('story_map_integration_settings') as StoryMapIntegrationSettingsTable;
   const { data: mapSettings, error: mapSettingsError } = await storyMapSettingsTable
-    .select('story_map_id, linear_project_id, linear_state_id, auto_import_labeled_issues, import_label_name')
+    .select('story_map_id, linear_project_id, auto_import_labeled_issues, import_label_name')
     .in('story_map_id', mapIds);
   if (mapSettingsError) throw mapSettingsError;
 

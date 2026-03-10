@@ -322,7 +322,27 @@ export async function createPersona(supabase: Supabase, input: CreatePersona) {
 }
 
 export async function updatePersona(supabase: Supabase, personaId: string, changes: UpdatePersona) {
-  return supabase.from('personas').update(pickDefined(changes)).eq('id', personaId).select().single();
+  const { sort_order, ...rest } = changes;
+  const updateFields = pickDefined(rest);
+
+  if (Object.keys(updateFields).length > 0) {
+    const metadataUpdate = await supabase.from('personas').update(updateFields).eq('id', personaId);
+    if (metadataUpdate.error) {
+      return { data: null, error: metadataUpdate.error };
+    }
+  }
+
+  if (typeof sort_order === 'number') {
+    const reorderResult = await supabase.rpc('move_persona_to_sort_order', {
+      p_persona_id: personaId,
+      p_target_sort_order: sort_order,
+    });
+    if (reorderResult.error) {
+      return { data: null, error: reorderResult.error };
+    }
+  }
+
+  return supabase.from('personas').select('*').eq('id', personaId).single();
 }
 
 export async function deletePersona(supabase: Supabase, personaId: string) {

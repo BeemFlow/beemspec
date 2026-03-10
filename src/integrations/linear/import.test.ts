@@ -23,7 +23,6 @@ describe('linear import candidate resolution', () => {
         {
           story_map_id: 'map_1',
           linear_project_id: 'project_match',
-          linear_state_id: null,
           auto_import_labeled_issues: true,
           import_label_name: 'Story',
         },
@@ -65,7 +64,6 @@ describe('linear import candidate resolution', () => {
         {
           story_map_id: 'map_1',
           linear_project_id: 'project_match',
-          linear_state_id: null,
           auto_import_labeled_issues: true,
           import_label_name: 'Story',
         },

@@ -58,7 +58,7 @@ describe('team linear options route', () => {
         team_id: TEAM_ID,
         linear_workspace_id: 'workspace_1',
         linear_team_id: null,
-        linear_state_id: null,
+        linear_status_mapping: {},
       },
       error: null,
     });
@@ -70,7 +70,7 @@ describe('team linear options route', () => {
         team_id: TEAM_ID,
         linear_workspace_id: 'workspace_1',
         linear_team_id: 'team_linear_1',
-        linear_state_id: null,
+        linear_status_mapping: {},
       },
       error: null,
     });
@@ -100,7 +100,7 @@ describe('team linear options route', () => {
     vi.mocked(applySuggestedLinearSettings).mockReturnValue({
       linearWorkspaceId: 'workspace_1',
       linearTeamId: 'team_linear_1',
-      linearStateId: null,
+      linearStatusMapping: {},
       changed: true,
     });
 

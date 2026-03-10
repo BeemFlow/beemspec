@@ -17,7 +17,7 @@ interface IntegrationSettingsRow {
   team_id: string;
   linear_workspace_id: string | null;
   linear_team_id: string | null;
-  linear_state_id: string | null;
+  linear_status_mapping: Record<string, string> | null;
 }
 
 function toSettingsPayload(teamId: string, row: IntegrationSettingsRow | null) {
@@ -25,7 +25,7 @@ function toSettingsPayload(teamId: string, row: IntegrationSettingsRow | null) {
     team_id: teamId,
     linear_workspace_id: row?.linear_workspace_id ?? null,
     linear_team_id: row?.linear_team_id ?? null,
-    linear_state_id: row?.linear_state_id ?? null,
+    linear_status_mapping: row?.linear_status_mapping ?? {},
   };
 }
 
@@ -47,7 +47,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       getLinearOAuthConnectionForTeam(admin, teamId),
       admin
         .from('integration_settings')
-        .select('team_id, linear_workspace_id, linear_team_id, linear_state_id')
+        .select('team_id, linear_workspace_id, linear_team_id, linear_status_mapping')
         .eq('team_id', teamId)
         .maybeSingle<IntegrationSettingsRow>(),
     ]);
@@ -94,7 +94,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       {
         linearWorkspaceId: settingsResult.data?.linear_workspace_id ?? null,
         linearTeamId: settingsResult.data?.linear_team_id ?? null,
-        linearStateId: settingsResult.data?.linear_state_id ?? null,
+        linearStatusMapping: settingsResult.data?.linear_status_mapping ?? {},
       },
       options,
     );
@@ -108,11 +108,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
             team_id: teamId,
             linear_workspace_id: suggested.linearWorkspaceId,
             linear_team_id: suggested.linearTeamId,
-            linear_state_id: suggested.linearStateId,
+            linear_status_mapping: suggested.linearStatusMapping,
           },
           { onConflict: 'team_id' },
         )
-        .select('team_id, linear_workspace_id, linear_team_id, linear_state_id')
+        .select('team_id, linear_workspace_id, linear_team_id, linear_status_mapping')
         .single<IntegrationSettingsRow>();
 
       if (upsertError) {

@@ -45,7 +45,7 @@ describe('story map linear sync route', () => {
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              maybeSingle: vi.fn().mockResolvedValue({ data: { linear_project_id: null }, error: null }),
+              maybeSingle: vi.fn().mockResolvedValue({ data: { linear_project_id: 'project_1' }, error: null }),
             }),
           }),
         };
@@ -85,7 +85,7 @@ describe('story map linear sync route', () => {
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              maybeSingle: vi.fn().mockResolvedValue({ data: { linear_project_id: null }, error: null }),
+              maybeSingle: vi.fn().mockResolvedValue({ data: { linear_project_id: 'project_1' }, error: null }),
             }),
           }),
         };
@@ -102,5 +102,32 @@ describe('story map linear sync route', () => {
     expect(syncStoriesByIdList).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ success: true, considered: 0, succeeded: 0, failed: 0 });
+  });
+
+  it('returns 422 when no project is configured for the map', async () => {
+    const from = vi.fn((table: string) => {
+      if (table === 'story_map_integration_settings') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({ data: { linear_project_id: null }, error: null }),
+            }),
+          }),
+        };
+      }
+      return {};
+    });
+
+    vi.mocked(createClient).mockResolvedValue({ from } as never);
+
+    const response = await POST(new Request('http://localhost/api/test', { method: 'POST' }), {
+      params: Promise.resolve({ id: STORY_MAP_ID }),
+    });
+
+    expect(syncStoriesByIdList).not.toHaveBeenCalled();
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Manual sync requires a saved Linear project for this story map',
+    });
   });
 });

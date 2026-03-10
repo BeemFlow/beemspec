@@ -17,6 +17,8 @@ export {
   getLinearViewerInfo,
   getLinearWorkspaceOptions,
   listLinearProjectIssuesForImport,
+  resolveLinearStateIdForStoryStatus,
+  selectLinearStateIdForStoryStatus,
 } from './client';
 export type { ParsedLinearStoryFields } from './description';
 // Description serialize/parse
@@ -39,7 +41,7 @@ export {
 } from './schemas';
 
 // Status mapping
-export { mapLinearStatusToStoryStatus } from './status-map';
+export { mapLinearStateToStoryStatus, mapLinearStatusToStoryStatus } from './status-map';
 
 // Type aliases
 export type { LinearIssueId, LinearProjectId, LinearStateId, LinearTeamId } from './types';

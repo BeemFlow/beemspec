@@ -29,7 +29,7 @@ describe('team settings route', () => {
         team_id: TEAM_ID,
         linear_workspace_id: 'workspace_1',
         linear_team_id: 'team_1',
-        linear_state_id: null,
+        linear_status_mapping: {},
         updated_at: '2026-02-16T10:00:00.000Z',
       },
       error: null,

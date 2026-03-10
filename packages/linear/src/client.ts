@@ -1,3 +1,4 @@
+import type { StoryStatus } from '@beemspec/storymap';
 import {
   type Issue,
   type IssuePayload,
@@ -183,6 +184,99 @@ interface LinearTeamLike {
   key?: string | null;
   projects?: () => Promise<LinearConnection<LinearProjectLike>>;
   states?: () => Promise<LinearConnection<LinearStateLike>>;
+}
+
+interface LinearStateForResolution {
+  id?: string | null;
+  name?: string | null;
+  type?: string | null;
+}
+
+function normalizeStateText(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase().replaceAll(/\s+/g, '_');
+}
+
+function findStateByNames(states: LinearStateForResolution[], names: string[]): string | null {
+  for (const name of names) {
+    const normalized = normalizeStateText(name);
+    const match = states.find((state) => normalizeStateText(state.name) === normalized);
+    if (typeof match?.id === 'string' && match.id) return match.id;
+  }
+  return null;
+}
+
+function findStateByTypes(states: LinearStateForResolution[], types: string[]): string | null {
+  for (const type of types) {
+    const normalized = normalizeStateText(type);
+    const match = states.find((state) => normalizeStateText(state.type) === normalized);
+    if (typeof match?.id === 'string' && match.id) return match.id;
+  }
+  return null;
+}
+
+export function selectLinearStateIdForStoryStatus(
+  states: LinearStateForResolution[],
+  storyStatus: StoryStatus,
+  fallbackStateId?: string,
+): string | null {
+  if (storyStatus === 'backlog') {
+    return (
+      findStateByTypes(states, ['backlog', 'unstarted']) ??
+      findStateByNames(states, ['Backlog', 'Todo']) ??
+      fallbackStateId ??
+      null
+    );
+  }
+
+  if (storyStatus === 'todo') {
+    return (
+      findStateByNames(states, ['Ready', 'Todo']) ??
+      findStateByTypes(states, ['unstarted', 'backlog']) ??
+      fallbackStateId ??
+      null
+    );
+  }
+
+  if (storyStatus === 'in_progress') {
+    return (
+      findStateByNames(states, ['In Progress']) ?? findStateByTypes(states, ['started']) ?? fallbackStateId ?? null
+    );
+  }
+
+  if (storyStatus === 'in_review') {
+    return (
+      findStateByNames(states, ['In Review', 'Review']) ??
+      findStateByTypes(states, ['started']) ??
+      fallbackStateId ??
+      null
+    );
+  }
+
+  return (
+    findStateByNames(states, ['Done', 'Completed']) ??
+    findStateByTypes(states, ['completed']) ??
+    fallbackStateId ??
+    null
+  );
+}
+
+export async function resolveLinearStateIdForStoryStatus(
+  accessToken: string,
+  teamId: string,
+  storyStatus: StoryStatus,
+  fallbackStateId?: string,
+): Promise<string | null> {
+  const client = new LinearClient({ accessToken });
+  const team = await client.team(teamId);
+  if (!team?.id) return fallbackStateId ?? null;
+
+  const statesConnection = (await team.states({
+    first: 100,
+  } as never)) as LinearConnectionPage<LinearStateForResolution>;
+  const states = await fetchAllConnectionNodes(statesConnection);
+  if (states.length === 0) return fallbackStateId ?? null;
+
+  return selectLinearStateIdForStoryStatus(states, storyStatus, fallbackStateId);
 }
 
 /**

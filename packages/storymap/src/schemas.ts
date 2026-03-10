@@ -17,7 +17,7 @@ const atLeastOneFieldMessage = { message: 'At least one field must be provided' 
 // Story status — single source of truth (derive the TS type via z.infer)
 // ---------------------------------------------------------------------------
 
-export const storyStatus = z.enum(['backlog', 'ready', 'in_progress', 'review', 'done']);
+export const storyStatus = z.enum(['backlog', 'todo', 'in_progress', 'in_review', 'done']);
 
 // ---------------------------------------------------------------------------
 // Story content — structured spec fields stored as JSON

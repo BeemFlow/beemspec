@@ -1,4 +1,4 @@
-import { buildStoryPatchFromLinearIssue } from '@beemspec/linear';
+import { buildStoryPatchFromLinearIssue, mapLinearStateToStoryStatus } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
 import { getLinearWebhookIngest, getLinearWebhookSignatureVerifier } from '@/integrations/linear/helpers';
 import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
@@ -7,6 +7,7 @@ import {
   getLinearIssueProjectIdFromPayload,
   getLinearIssueTeamIdFromPayload,
 } from '@/integrations/linear/label-sync';
+import { getSyncTargetForStory } from '@/integrations/linear/settings';
 import { getStoryLinearLinkByLinearIssueId, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import type { WebhookEvent } from '@/integrations/sync';
 import { buildDbUpdateFromPatch, hasMutableStoryFields, shouldApplyRemoteUpdate } from '@/integrations/sync';
@@ -277,6 +278,15 @@ async function processIssueEvent(
     stateName: getString(asRecord(payload?.state)?.name),
     updatedAt: remoteUpdatedAt,
   });
+
+  const syncTarget = await getSyncTargetForStory(supabase, link.storyId);
+  const mappedStatus = mapLinearStateToStoryStatus({
+    stateId: getString(asRecord(payload?.state)?.id),
+    stateName: getString(asRecord(payload?.state)?.name),
+    statusMapping: syncTarget?.statusMapping,
+  });
+  if (mappedStatus) patch.status = mappedStatus;
+
   if (!hasMutableStoryFields(patch)) {
     logLinearWebhook('info', 'ignored_no_mutable_fields', {
       delivery_id: event.idempotencyKey,

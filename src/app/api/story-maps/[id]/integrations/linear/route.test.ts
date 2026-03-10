@@ -39,7 +39,7 @@ describe('story map linear integration settings route', () => {
     const storyMapSelect = vi.fn().mockReturnValue({ eq: storyMapEq });
 
     const teamMaybeSingle = vi.fn().mockResolvedValue({
-      data: { linear_team_id: 'linear_team_1', linear_state_id: 'team_state_1' },
+      data: { linear_team_id: 'linear_team_1', linear_status_mapping: { todo: 'team_state_todo' } },
       error: null,
     });
     const teamEq = vi.fn().mockReturnValue({ maybeSingle: teamMaybeSingle });
@@ -49,7 +49,8 @@ describe('story map linear integration settings route', () => {
       data: {
         story_map_id: STORY_MAP_ID,
         linear_project_id: 'map_project_1',
-        linear_state_id: null,
+        use_team_status_mapping: true,
+        linear_status_mapping: {},
         auto_import_labeled_issues: true,
         import_label_name: 'Story',
         updated_at: null,
@@ -78,13 +79,14 @@ describe('story map linear integration settings route', () => {
       team_id: TEAM_ID,
       story_map_settings: {
         linear_project_id: 'map_project_1',
-        linear_state_id: null,
+        use_team_status_mapping: true,
+        linear_status_mapping: {},
         auto_import_labeled_issues: true,
         import_label_name: 'Story',
       },
       effective_settings: {
         linear_project_id: 'map_project_1',
-        linear_state_id: 'team_state_1',
+        linear_status_mapping: { todo: 'team_state_todo' },
         auto_import_labeled_issues: true,
         import_label_name: 'Story',
       },
@@ -97,7 +99,7 @@ describe('story map linear integration settings route', () => {
     const storyMapSelect = vi.fn().mockReturnValue({ eq: storyMapEq });
 
     const teamMaybeSingle = vi.fn().mockResolvedValue({
-      data: { linear_team_id: 'linear_team_1', linear_state_id: 'team_state_1' },
+      data: { linear_team_id: 'linear_team_1', linear_status_mapping: { todo: 'team_state_todo' } },
       error: null,
     });
     const teamEq = vi.fn().mockReturnValue({ maybeSingle: teamMaybeSingle });
@@ -107,7 +109,8 @@ describe('story map linear integration settings route', () => {
       data: {
         story_map_id: STORY_MAP_ID,
         linear_project_id: null,
-        linear_state_id: null,
+        use_team_status_mapping: true,
+        linear_status_mapping: {},
         auto_import_labeled_issues: true,
         import_label_name: 'Story',
         updated_at: null,
@@ -139,7 +142,7 @@ describe('story map linear integration settings route', () => {
     });
   });
 
-  it('saves story map settings even when project/state are null', async () => {
+  it('saves story map settings even when project/mapping are null', async () => {
     const storyMapSingle = vi.fn().mockResolvedValue({ data: { id: STORY_MAP_ID, team_id: TEAM_ID }, error: null });
     const storyMapEq = vi.fn().mockReturnValue({ single: storyMapSingle });
     const storyMapSelect = vi.fn().mockReturnValue({ eq: storyMapEq });
@@ -148,7 +151,8 @@ describe('story map linear integration settings route', () => {
       data: {
         story_map_id: STORY_MAP_ID,
         linear_project_id: null,
-        linear_state_id: null,
+        use_team_status_mapping: true,
+        linear_status_mapping: {},
         auto_import_labeled_issues: true,
         import_label_name: 'Story',
         updated_at: null,
@@ -170,7 +174,8 @@ describe('story map linear integration settings route', () => {
     const response = await PUT(
       jsonRequest({
         linear_project_id: null,
-        linear_state_id: null,
+        use_team_status_mapping: true,
+        linear_status_mapping: {},
         auto_import_labeled_issues: true,
         import_label_name: 'Story',
       }),
@@ -184,7 +189,8 @@ describe('story map linear integration settings route', () => {
     await expect(response.json()).resolves.toMatchObject({
       story_map_id: STORY_MAP_ID,
       linear_project_id: null,
-      linear_state_id: null,
+      use_team_status_mapping: true,
+      linear_status_mapping: {},
       auto_import_labeled_issues: true,
       import_label_name: 'Story',
     });

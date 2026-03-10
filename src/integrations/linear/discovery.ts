@@ -5,14 +5,17 @@ import {
   type LinearTeamOption,
   type LinearWorkspaceOptions,
 } from '@beemspec/linear';
+import type { StoryStatus } from '@beemspec/storymap';
 import { normalize } from '@/lib/strings';
 
-const PREFERRED_STATE_TYPES = ['unstarted', 'backlog', 'triage'];
+const STORY_STATUSES: StoryStatus[] = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
+
+export type LinearStatusMapping = Partial<Record<StoryStatus, string>>;
 
 export interface LinearSettingsSnapshot {
   linearWorkspaceId: string | null;
   linearTeamId: string | null;
-  linearStateId: string | null;
+  linearStatusMapping?: LinearStatusMapping | null;
 }
 
 export interface LinearResolvedOptions {
@@ -31,17 +34,54 @@ function chooseDefaultTeamId(options: LinearResolvedOptions): string | null {
   return options.teams[0]?.id ?? null;
 }
 
-function chooseDefaultStateId(options: LinearResolvedOptions, teamId: string | null): string | null {
-  if (!teamId) return null;
-  const candidates = options.states.filter((state) => state.teamId === teamId);
-  if (candidates.length === 1) return candidates[0]?.id ?? null;
+function normalizeStateName(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase().replaceAll(/\s+/g, '_');
+}
 
-  for (const type of PREFERRED_STATE_TYPES) {
-    const match = candidates.find((state) => state.type?.toLowerCase() === type);
-    if (match) return match.id;
+function chooseDefaultStatusMapping(options: LinearResolvedOptions, teamId: string | null): LinearStatusMapping {
+  if (!teamId) return {};
+  const states = options.states.filter((state) => state.teamId === teamId);
+  if (states.length === 0) return {};
+
+  const byType = new Map<string, LinearStateOption>();
+  const byName = new Map<string, LinearStateOption>();
+  for (const state of states) {
+    const type = normalizeStateName(state.type);
+    const name = normalizeStateName(state.name);
+    if (type && !byType.has(type)) byType.set(type, state);
+    if (name && !byName.has(name)) byName.set(name, state);
   }
 
-  return null;
+  const pick = (...candidates: string[]): string | undefined => {
+    for (const candidate of candidates) {
+      const normalized = normalizeStateName(candidate);
+      const match = byType.get(normalized) ?? byName.get(normalized);
+      if (match?.id) return match.id;
+    }
+    return undefined;
+  };
+
+  const mapping: LinearStatusMapping = {};
+  mapping.backlog = pick('backlog');
+  mapping.todo = pick('todo', 'unstarted');
+  mapping.in_progress = pick('in_progress', 'started');
+  mapping.in_review = pick('in_review', 'review');
+  mapping.done = pick('done', 'completed');
+
+  for (const status of STORY_STATUSES) {
+    if (!mapping[status]) delete mapping[status];
+  }
+  return mapping;
+}
+
+function normalizeStatusMapping(input: LinearStatusMapping | null | undefined): LinearStatusMapping {
+  if (!input) return {};
+  const result: LinearStatusMapping = {};
+  for (const status of STORY_STATUSES) {
+    const value = normalize(input[status]);
+    if (value) result[status] = value;
+  }
+  return result;
 }
 
 function withFallback(current: string | null, fallback: string | null): string | null {
@@ -65,20 +105,21 @@ export function applySuggestedLinearSettings(
   const defaultTeamId = chooseDefaultTeamId(options);
   const linearTeamId = withFallback(current.linearTeamId, defaultTeamId);
 
-  const defaultStateId = chooseDefaultStateId(options, linearTeamId);
-  const linearStateId = withFallback(current.linearStateId, defaultStateId);
+  const defaultStatusMapping = chooseDefaultStatusMapping(options, linearTeamId);
+  const currentStatusMapping = normalizeStatusMapping(current.linearStatusMapping);
+  const linearStatusMapping: LinearStatusMapping = { ...defaultStatusMapping, ...currentStatusMapping };
 
   const linearWorkspaceId = withFallback(current.linearWorkspaceId, options.workspaceId);
 
   const changed =
     linearWorkspaceId !== normalize(current.linearWorkspaceId) ||
     linearTeamId !== normalize(current.linearTeamId) ||
-    linearStateId !== normalize(current.linearStateId);
+    JSON.stringify(linearStatusMapping) !== JSON.stringify(currentStatusMapping);
 
   return {
     linearWorkspaceId,
     linearTeamId,
-    linearStateId,
+    linearStatusMapping,
     changed,
   };
 }

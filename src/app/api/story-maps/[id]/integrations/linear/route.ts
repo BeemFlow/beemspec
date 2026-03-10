@@ -15,14 +15,15 @@ interface StoryMapRow {
 
 interface TeamSettingsRow {
   linear_team_id: string | null;
-  linear_state_id: string | null;
+  linear_status_mapping: Record<string, string> | null;
 }
 
 interface StoryMapSettingsRow {
   team_id: string;
   story_map_id: string;
   linear_project_id: string | null;
-  linear_state_id: string | null;
+  use_team_status_mapping: boolean;
+  linear_status_mapping: Record<string, string> | null;
   auto_import_labeled_issues: boolean;
   import_label_name: string;
   updated_at: string;
@@ -62,13 +63,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const [teamSettingsResult, storyMapSettingsResult, canEdit] = await Promise.all([
     supabase
       .from('integration_settings')
-      .select('linear_team_id, linear_state_id')
+      .select('linear_team_id, linear_status_mapping')
       .eq('team_id', storyMap.team_id)
       .maybeSingle<TeamSettingsRow>(),
     supabase
       .from('story_map_integration_settings')
       .select(
-        'team_id, story_map_id, linear_project_id, linear_state_id, auto_import_labeled_issues, import_label_name, updated_at',
+        'team_id, story_map_id, linear_project_id, use_team_status_mapping, linear_status_mapping, auto_import_labeled_issues, import_label_name, updated_at',
       )
       .eq('story_map_id', storyMapId)
       .maybeSingle<StoryMapSettingsRow>(),
@@ -91,18 +92,22 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     can_edit: canEdit,
     team_settings: {
       linear_team_id: teamSettings?.linear_team_id ?? null,
-      linear_state_id: teamSettings?.linear_state_id ?? null,
+      linear_status_mapping: teamSettings?.linear_status_mapping ?? {},
     },
     story_map_settings: {
       linear_project_id: storyMapSettings?.linear_project_id ?? null,
-      linear_state_id: storyMapSettings?.linear_state_id ?? null,
+      use_team_status_mapping: storyMapSettings?.use_team_status_mapping ?? true,
+      linear_status_mapping: storyMapSettings?.linear_status_mapping ?? {},
       auto_import_labeled_issues: storyMapSettings?.auto_import_labeled_issues ?? DEFAULT_AUTO_IMPORT_LABELED_ISSUES,
       import_label_name: toNullable(storyMapSettings?.import_label_name) ?? DEFAULT_IMPORT_LABEL_NAME,
       updated_at: storyMapSettings?.updated_at ?? null,
     },
     effective_settings: {
       linear_project_id: toNullable(storyMapSettings?.linear_project_id),
-      linear_state_id: toNullable(storyMapSettings?.linear_state_id) ?? toNullable(teamSettings?.linear_state_id),
+      linear_status_mapping:
+        storyMapSettings?.use_team_status_mapping === false
+          ? (storyMapSettings?.linear_status_mapping ?? {})
+          : { ...(teamSettings?.linear_status_mapping ?? {}), ...(storyMapSettings?.linear_status_mapping ?? {}) },
       auto_import_labeled_issues: storyMapSettings?.auto_import_labeled_issues ?? DEFAULT_AUTO_IMPORT_LABELED_ISSUES,
       import_label_name: toNullable(storyMapSettings?.import_label_name) ?? DEFAULT_IMPORT_LABEL_NAME,
     },
@@ -131,7 +136,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const linearProjectId = toNullable(validation.data.linear_project_id);
-  const linearStateId = toNullable(validation.data.linear_state_id);
+  const useTeamStatusMapping = validation.data.use_team_status_mapping ?? true;
+  const linearStatusMapping = validation.data.linear_status_mapping ?? {};
   const autoImportLabeledIssues = validation.data.auto_import_labeled_issues ?? DEFAULT_AUTO_IMPORT_LABELED_ISSUES;
   const importLabelName = toNullable(validation.data.import_label_name) ?? DEFAULT_IMPORT_LABEL_NAME;
 
@@ -142,14 +148,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         team_id: storyMap.team_id,
         story_map_id: storyMapId,
         linear_project_id: linearProjectId,
-        linear_state_id: linearStateId,
+        use_team_status_mapping: useTeamStatusMapping,
+        linear_status_mapping: linearStatusMapping,
         auto_import_labeled_issues: autoImportLabeledIssues,
         import_label_name: importLabelName,
       },
       { onConflict: 'story_map_id' },
     )
     .select(
-      'team_id, story_map_id, linear_project_id, linear_state_id, auto_import_labeled_issues, import_label_name, updated_at',
+      'team_id, story_map_id, linear_project_id, use_team_status_mapping, linear_status_mapping, auto_import_labeled_issues, import_label_name, updated_at',
     )
     .single<StoryMapSettingsRow>();
 

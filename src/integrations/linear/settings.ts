@@ -1,15 +1,27 @@
+import type { StoryStatus } from '@beemspec/storymap';
 import type { SyncTarget } from '@/integrations/sync';
 import { normalize } from '@/lib/strings';
 import type { SupabaseLike } from '@/lib/supabase/types';
 
+const STORY_STATUSES: StoryStatus[] = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
+
+interface LinearStatusMappingRaw {
+  backlog?: string | null;
+  todo?: string | null;
+  in_progress?: string | null;
+  in_review?: string | null;
+  done?: string | null;
+}
+
 interface IntegrationSettingsRow {
   linear_team_id: string | null;
-  linear_state_id: string | null;
+  linear_status_mapping?: LinearStatusMappingRaw | null;
 }
 
 interface StoryMapIntegrationSettingsRow {
   linear_project_id: string | null;
-  linear_state_id: string | null;
+  use_team_status_mapping?: boolean | null;
+  linear_status_mapping?: LinearStatusMappingRaw | null;
   auto_import_labeled_issues?: boolean | null;
   import_label_name?: string | null;
 }
@@ -73,6 +85,32 @@ interface TeamIdResult {
   teamId: string | null;
 }
 
+function normalizeStatusMapping(
+  input: LinearStatusMappingRaw | null | undefined,
+): Partial<Record<StoryStatus, string>> | undefined {
+  if (!input) return undefined;
+
+  const normalized: Partial<Record<StoryStatus, string>> = {};
+  for (const status of STORY_STATUSES) {
+    const value = normalize(input[status]);
+    if (value) normalized[status] = value;
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+function mergeStatusMappings(
+  base: Partial<Record<StoryStatus, string>> | undefined,
+  override: Partial<Record<StoryStatus, string>> | undefined,
+): Partial<Record<StoryStatus, string>> | undefined {
+  const merged: Partial<Record<StoryStatus, string>> = {};
+  for (const status of STORY_STATUSES) {
+    const value = override?.[status] ?? base?.[status];
+    if (value) merged[status] = value;
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
 function toLinearTarget(row: IntegrationSettingsRow | null): SyncTarget | null {
   if (!row) return null;
 
@@ -81,7 +119,7 @@ function toLinearTarget(row: IntegrationSettingsRow | null): SyncTarget | null {
 
   return {
     teamId,
-    stateId: normalize(row.linear_state_id) ?? undefined,
+    statusMapping: normalizeStatusMapping(row.linear_status_mapping),
   };
 }
 
@@ -95,7 +133,10 @@ function applyStoryMapOverrides(
   return {
     teamId: target.teamId,
     projectId: mapProjectId,
-    stateId: normalize(overrides?.linear_state_id) ?? target.stateId,
+    statusMapping:
+      overrides?.use_team_status_mapping === false
+        ? mergeStatusMappings(undefined, normalizeStatusMapping(overrides.linear_status_mapping))
+        : mergeStatusMappings(target.statusMapping, normalizeStatusMapping(overrides?.linear_status_mapping)),
   };
 }
 
@@ -106,7 +147,9 @@ async function getStoryMapLinearOverrides(
   try {
     const table = supabase.from('story_map_integration_settings') as StoryMapIntegrationSettingsTable;
     const { data, error } = await table
-      .select('linear_project_id, linear_state_id, auto_import_labeled_issues, import_label_name')
+      .select(
+        'linear_project_id, use_team_status_mapping, linear_status_mapping, auto_import_labeled_issues, import_label_name',
+      )
       .eq('story_map_id', storyMapId)
       .maybeSingle();
 
@@ -139,7 +182,10 @@ export async function getStoryMapLinearImportSettings(
 
 async function getSettingsForTeamId(supabase: SupabaseLike, teamId: string): Promise<SyncTarget | null> {
   const table = supabase.from('integration_settings') as IntegrationSettingsTable;
-  const { data, error } = await table.select('linear_team_id, linear_state_id').eq('team_id', teamId).maybeSingle();
+  const { data, error } = await table
+    .select('linear_team_id, linear_status_mapping')
+    .eq('team_id', teamId)
+    .maybeSingle();
 
   if (error) throw error;
   return toLinearTarget(data);

@@ -18,18 +18,19 @@ interface StoryMapLinearSettingsResponse {
   can_edit: boolean;
   team_settings: {
     linear_team_id: string | null;
-    linear_state_id: string | null;
+    linear_status_mapping: Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>;
   };
   story_map_settings: {
     linear_project_id: string | null;
-    linear_state_id: string | null;
+    use_team_status_mapping: boolean;
+    linear_status_mapping: Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>;
     auto_import_labeled_issues: boolean;
     import_label_name: string;
     updated_at: string | null;
   };
   effective_settings: {
     linear_project_id: string | null;
-    linear_state_id: string | null;
+    linear_status_mapping: Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>;
     auto_import_labeled_issues: boolean;
     import_label_name: string;
   };
@@ -80,11 +81,23 @@ export function StoryMapSettingsDialog({
   const [teamLinearTeamId, setTeamLinearTeamId] = useState<string | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [projectId, setProjectId] = useState('');
-  const [stateId, setStateId] = useState('');
+  const [useTeamStatusMapping, setUseTeamStatusMapping] = useState(true);
+  const [statusMapping, setStatusMapping] = useState<
+    Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>
+  >({});
   const [autoImportLabeledIssues, setAutoImportLabeledIssues] = useState(true);
   const [importLabelName, setImportLabelName] = useState('Story');
+  const [savedProjectId, setSavedProjectId] = useState('');
+  const [savedAutoImportLabeledIssues, setSavedAutoImportLabeledIssues] = useState(true);
+  const [savedImportLabelName, setSavedImportLabelName] = useState('Story');
+  const [savedUseTeamStatusMapping, setSavedUseTeamStatusMapping] = useState(true);
+  const [savedStatusMapping, setSavedStatusMapping] = useState<
+    Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>
+  >({});
   const [effectiveProjectId, setEffectiveProjectId] = useState<string | null>(null);
-  const [effectiveStateId, setEffectiveStateId] = useState<string | null>(null);
+  const [effectiveStatusMapping, setEffectiveStatusMapping] = useState<
+    Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>
+  >({});
   const [effectiveAutoImportLabeledIssues, setEffectiveAutoImportLabeledIssues] = useState(true);
   const [effectiveImportLabelName, setEffectiveImportLabelName] = useState('Story');
   const [projectOptions, setProjectOptions] = useState<Array<{ id: string; name: string; teamIds: string[] }>>([]);
@@ -107,12 +120,19 @@ export function StoryMapSettingsDialog({
       setTeamId(data.team_id);
       setCanEdit(data.can_edit);
       setTeamLinearTeamId(data.team_settings.linear_team_id);
-      setProjectId(asInputValue(data.story_map_settings.linear_project_id));
-      setStateId(asInputValue(data.story_map_settings.linear_state_id));
+      const nextProjectId = asInputValue(data.story_map_settings.linear_project_id);
+      setProjectId(nextProjectId);
+      setSavedProjectId(nextProjectId);
+      setUseTeamStatusMapping(data.story_map_settings.use_team_status_mapping);
+      setSavedUseTeamStatusMapping(data.story_map_settings.use_team_status_mapping);
+      setStatusMapping(data.story_map_settings.linear_status_mapping ?? {});
+      setSavedStatusMapping(data.story_map_settings.linear_status_mapping ?? {});
       setAutoImportLabeledIssues(data.story_map_settings.auto_import_labeled_issues);
+      setSavedAutoImportLabeledIssues(data.story_map_settings.auto_import_labeled_issues);
       setImportLabelName(data.story_map_settings.import_label_name);
+      setSavedImportLabelName(data.story_map_settings.import_label_name);
       setEffectiveProjectId(data.effective_settings.linear_project_id ?? null);
-      setEffectiveStateId(data.effective_settings.linear_state_id ?? null);
+      setEffectiveStatusMapping(data.effective_settings.linear_status_mapping ?? {});
       setEffectiveAutoImportLabeledIssues(data.effective_settings.auto_import_labeled_issues);
       setEffectiveImportLabelName(data.effective_settings.import_label_name);
 
@@ -188,7 +208,8 @@ export function StoryMapSettingsDialog({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             linear_project_id: asNullable(projectId),
-            linear_state_id: asNullable(stateId),
+            use_team_status_mapping: useTeamStatusMapping,
+            linear_status_mapping: statusMapping,
             auto_import_labeled_issues: autoImportLabeledIssues,
             import_label_name: importLabelName.trim(),
           }),
@@ -231,6 +252,16 @@ export function StoryMapSettingsDialog({
       setSyncing(false);
     }
   }
+
+  const hasUnsavedChanges =
+    asNullable(projectId) !== asNullable(savedProjectId) ||
+    useTeamStatusMapping !== savedUseTeamStatusMapping ||
+    JSON.stringify(statusMapping) !== JSON.stringify(savedStatusMapping) ||
+    autoImportLabeledIssues !== savedAutoImportLabeledIssues ||
+    importLabelName.trim() !== savedImportLabelName.trim();
+
+  const manualSyncDisabled =
+    !canEdit || !teamLinearTeamId || syncing || saving || hasUnsavedChanges || !effectiveProjectId;
 
   async function handleDeleteStoryMap() {
     if (!onDeleteStoryMap) return;
@@ -298,33 +329,61 @@ export function StoryMapSettingsDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>Default Linear state (optional)</Label>
-              {filteredStateOptions.length > 0 ? (
-                <Select
-                  value={stateId || NO_SELECTION}
-                  onValueChange={(value) => setStateId(value === NO_SELECTION ? '' : value)}
-                  disabled={!canEdit || !teamLinearTeamId || saving || optionsLoading}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="No default state" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_SELECTION}>No default state</SelectItem>
-                    {filteredStateOptions.map((state) => (
-                      <SelectItem key={state.id} value={state.id}>
-                        {state.name}
-                        {state.type ? ` (${state.type})` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  value={stateId}
-                  onChange={(event) => setStateId(event.target.value)}
-                  placeholder="Optional Linear state ID"
+              <Label>Status mapping</Label>
+              <p className="text-xs text-muted-foreground">
+                Use team defaults by default. Turn this off to override status mapping for this map.
+              </p>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={useTeamStatusMapping}
+                  onChange={(event) => setUseTeamStatusMapping(event.target.checked)}
                   disabled={!canEdit || !teamLinearTeamId || saving}
                 />
+                Use team status mapping
+              </label>
+
+              {!useTeamStatusMapping && (
+                <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+                  {(
+                    [
+                      ['backlog', 'Backlog'],
+                      ['todo', 'Todo'],
+                      ['in_progress', 'In Progress'],
+                      ['in_review', 'In Review'],
+                      ['done', 'Done'],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <div key={key} className="grid grid-cols-[120px_1fr] items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{label}</span>
+                      <Select
+                        value={statusMapping[key] || NO_SELECTION}
+                        onValueChange={(value) =>
+                          setStatusMapping((current) => {
+                            const next = { ...current };
+                            if (value === NO_SELECTION) delete next[key];
+                            else next[key] = value;
+                            return next;
+                          })
+                        }
+                        disabled={!canEdit || !teamLinearTeamId || saving || optionsLoading}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder={`Map ${label}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_SELECTION}>Unmapped</SelectItem>
+                          {filteredStateOptions.map((state) => (
+                            <SelectItem key={state.id} value={state.id}>
+                              {state.name}
+                              {state.type ? ` (${state.type})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
@@ -359,8 +418,9 @@ export function StoryMapSettingsDialog({
             </div>
 
             <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-              Effective project: {effectiveProjectId ?? 'none'} | Effective state: {effectiveStateId ?? 'none'} |
-              Auto-import: {effectiveAutoImportLabeledIssues ? 'on' : 'off'} | Sync label: {effectiveImportLabelName}
+              Effective project: {effectiveProjectId ?? 'none'} | Auto-import:{' '}
+              {effectiveAutoImportLabeledIssues ? 'on' : 'off'} | Sync label: {effectiveImportLabelName} | Effective
+              mapping keys: {Object.keys(effectiveStatusMapping).join(', ') || 'none'}
             </div>
 
             <div className="space-y-2 rounded-md border bg-muted/20 p-3">
@@ -368,12 +428,11 @@ export function StoryMapSettingsDialog({
               <p className="text-xs text-muted-foreground">
                 Run a one-time reconciliation sync for all stories in this map.
               </p>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleManualSync}
-                disabled={!canEdit || !teamLinearTeamId || !asNullable(projectId) || syncing}
-              >
+              {hasUnsavedChanges && <p className="text-xs text-amber-700">Save settings before running manual sync.</p>}
+              {!effectiveProjectId && !hasUnsavedChanges && (
+                <p className="text-xs text-muted-foreground">Choose and save a Linear project to enable sync.</p>
+              )}
+              <Button type="button" variant="outline" onClick={handleManualSync} disabled={manualSyncDisabled}>
                 {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Run manual sync'}
               </Button>
             </div>
@@ -392,7 +451,7 @@ export function StoryMapSettingsDialog({
             )}
 
             {canEdit ? (
-              <Button type="submit" disabled={!teamLinearTeamId || saving}>
+              <Button type="submit" disabled={!teamLinearTeamId || saving || !hasUnsavedChanges}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save settings'}
               </Button>
             ) : (

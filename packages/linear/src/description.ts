@@ -1,6 +1,4 @@
-import type { StoryContent } from '@beemspec/storymap';
 import type { IssueUpsertInput, StoryForSync, SyncTarget } from '@/integrations/sync';
-import { mapLinearStatusToStoryStatus } from './status-map';
 
 // ---------------------------------------------------------------------------
 // Markdown section helpers
@@ -20,6 +18,23 @@ function sectionBody(description: string, title: string): string | null {
   return body.length > 0 ? body : null;
 }
 
+function normalizeFigmaLink(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const markdownLink = trimmed.match(/^\[[^\]]*\]\((?:<)?([^)>\s]+)(?:>)?\)$/);
+  if (markdownLink?.[1]) return markdownLink[1].trim();
+
+  const directUrl = trimmed.match(/^<?(https?:\/\/\S+?)>?$/i);
+  if (directUrl?.[1]) return directUrl[1].trim();
+
+  const firstUrl = trimmed.match(/https?:\/\/\S+/i);
+  if (firstUrl?.[0]) return firstUrl[0].replace(/[)>.,;]+$/, '');
+
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Serialize story -> Linear markdown description
 // ---------------------------------------------------------------------------
@@ -30,7 +45,6 @@ export function buildLinearDescription(story: StoryForSync): string {
   const parts = [
     section('Requirements', content.requirements),
     section('Acceptance Criteria', content.acceptance_criteria),
-    section('Status', story.status),
     section('Figma', content.figma_link),
     section('Edge Cases', content.edge_cases),
     section('Technical Guidelines', content.technical_guidelines),
@@ -50,7 +64,6 @@ export interface ParsedLinearStoryFields {
   figma_link?: string | null;
   edge_cases?: string | null;
   technical_guidelines?: string | null;
-  status?: string;
 }
 
 /** Parse a Linear issue description (markdown) back into story content fields. */
@@ -62,15 +75,13 @@ export function parseLinearDescriptionToStoryFields(description: string | null):
   const figmaLink = sectionBody(description, 'Figma');
   const edgeCases = sectionBody(description, 'Edge Cases');
   const technicalGuidelines = sectionBody(description, 'Technical Guidelines');
-  const statusSection = sectionBody(description, 'Status');
 
   return {
     requirements: requirements ?? undefined,
     acceptance_criteria: acceptanceCriteria ?? undefined,
-    figma_link: figmaLink ?? undefined,
+    ...(figmaLink !== null ? { figma_link: normalizeFigmaLink(figmaLink) } : {}),
     edge_cases: edgeCases ?? undefined,
     technical_guidelines: technicalGuidelines ?? undefined,
-    status: mapLinearStatusToStoryStatus(statusSection) ?? undefined,
   };
 }
 
@@ -88,6 +99,5 @@ export function mapStoryToLinearIssueInput(story: StoryForSync, target: SyncTarg
     description: buildLinearDescription(story),
     teamId: target.teamId,
     projectId: target.projectId,
-    stateId: target.stateId,
   };
 }

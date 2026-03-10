@@ -204,6 +204,67 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION move_persona_to_sort_order(
+  p_persona_id UUID,
+  p_target_sort_order INTEGER
+)
+RETURNS void AS $$
+DECLARE
+  v_story_map_id UUID;
+  v_current_sort_order INTEGER;
+  v_max_sort_order INTEGER;
+  v_target_sort_order INTEGER;
+BEGIN
+  IF p_target_sort_order IS NULL THEN
+    RAISE EXCEPTION 'Target sort order cannot be null';
+  END IF;
+
+  SELECT story_map_id, sort_order
+  INTO v_story_map_id, v_current_sort_order
+  FROM personas
+  WHERE id = p_persona_id;
+
+  IF v_story_map_id IS NULL THEN
+    RAISE EXCEPTION 'Persona not found';
+  END IF;
+
+  SELECT COALESCE(MAX(sort_order), 0)
+  INTO v_max_sort_order
+  FROM personas
+  WHERE story_map_id = v_story_map_id;
+
+  v_target_sort_order = GREATEST(0, LEAST(p_target_sort_order, v_max_sort_order));
+
+  IF v_current_sort_order = v_target_sort_order THEN
+    RETURN;
+  END IF;
+
+  UPDATE personas
+  SET sort_order = -1
+  WHERE id = p_persona_id;
+
+  IF v_target_sort_order < v_current_sort_order THEN
+    UPDATE personas
+    SET sort_order = sort_order + 1
+    WHERE story_map_id = v_story_map_id
+      AND id <> p_persona_id
+      AND sort_order >= v_target_sort_order
+      AND sort_order < v_current_sort_order;
+  ELSE
+    UPDATE personas
+    SET sort_order = sort_order - 1
+    WHERE story_map_id = v_story_map_id
+      AND id <> p_persona_id
+      AND sort_order <= v_target_sort_order
+      AND sort_order > v_current_sort_order;
+  END IF;
+
+  UPDATE personas
+  SET sort_order = v_target_sort_order
+  WHERE id = p_persona_id;
+END;
+$$ LANGUAGE plpgsql;
+
 CREATE OR REPLACE FUNCTION move_task_and_reorder(
   p_task_id UUID,
   p_target_activity_id UUID,

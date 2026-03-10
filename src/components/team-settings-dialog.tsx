@@ -44,10 +44,10 @@ interface TeamIntegrationsTabProps {
   linearExpiresAt: string | null;
   linearWorkspaceId: string;
   linearTeamId: string;
-  linearStateId: string;
   linearOptionsLoading: boolean;
   linearTeamOptions: Array<{ id: string; name: string; key: string | null }>;
   linearStateOptions: Array<{ id: string; name: string; type: string | null; teamId: string }>;
+  linearStatusMapping: Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>;
   savingLinearSettings: boolean;
   disconnectingLinear: boolean;
   linearStatus: LinearStatus;
@@ -55,7 +55,10 @@ interface TeamIntegrationsTabProps {
   onDisconnectLinear: () => Promise<void>;
   onSaveLinearSettings: (event: React.FormEvent) => Promise<void>;
   onLinearTeamIdChange: (value: string) => void;
-  onLinearStateIdChange: (value: string) => void;
+  onLinearStatusMappingChange: (
+    status: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done',
+    value: string,
+  ) => void;
 }
 
 interface TeamMembersTabProps {
@@ -159,19 +162,26 @@ function LinearSettingsForm(input: {
   isOwner: boolean;
   workspaceId: string;
   teamId: string;
-  stateId: string;
   optionsLoading: boolean;
   teamOptions: Array<{ id: string; name: string; key: string | null }>;
   stateOptions: Array<{ id: string; name: string; type: string | null; teamId: string }>;
+  statusMapping: Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>;
   saving: boolean;
   onSave: (event: React.FormEvent) => Promise<void>;
   onTeamIdChange: (value: string) => void;
-  onStateIdChange: (value: string) => void;
+  onStatusMappingChange: (status: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', value: string) => void;
 }) {
   const NO_SELECTION = '__none__';
   const filteredStateOptions = input.stateOptions.filter((state) =>
     input.teamId ? state.teamId === input.teamId : true,
   );
+  const statusRows: Array<{ key: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done'; label: string }> = [
+    { key: 'backlog', label: 'Backlog' },
+    { key: 'todo', label: 'Todo' },
+    { key: 'in_progress', label: 'In Progress' },
+    { key: 'in_review', label: 'In Review' },
+    { key: 'done', label: 'Done' },
+  ];
 
   return (
     <form onSubmit={input.onSave} className="space-y-3">
@@ -211,35 +221,32 @@ function LinearSettingsForm(input: {
         )}
       </div>
       <div className="space-y-2">
-        <Label>Linear state (optional)</Label>
-        {filteredStateOptions.length > 0 ? (
-          <Select
-            value={input.stateId || NO_SELECTION}
-            onValueChange={(value) => input.onStateIdChange(value === NO_SELECTION ? '' : value)}
-            disabled={!input.isOwner || input.saving || input.optionsLoading}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Use team default" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_SELECTION}>Use team default</SelectItem>
-              {filteredStateOptions.map((state) => (
-                <SelectItem key={state.id} value={state.id}>
-                  {state.name}
-                  {state.type ? ` (${state.type})` : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <Input
-            id="linear-state-id"
-            value={input.stateId}
-            onChange={(event) => input.onStateIdChange(event.target.value)}
-            disabled={!input.isOwner || input.saving}
-            placeholder="Optional state ID"
-          />
-        )}
+        <Label>Status mapping</Label>
+        <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+          {statusRows.map((row) => (
+            <div key={row.key} className="grid grid-cols-[120px_1fr] items-center gap-2">
+              <span className="text-xs text-muted-foreground">{row.label}</span>
+              <Select
+                value={input.statusMapping[row.key] ?? NO_SELECTION}
+                onValueChange={(value) => input.onStatusMappingChange(row.key, value === NO_SELECTION ? '' : value)}
+                disabled={!input.isOwner || input.saving || input.optionsLoading || !input.teamId}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={`Map ${row.label}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_SELECTION}>Unmapped</SelectItem>
+                  {filteredStateOptions.map((state) => (
+                    <SelectItem key={state.id} value={state.id}>
+                      {state.name}
+                      {state.type ? ` (${state.type})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
+        </div>
       </div>
       {input.isOwner && (
         <Button type="submit" disabled={input.saving || !input.teamId.trim()}>
@@ -257,10 +264,10 @@ function TeamIntegrationsTab({
   linearExpiresAt,
   linearWorkspaceId,
   linearTeamId,
-  linearStateId,
   linearOptionsLoading,
   linearTeamOptions,
   linearStateOptions,
+  linearStatusMapping,
   savingLinearSettings,
   disconnectingLinear,
   linearStatus,
@@ -268,7 +275,7 @@ function TeamIntegrationsTab({
   onDisconnectLinear,
   onSaveLinearSettings,
   onLinearTeamIdChange,
-  onLinearStateIdChange,
+  onLinearStatusMappingChange,
 }: TeamIntegrationsTabProps) {
   return (
     <div className="space-y-4">
@@ -293,14 +300,14 @@ function TeamIntegrationsTab({
         isOwner={isOwner}
         workspaceId={linearWorkspaceId}
         teamId={linearTeamId}
-        stateId={linearStateId}
         optionsLoading={linearOptionsLoading}
         teamOptions={linearTeamOptions}
         stateOptions={linearStateOptions}
+        statusMapping={linearStatusMapping}
         saving={savingLinearSettings}
         onSave={onSaveLinearSettings}
         onTeamIdChange={onLinearTeamIdChange}
-        onStateIdChange={onLinearStateIdChange}
+        onStatusMappingChange={onLinearStatusMappingChange}
       />
 
       {linearStatus.type === 'success' && <p className="text-sm text-green-600">{linearStatus.message}</p>}
@@ -464,8 +471,8 @@ export function TeamSettingsDialog({
     linearWorkspaceId,
     linearTeamId,
     setLinearTeamId,
-    linearStateId,
-    setLinearStateId,
+    linearStatusMapping,
+    setLinearStatusMappingValue,
     linearConnected,
     linearScope,
     linearExpiresAt,
@@ -534,10 +541,10 @@ export function TeamSettingsDialog({
               linearExpiresAt={linearExpiresAt}
               linearWorkspaceId={linearWorkspaceId}
               linearTeamId={linearTeamId}
-              linearStateId={linearStateId}
               linearOptionsLoading={linearOptionsLoading}
               linearTeamOptions={linearTeamOptions}
               linearStateOptions={linearStateOptions}
+              linearStatusMapping={linearStatusMapping}
               savingLinearSettings={savingLinearSettings}
               disconnectingLinear={disconnectingLinear}
               linearStatus={linearStatus}
@@ -545,7 +552,7 @@ export function TeamSettingsDialog({
               onDisconnectLinear={handleDisconnectLinear}
               onSaveLinearSettings={handleSaveLinearSettings}
               onLinearTeamIdChange={setLinearTeamId}
-              onLinearStateIdChange={setLinearStateId}
+              onLinearStatusMappingChange={setLinearStatusMappingValue}
             />
           </TabsContent>
 

@@ -5,8 +5,8 @@ describe('buildStoryPatchFromLinearIssue', () => {
   it('builds patch from linear issue snapshot fields', () => {
     const patch = buildStoryPatchFromLinearIssue({
       title: 'Remote title',
-      description: '## Requirements\nReq\n\n## Acceptance Criteria\n- [ ] AC\n\n## Status\nIn Progress',
-      stateName: null,
+      description: '## Requirements\nReq\n\n## Acceptance Criteria\n- [ ] AC',
+      stateName: 'In Progress',
       updatedAt: '2026-02-14T11:00:00.000Z',
     });
 

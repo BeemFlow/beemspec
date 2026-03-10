@@ -26,7 +26,7 @@ describe('linear settings target resolution', () => {
     const settingsMaybeSingle = vi.fn().mockResolvedValue({
       data: {
         linear_team_id: 'linear_team_db',
-        linear_state_id: null,
+        linear_status_mapping: { todo: 'state_todo' },
       },
       error: null,
     });
@@ -36,7 +36,8 @@ describe('linear settings target resolution', () => {
     const mapSettingsMaybeSingle = vi.fn().mockResolvedValue({
       data: {
         linear_project_id: 'linear_project_map',
-        linear_state_id: null,
+        use_team_status_mapping: true,
+        linear_status_mapping: {},
       },
       error: null,
     });
@@ -55,7 +56,7 @@ describe('linear settings target resolution', () => {
     expect(target).toEqual({
       teamId: 'linear_team_db',
       projectId: 'linear_project_map',
-      stateId: undefined,
+      statusMapping: { todo: 'state_todo' },
     });
   });
 
@@ -70,7 +71,7 @@ describe('linear settings target resolution', () => {
     const settingsMaybeSingle = vi.fn().mockResolvedValue({
       data: {
         linear_team_id: 'linear_team_db',
-        linear_state_id: null,
+        linear_status_mapping: {},
       },
       error: null,
     });
@@ -80,7 +81,8 @@ describe('linear settings target resolution', () => {
     const mapSettingsMaybeSingle = vi.fn().mockResolvedValue({
       data: {
         linear_project_id: null,
-        linear_state_id: null,
+        use_team_status_mapping: true,
+        linear_status_mapping: {},
       },
       error: null,
     });

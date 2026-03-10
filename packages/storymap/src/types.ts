@@ -44,7 +44,7 @@ export interface Release {
 // Story content — the structured spec that makes the map useful
 // ---------------------------------------------------------------------------
 
-export type StoryStatus = 'backlog' | 'ready' | 'in_progress' | 'review' | 'done';
+export type StoryStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done';
 
 /**
  * Structured spec fields stored as JSON on each story.

@@ -39,7 +39,7 @@ export interface IssueSync {
 export interface SyncTarget {
   teamId: string;
   projectId?: string;
-  stateId?: string;
+  statusMapping?: Partial<Record<StoryStatus, string>>;
 }
 
 export const SYNC_DIRECTION = {

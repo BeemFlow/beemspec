@@ -3,6 +3,9 @@ import { errorMessage } from '@/lib/errors';
 import { fetchJson } from '@/lib/http';
 import type { TeamInvite, TeamMember } from '@/types';
 
+type StoryStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done';
+const STORY_STATUSES: StoryStatus[] = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
+
 export type SettingsTab = 'general' | 'integrations' | 'members' | 'danger';
 
 export type InviteStatus =
@@ -21,7 +24,7 @@ interface LinearIntegrationSettings {
   team_id: string;
   linear_workspace_id: string | null;
   linear_team_id: string | null;
-  linear_state_id: string | null;
+  linear_status_mapping?: Partial<Record<StoryStatus, string>>;
   updated_at: string;
 }
 
@@ -106,8 +109,8 @@ export interface UseTeamSettingsReturn {
   linearWorkspaceId: string;
   linearTeamId: string;
   setLinearTeamId: (value: string) => void;
-  linearStateId: string;
-  setLinearStateId: (value: string) => void;
+  linearStatusMapping: Partial<Record<StoryStatus, string>>;
+  setLinearStatusMappingValue: (status: StoryStatus, value: string) => void;
   linearConnected: boolean;
   linearScope: string | null;
   linearExpiresAt: string | null;
@@ -132,6 +135,17 @@ function asInputValue(value: string | null | undefined): string {
 function asNullable(value: string): string | null {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeStatusMapping(
+  value: Partial<Record<StoryStatus, string>> | null | undefined,
+): Partial<Record<StoryStatus, string>> {
+  const normalized: Partial<Record<StoryStatus, string>> = {};
+  for (const status of STORY_STATUSES) {
+    const item = asNullable(value?.[status] ?? '');
+    if (item) normalized[status] = item;
+  }
+  return normalized;
 }
 
 export function useTeamSettings({
@@ -160,7 +174,7 @@ export function useTeamSettings({
   const [disconnectingLinear, setDisconnectingLinear] = useState(false);
   const [linearWorkspaceId, setLinearWorkspaceId] = useState('');
   const [linearTeamId, setLinearTeamIdState] = useState('');
-  const [linearStateId, setLinearStateIdState] = useState('');
+  const [linearStatusMapping, setLinearStatusMapping] = useState<Partial<Record<StoryStatus, string>>>({});
   const [linearConnected, setLinearConnected] = useState(false);
   const [linearScope, setLinearScope] = useState<string | null>(null);
   const [linearExpiresAt, setLinearExpiresAt] = useState<string | null>(null);
@@ -180,7 +194,7 @@ export function useTeamSettings({
 
       setLinearWorkspaceId(asInputValue(data.settings?.linear_workspace_id ?? data.options.workspace_id));
       setLinearTeamIdState(asInputValue(data.settings?.linear_team_id));
-      setLinearStateIdState(asInputValue(data.settings?.linear_state_id));
+      setLinearStatusMapping(normalizeStatusMapping(data.settings?.linear_status_mapping));
 
       setLinearTeamOptions(data.options.teams ?? []);
       setLinearStateOptions(data.options.states ?? []);
@@ -212,7 +226,7 @@ export function useTeamSettings({
       setInvites(data.invites ?? []);
       setLinearWorkspaceId(asInputValue(data.linear.settings?.linear_workspace_id));
       setLinearTeamIdState(asInputValue(data.linear.settings?.linear_team_id));
-      setLinearStateIdState(asInputValue(data.linear.settings?.linear_state_id));
+      setLinearStatusMapping(normalizeStatusMapping(data.linear.settings?.linear_status_mapping));
       setLinearConnected(Boolean(data.linear.connection.connected));
       setLinearScope(data.linear.connection.scope ?? null);
       setLinearExpiresAt(data.linear.connection.expires_at ?? null);
@@ -390,7 +404,7 @@ export function useTeamSettings({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             linear_team_id: asNullable(linearTeamId),
-            linear_state_id: asNullable(linearStateId),
+            linear_status_mapping: normalizeStatusMapping(linearStatusMapping),
           }),
         },
         'Failed to save Linear settings',
@@ -408,16 +422,28 @@ export function useTeamSettings({
   function setLinearTeamId(value: string) {
     setLinearTeamIdState(value);
 
-    setLinearStateIdState((current) => {
-      if (!current) return current;
-      const state = linearStateOptions.find((item) => item.id === current);
-      if (!state || state.teamId === value) return current;
-      return '';
+    setLinearStatusMapping((current) => {
+      if (!value) return current;
+      const allowedStateIds = new Set(
+        linearStateOptions.filter((state) => state.teamId === value).map((state) => state.id),
+      );
+      const next: Partial<Record<StoryStatus, string>> = {};
+      for (const status of STORY_STATUSES) {
+        const mapped = current[status];
+        if (mapped && allowedStateIds.has(mapped)) next[status] = mapped;
+      }
+      return next;
     });
   }
 
-  function setLinearStateId(value: string) {
-    setLinearStateIdState(value);
+  function setLinearStatusMappingValue(status: StoryStatus, value: string) {
+    setLinearStatusMapping((current) => {
+      const next = { ...current };
+      const normalized = asNullable(value);
+      if (normalized) next[status] = normalized;
+      else delete next[status];
+      return next;
+    });
   }
 
   async function handleDeleteTeam() {
@@ -462,8 +488,8 @@ export function useTeamSettings({
     linearWorkspaceId,
     linearTeamId,
     setLinearTeamId,
-    linearStateId,
-    setLinearStateId,
+    linearStatusMapping,
+    setLinearStatusMappingValue,
     linearConnected,
     linearScope,
     linearExpiresAt,

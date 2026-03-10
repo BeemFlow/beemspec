@@ -1,4 +1,5 @@
-import { mapStoryToLinearIssueInput } from '@beemspec/linear';
+import { mapStoryToLinearIssueInput, resolveLinearStateIdForStoryStatus } from '@beemspec/linear';
+import type { StoryStatus } from '@beemspec/storymap';
 import { resolveLinearAuthTokenForTeam, resolveLinearSyncContextForStoryMap } from '@/integrations/linear/auth';
 import { ensureLinearIssueHasLabel } from '@/integrations/linear/label-sync';
 import { getStoryMapLinearImportSettings } from '@/integrations/linear/settings';
@@ -31,6 +32,24 @@ export async function processStoryLinearSyncById(
   const { story } = context.data;
   const existingLink = await getStoryLinearLink(supabase, input.storyId);
   const input_ = mapStoryToLinearIssueInput(story, linearSyncContext.target);
+  const mappedStateId = linearSyncContext.target.statusMapping?.[story.status as StoryStatus];
+  if (mappedStateId) input_.stateId = mappedStateId;
+
+  const authToken = linearSyncContext.teamId ? await resolveLinearAuthTokenForTeam(linearSyncContext.teamId) : null;
+  if (authToken) {
+    try {
+      const resolvedStateId = await resolveLinearStateIdForStoryStatus(
+        authToken,
+        linearSyncContext.target.teamId,
+        story.status as StoryStatus,
+        input_.stateId,
+      );
+      input_.stateId = resolvedStateId ?? undefined;
+    } catch {
+      // Best-effort state mapping; fallback stateId remains unchanged.
+    }
+  }
+
   const linearIssue = await syncStoryToRemote(
     linearSyncContext.linearIssueSync,
     input_,
@@ -48,10 +67,7 @@ export async function processStoryLinearSyncById(
 
   if (linearSyncContext.teamId) {
     try {
-      const [authToken, importSettings] = await Promise.all([
-        resolveLinearAuthTokenForTeam(linearSyncContext.teamId),
-        getStoryMapLinearImportSettings(supabase, context.data.storyMapId),
-      ]);
+      const importSettings = await getStoryMapLinearImportSettings(supabase, context.data.storyMapId);
 
       if (authToken) {
         await ensureLinearIssueHasLabel({

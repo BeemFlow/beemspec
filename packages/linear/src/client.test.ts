@@ -1,6 +1,6 @@
 import { type Issue, type IssuePayload, type LinearClient, RatelimitedLinearError } from '@linear/sdk';
 import { describe, expect, it, vi } from 'vitest';
-import { createLinearClient, listLinearProjectIssuesForImport } from './client';
+import { createLinearClient, listLinearProjectIssuesForImport, selectLinearStateIdForStoryStatus } from './client';
 
 function makeIssue(overrides: Partial<Issue> = {}): Issue {
   return {
@@ -248,5 +248,27 @@ describe('listLinearProjectIssuesForImport', () => {
 
     const results = await listLinearProjectIssuesForImport('token', 'project_1', { client: client as never });
     expect(results).toEqual([]);
+  });
+});
+
+describe('selectLinearStateIdForStoryStatus', () => {
+  const states = [
+    { id: 'state_backlog', name: 'Backlog', type: 'backlog' },
+    { id: 'state_todo', name: 'Todo', type: 'unstarted' },
+    { id: 'state_progress', name: 'In Progress', type: 'started' },
+    { id: 'state_review', name: 'In Review', type: 'started' },
+    { id: 'state_done', name: 'Done', type: 'completed' },
+  ];
+
+  it('prefers workflow state names and types by story status', () => {
+    expect(selectLinearStateIdForStoryStatus(states, 'backlog')).toBe('state_backlog');
+    expect(selectLinearStateIdForStoryStatus(states, 'todo')).toBe('state_todo');
+    expect(selectLinearStateIdForStoryStatus(states, 'in_progress')).toBe('state_progress');
+    expect(selectLinearStateIdForStoryStatus(states, 'in_review')).toBe('state_review');
+    expect(selectLinearStateIdForStoryStatus(states, 'done')).toBe('state_done');
+  });
+
+  it('falls back to configured state id when no matching state exists', () => {
+    expect(selectLinearStateIdForStoryStatus([], 'in_progress', 'fallback_state')).toBe('fallback_state');
   });
 });
