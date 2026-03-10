@@ -47,6 +47,25 @@ function escapeHtml(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }
 
+function getConsentFormActionSources(request: Request): string {
+  const requestUrl = new URL(request.url);
+  const sources = new Set<string>(["'self'"]);
+
+  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const candidateHosts = [request.headers.get('x-forwarded-host'), request.headers.get('host'), requestUrl.host]
+    .filter(Boolean)
+    .flatMap((value) => String(value).split(','))
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const protocol = forwardedProto || requestUrl.protocol.replace(':', '');
+  for (const host of candidateHosts) {
+    sources.add(`${protocol}://${host}`);
+  }
+
+  return Array.from(sources).join(' ');
+}
+
 function buildAuthorizeUrl(
   requestUrl: URL,
   params: ReturnType<typeof getAuthorizeParamsFromForm> | ReturnType<typeof getAuthorizeParams>,
@@ -66,6 +85,7 @@ function buildAuthorizeUrl(
 function renderConsentPage(request: Request, params: ReturnType<typeof getAuthorizeParams>, consentToken: string) {
   const requestUrl = new URL(request.url);
   const actionPath = requestUrl.pathname;
+  const formActionSources = getConsentFormActionSources(request);
   const redirectHost = (() => {
     try {
       return new URL(params.redirectUri).host;
@@ -159,8 +179,7 @@ function renderConsentPage(request: Request, params: ReturnType<typeof getAuthor
       'Cache-Control': 'no-store',
       Pragma: 'no-cache',
       'X-Frame-Options': 'DENY',
-      'Content-Security-Policy':
-        "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
+      'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; form-action ${formActionSources}; frame-ancestors 'none'`,
     },
   });
 }
