@@ -65,7 +65,7 @@ function buildAuthorizeUrl(
 
 function renderConsentPage(request: Request, params: ReturnType<typeof getAuthorizeParams>, consentToken: string) {
   const requestUrl = new URL(request.url);
-  const actionUrl = new URL(requestUrl.pathname, request.url);
+  const actionPath = requestUrl.pathname;
   const redirectHost = (() => {
     try {
       return new URL(params.redirectUri).host;
@@ -133,7 +133,7 @@ function renderConsentPage(request: Request, params: ReturnType<typeof getAuthor
         <p><strong>Redirect host:</strong> <span class="mono">${escapeHtml(redirectHost)}</span></p>
         <p><strong>Scope:</strong> <span class="mono">${escapeHtml(params.scope || '(default)')}</span></p>
       </div>
-      <form method="post" action="${escapeHtml(actionUrl.toString())}">
+      <form method="post" action="${escapeHtml(actionPath)}">
         <input type="hidden" name="response_type" value="${escapeHtml(params.responseType ?? '')}" />
         <input type="hidden" name="client_id" value="${escapeHtml(params.clientId)}" />
         <input type="hidden" name="redirect_uri" value="${escapeHtml(params.redirectUri)}" />
