@@ -16,8 +16,6 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@linear/sdk": "^75.0.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "@opencode-ai/plugin": "^1.2.6",
-    "@opencode-ai/sdk": "^1.2.6",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",

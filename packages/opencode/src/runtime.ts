@@ -1,6 +1,10 @@
-import type { Plugin } from '@opencode-ai/plugin';
 import { compactedContextForStories } from './plugin';
 import type { OpenCodeSessionContext } from './types';
+
+type SessionCompactingHook = (_input: unknown, output: { context: string[] }) => Promise<void> | void;
+type Plugin = () => Promise<{
+  'experimental.session.compacting': SessionCompactingHook;
+}>;
 
 function getMcpUrl(): string | null {
   const explicit = process.env.BEEMSPEC_MCP_URL?.trim();

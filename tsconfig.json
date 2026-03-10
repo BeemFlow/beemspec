@@ -21,8 +21,6 @@
     "paths": {
       "@/*": ["./src/*"],
       "@beemspec/storymap": ["./packages/storymap/src/index.ts"],
-      "@beemspec/opencode": ["./packages/opencode/src/index.ts"],
-      "@beemspec/opencode/runtime": ["./packages/opencode/src/runtime.ts"],
       "@beemspec/linear": ["./packages/linear/src/index.ts"]
     }
   },
