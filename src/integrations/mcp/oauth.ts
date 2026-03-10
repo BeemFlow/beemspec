@@ -58,15 +58,8 @@ export function isSameMcpRedirectUri(a: string, b: string): boolean {
 export function isAllowedMcpRedirectUri(uri: string): boolean {
   try {
     const parsed = new URL(uri);
-    if (parsed.protocol === 'https:') {
-      return true;
-    }
-
-    if (parsed.protocol === 'http:') {
-      return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-    }
-
-    return false;
+    if (parsed.protocol !== 'http:') return false;
+    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
   } catch {
     return false;
   }
@@ -112,6 +105,18 @@ interface AuthorizationCodePayload {
   userId: string;
   refreshToken: string;
   resource?: string;
+  expiresAt: number;
+}
+
+interface AuthorizeConsentPayload {
+  clientId: string;
+  redirectUri: string;
+  codeChallenge: string;
+  codeChallengeMethod: 'S256';
+  state: string;
+  scope: string;
+  resource: string;
+  userId: string;
   expiresAt: number;
 }
 
@@ -201,6 +206,12 @@ export async function validateRegisteredClient(
   if (!clientId.startsWith('bsmcp_')) return { valid: false, reason: 'unknown_client' };
   const payload = await decodeSignedObject<RegisteredClientPayload>(clientId.slice('bsmcp_'.length));
   if (!payload) return { valid: false, reason: 'invalid_client' };
+  if (!isAllowedMcpRedirectUri(redirectUri)) {
+    return { valid: false, reason: 'redirect_uri_not_allowed' };
+  }
+  if (!payload.redirect_uris.every((uri) => isAllowedMcpRedirectUri(uri))) {
+    return { valid: false, reason: 'redirect_uri_not_allowed' };
+  }
   if (!redirectUriMatches(payload.redirect_uris, redirectUri)) {
     return { valid: false, reason: 'redirect_uri_mismatch' };
   }
@@ -256,4 +267,58 @@ export async function consumeAuthorizationCode(code: string): Promise<Authorizat
 export function verifyPkceS256(codeVerifier: string, codeChallenge: string): boolean {
   const digest = createHash('sha256').update(codeVerifier).digest('base64url');
   return digest === codeChallenge;
+}
+
+export async function issueAuthorizeConsentToken(input: {
+  clientId: string;
+  redirectUri: string;
+  codeChallenge: string;
+  codeChallengeMethod: 'S256';
+  state: string;
+  scope: string;
+  resource: string;
+  userId: string;
+}): Promise<string> {
+  const payload: AuthorizeConsentPayload = {
+    clientId: input.clientId,
+    redirectUri: input.redirectUri,
+    codeChallenge: input.codeChallenge,
+    codeChallengeMethod: input.codeChallengeMethod,
+    state: input.state,
+    scope: input.scope,
+    resource: input.resource,
+    userId: input.userId,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+  };
+
+  return encodeSignedObject(payload);
+}
+
+export async function verifyAuthorizeConsentToken(
+  token: string,
+  expected: {
+    clientId: string;
+    redirectUri: string;
+    codeChallenge: string;
+    codeChallengeMethod: 'S256';
+    state: string;
+    scope: string;
+    resource: string;
+    userId: string;
+  },
+): Promise<boolean> {
+  const payload = await decodeSignedObject<AuthorizeConsentPayload>(token);
+  if (!payload) return false;
+  if (payload.expiresAt < Date.now()) return false;
+
+  return (
+    payload.clientId === expected.clientId &&
+    payload.redirectUri === expected.redirectUri &&
+    payload.codeChallenge === expected.codeChallenge &&
+    payload.codeChallengeMethod === expected.codeChallengeMethod &&
+    payload.state === expected.state &&
+    payload.scope === expected.scope &&
+    payload.resource === expected.resource &&
+    payload.userId === expected.userId
+  );
 }

@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: 'invalid_redirect_uri',
-        error_description: 'redirect_uris must use https or loopback http://localhost',
+        error_description: 'redirect_uris must use loopback http://localhost or http://127.0.0.1',
       },
       { status: 400 },
     );

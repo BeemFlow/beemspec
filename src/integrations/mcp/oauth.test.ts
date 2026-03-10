@@ -1,11 +1,15 @@
 import { createHash } from 'node:crypto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   consumeAuthorizationCode,
   isAllowedMcpRedirectUri,
   isSameMcpResourceUri,
   issueAuthorizationCode,
+  issueAuthorizeConsentToken,
   normalizeMcpResourceUri,
+  registerMcpOAuthClient,
+  validateRegisteredClient,
+  verifyAuthorizeConsentToken,
   verifyPkceS256,
 } from './oauth';
 
@@ -14,8 +18,8 @@ describe('mcp oauth helpers', () => {
     process.env.BEEMSPEC_MCP_OAUTH_SECRET = 'test-secret-for-mcp-oauth';
   });
 
-  it('allows only https or loopback http redirect uris', () => {
-    expect(isAllowedMcpRedirectUri('https://example.com/callback')).toBe(true);
+  it('allows only loopback http redirect uris', () => {
+    expect(isAllowedMcpRedirectUri('https://example.com/callback')).toBe(false);
     expect(isAllowedMcpRedirectUri('http://127.0.0.1:3000/callback')).toBe(true);
     expect(isAllowedMcpRedirectUri('http://localhost:3000/callback')).toBe(true);
     expect(isAllowedMcpRedirectUri('http://example.com/callback')).toBe(false);
@@ -56,5 +60,89 @@ describe('mcp oauth helpers', () => {
     const challenge = createHash('sha256').update(verifier).digest('base64url');
     expect(verifyPkceS256(verifier, challenge)).toBe(true);
     expect(verifyPkceS256('wrong', challenge)).toBe(false);
+  });
+
+  it('issues and verifies consent tokens', async () => {
+    const token = await issueAuthorizeConsentToken({
+      clientId: 'bsmcp_client',
+      redirectUri: 'https://example.com/callback',
+      codeChallenge: 'challenge',
+      codeChallengeMethod: 'S256',
+      state: 'state-1',
+      scope: 'read',
+      resource: 'https://beemspec.com/api/mcp',
+      userId: 'user-1',
+    });
+
+    await expect(
+      verifyAuthorizeConsentToken(token, {
+        clientId: 'bsmcp_client',
+        redirectUri: 'https://example.com/callback',
+        codeChallenge: 'challenge',
+        codeChallengeMethod: 'S256',
+        state: 'state-1',
+        scope: 'read',
+        resource: 'https://beemspec.com/api/mcp',
+        userId: 'user-1',
+      }),
+    ).resolves.toBe(true);
+
+    await expect(
+      verifyAuthorizeConsentToken(token, {
+        clientId: 'bsmcp_client',
+        redirectUri: 'https://example.com/callback',
+        codeChallenge: 'challenge',
+        codeChallengeMethod: 'S256',
+        state: 'state-1',
+        scope: 'write',
+        resource: 'https://beemspec.com/api/mcp',
+        userId: 'user-1',
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects expired consent tokens', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+
+    const token = await issueAuthorizeConsentToken({
+      clientId: 'bsmcp_client',
+      redirectUri: 'https://example.com/callback',
+      codeChallenge: 'challenge',
+      codeChallengeMethod: 'S256',
+      state: 'state-1',
+      scope: 'read',
+      resource: 'https://beemspec.com/api/mcp',
+      userId: 'user-1',
+    });
+
+    vi.setSystemTime(new Date('2026-01-01T00:11:00.000Z'));
+
+    await expect(
+      verifyAuthorizeConsentToken(token, {
+        clientId: 'bsmcp_client',
+        redirectUri: 'https://example.com/callback',
+        codeChallenge: 'challenge',
+        codeChallengeMethod: 'S256',
+        state: 'state-1',
+        scope: 'read',
+        resource: 'https://beemspec.com/api/mcp',
+        userId: 'user-1',
+      }),
+    ).resolves.toBe(false);
+
+    vi.useRealTimers();
+  });
+
+  it('rejects registered clients with non-loopback redirect uris', async () => {
+    const registered = await registerMcpOAuthClient({
+      redirect_uris: ['https://example.com/callback'],
+      client_name: 'web-client',
+    });
+
+    await expect(validateRegisteredClient(registered.client_id, 'https://example.com/callback')).resolves.toEqual({
+      valid: false,
+      reason: 'redirect_uri_not_allowed',
+    });
   });
 });
