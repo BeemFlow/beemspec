@@ -100,7 +100,7 @@ export default async function OAuthConsentPage({ searchParams }: ConsentPageProp
           </div>
         </dl>
 
-        <form action="/api/oauth/decision" method="post" className="mt-6 flex gap-3">
+        <form action="/oauth/decision" method="post" className="mt-6 flex gap-3">
           <input type="hidden" name="authorization_id" value={authorizationId} />
           <Button type="submit" name="decision" value="deny" variant="outline">
             Deny
