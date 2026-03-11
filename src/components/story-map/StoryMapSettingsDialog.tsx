@@ -223,18 +223,26 @@ export function StoryMapSettingsDialog({
     setNotice(null);
 
     try {
-      const result = await fetchJson<{ considered: number; succeeded: number; failed: number }>(
+      const result = await fetchJson<{
+        considered: number;
+        succeeded: number;
+        failed: number;
+        import_considered: number;
+        imported: number;
+        import_skipped: number;
+      }>(
         `/api/story-maps/${storyMapId}/integrations/linear/sync`,
         { method: 'POST' },
         'Failed to sync story map with Linear',
       );
 
+      const existingSyncSummary = `${result.succeeded}/${result.considered} existing stories synced`;
+      const importSummary = `${result.imported}/${result.import_considered} labeled issues imported`;
+
       if (result.failed > 0) {
-        setError(
-          `Manual sync completed with ${result.failed} failures (${result.succeeded}/${result.considered} succeeded).`,
-        );
+        setError(`Manual sync completed with ${result.failed} failures (${existingSyncSummary}; ${importSummary}).`);
       } else {
-        setNotice(`Manual sync complete: ${result.succeeded}/${result.considered} stories synced.`);
+        setNotice(`Manual sync complete: ${existingSyncSummary}; ${importSummary} (${result.import_skipped} skipped).`);
       }
       onSyncComplete?.();
     } catch (err) {
