@@ -13,6 +13,7 @@ type AuthorizationDetails = {
   };
   redirect_uri?: string;
   scope?: string;
+  redirect_url?: string;
 };
 
 export default async function OAuthConsentPage({ searchParams }: ConsentPageProps) {
@@ -60,6 +61,10 @@ export default async function OAuthConsentPage({ searchParams }: ConsentPageProp
         </div>
       </div>
     );
+  }
+
+  if (typeof authorization.redirect_url === 'string' && authorization.redirect_url.length > 0) {
+    redirect(authorization.redirect_url);
   }
 
   const scopes =

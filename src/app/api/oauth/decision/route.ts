@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 type OAuthDecisionResponse = {
-  redirect_to?: string;
+  redirect_url?: string;
 };
 
 export const runtime = 'nodejs';
@@ -52,12 +52,12 @@ export async function POST(request: Request) {
       ? await oauthApi.approveAuthorization(authorizationId)
       : await oauthApi.denyAuthorization(authorizationId);
 
-  if (outcome.error || !outcome.data?.redirect_to) {
+  if (outcome.error || !outcome.data?.redirect_url) {
     return NextResponse.json(
       { error: outcome.error?.message ?? 'Failed to process authorization decision' },
       { status: 400 },
     );
   }
 
-  return NextResponse.redirect(outcome.data.redirect_to);
+  return NextResponse.redirect(outcome.data.redirect_url);
 }
