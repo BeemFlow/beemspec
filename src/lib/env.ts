@@ -36,8 +36,4 @@ export const env = {
   mcpOAuthSecret(): string | null {
     return readEnv('BEEMSPEC_MCP_OAUTH_SECRET');
   },
-
-  syncCronToken(): string | null {
-    return readEnv('BEEMSPEC_SYNC_CRON_TOKEN');
-  },
 };

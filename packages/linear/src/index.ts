@@ -27,15 +27,11 @@ export type { LinearIssueForSync } from './patch';
 // Patch building (Linear description -> generic StoryPatchFromRemote)
 export { buildStoryPatchFromLinearIssue } from './patch';
 export type {
-  LinearSyncBatchRequest,
-  LinearSyncStoryRequest,
   UpdateLinearIntegrationSettings,
   UpdateStoryMapLinearSettings,
 } from './schemas';
 // Zod validation schemas
 export {
-  linearSyncBatchSchema,
-  linearSyncStorySchema,
   updateLinearIntegrationSettingsSchema,
   updateStoryMapLinearSettingsSchema,
 } from './schemas';

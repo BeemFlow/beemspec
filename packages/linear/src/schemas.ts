@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-const uuid = z.string().uuid();
 const nullableString = z.string().min(1).nullable();
 const linearStatusMappingSchema = z
   .object({
@@ -34,24 +33,5 @@ export const updateStoryMapLinearSettingsSchema = z
   })
   .refine(atLeastOneField, atLeastOneFieldMessage);
 
-export const linearSyncStorySchema = z.object({
-  story_id: uuid,
-});
-
-export const linearSyncBatchSchema = z
-  .object({
-    story_ids: z.array(uuid).min(1).max(200).optional(),
-    limit: z.number().int().min(1).max(200).optional(),
-    older_than_minutes: z
-      .number()
-      .int()
-      .min(1)
-      .max(24 * 60)
-      .optional(),
-  })
-  .default({});
-
 export type UpdateLinearIntegrationSettings = z.infer<typeof updateLinearIntegrationSettingsSchema>;
 export type UpdateStoryMapLinearSettings = z.infer<typeof updateStoryMapLinearSettingsSchema>;
-export type LinearSyncStoryRequest = z.infer<typeof linearSyncStorySchema>;
-export type LinearSyncBatchRequest = z.infer<typeof linearSyncBatchSchema>;

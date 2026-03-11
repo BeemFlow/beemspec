@@ -18,12 +18,11 @@ import type {
   UpdateStoryMap,
   UpdateTask,
 } from '@beemspec/storymap';
-import { isLinearSyncAvailableForStoryMap, resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
+import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
 import { getStoryLinearLink } from '@/integrations/linear/story-links';
-import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
+import { maybeSyncStoryToLinear } from '@/integrations/linear/sync';
 import type { Supabase } from '@/lib/supabase/types';
 import { pickDefined } from '@/lib/validations';
-import { loadStoryWithStoryMap } from './story-context';
 
 export async function listStoryMaps(supabase: Supabase, teamId: string) {
   return supabase.from('story_maps').select('*').eq('team_id', teamId).order('updated_at', { ascending: false });
@@ -164,20 +163,6 @@ export async function reorderReleases(supabase: Supabase, input: ReorderReleases
   return supabase.rpc('reorder_releases', {
     p_story_map_id: input.story_map_id,
     p_order: input.order,
-  });
-}
-
-async function maybeSyncStoryToLinear(supabase: Supabase, storyId: string) {
-  const context = await loadStoryWithStoryMap(supabase, storyId);
-  if (!context.ok) return null;
-
-  const linearSyncEnabled = await isLinearSyncAvailableForStoryMap(supabase, {
-    storyMapId: context.data.storyMapId,
-  });
-  if (!linearSyncEnabled) return null;
-
-  return processStoryLinearSyncById(supabase, {
-    storyId,
   });
 }
 
