@@ -27,28 +27,3 @@ export function createClientForAccessToken(accessToken: string) {
     },
   });
 }
-
-export async function refreshSupabaseAccessToken(refreshToken: string) {
-  const { supabaseUrl, publishableKey } = getSupabasePublicConfig();
-  const supabase = createClient(supabaseUrl, publishableKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
-  if (error || !data.session) {
-    return { data: null, error: error ?? new Error('Session refresh failed') };
-  }
-
-  return {
-    data: {
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-      token_type: 'Bearer',
-      expires_in: data.session.expires_in ?? 3600,
-    },
-    error: null,
-  };
-}

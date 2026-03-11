@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildMcpResourceUrl,
-  buildOAuthAuthorizationServerMetadata,
   buildProtectedResourceMetadata,
   buildProtectedResourceMetadataPath,
   buildProtectedResourceMetadataUrl,
@@ -41,18 +40,5 @@ describe('mcp metadata helpers', () => {
     expect(metadata.authorization_servers).toEqual([`${supabaseOrigin}/auth/v1`]);
     expect(metadata.scopes_supported).toEqual(MCP_DEFAULT_SCOPES.length > 0 ? MCP_DEFAULT_SCOPES : undefined);
     expect(metadata.bearer_methods_supported).toEqual(['header']);
-  });
-
-  it('builds oauth authorization server metadata with expected endpoints', () => {
-    process.env.NEXT_PUBLIC_SUPABASE_URL = supabaseOrigin;
-    const metadata = buildOAuthAuthorizationServerMetadata(origin);
-
-    expect(metadata.issuer).toBe(`${supabaseOrigin}/auth/v1`);
-    expect(metadata.authorization_endpoint).toBe(`${supabaseOrigin}/auth/v1/oauth/authorize`);
-    expect(metadata.token_endpoint).toBe(`${supabaseOrigin}/auth/v1/oauth/token`);
-    expect(metadata.registration_endpoint).toBe(`${supabaseOrigin}/auth/v1/oauth/register`);
-    expect(metadata.scopes_supported).toEqual(MCP_DEFAULT_SCOPES.length > 0 ? MCP_DEFAULT_SCOPES : undefined);
-    expect(metadata.code_challenge_methods_supported).toEqual(['S256']);
-    expect(metadata.client_id_metadata_document_supported).toBe(false);
   });
 });

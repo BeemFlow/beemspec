@@ -1,7 +1,5 @@
 import { getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import {
-  type OAuthMetadata,
-  OAuthMetadataSchema,
   type OAuthProtectedResourceMetadata,
   OAuthProtectedResourceMetadataSchema,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
@@ -51,22 +49,4 @@ export function buildProtectedResourceMetadata(origin: string, resourcePath = MC
   };
 
   return OAuthProtectedResourceMetadataSchema.parse(metadata);
-}
-
-export function buildOAuthAuthorizationServerMetadata(origin: string): OAuthMetadata {
-  const issuer = buildSupabaseOAuthIssuer(origin);
-  const metadata: OAuthMetadata = {
-    issuer,
-    authorization_endpoint: `${issuer}/oauth/authorize`,
-    token_endpoint: `${issuer}/oauth/token`,
-    registration_endpoint: `${issuer}/oauth/register`,
-    response_types_supported: ['code'],
-    grant_types_supported: ['authorization_code', 'refresh_token'],
-    token_endpoint_auth_methods_supported: ['none'],
-    code_challenge_methods_supported: ['S256'],
-    ...(MCP_DEFAULT_SCOPES.length > 0 ? { scopes_supported: MCP_DEFAULT_SCOPES } : {}),
-    client_id_metadata_document_supported: false,
-  };
-
-  return OAuthMetadataSchema.parse(metadata);
 }

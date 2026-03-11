@@ -32,8 +32,4 @@ export const env = {
   linearWebhookSecret(): string | null {
     return readEnv('LINEAR_WEBHOOK_SECRET') ?? readEnv('BEEMSPEC_LINEAR_WEBHOOK_SECRET');
   },
-
-  mcpOAuthSecret(): string | null {
-    return readEnv('BEEMSPEC_MCP_OAUTH_SECRET');
-  },
 };
