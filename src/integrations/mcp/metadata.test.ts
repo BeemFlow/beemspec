@@ -6,7 +6,7 @@ import {
   buildProtectedResourceMetadataPath,
   buildProtectedResourceMetadataUrl,
   MCP_DEFAULT_RESOURCE_PATH,
-  MCP_DEFAULT_SCOPE,
+  MCP_DEFAULT_SCOPES,
 } from './metadata';
 
 describe('mcp metadata helpers', () => {
@@ -39,7 +39,7 @@ describe('mcp metadata helpers', () => {
 
     expect(metadata.resource).toBe(buildMcpResourceUrl(origin, '/api/mcp'));
     expect(metadata.authorization_servers).toEqual([`${supabaseOrigin}/auth/v1`]);
-    expect(metadata.scopes_supported).toEqual([MCP_DEFAULT_SCOPE]);
+    expect(metadata.scopes_supported).toEqual(MCP_DEFAULT_SCOPES.length > 0 ? MCP_DEFAULT_SCOPES : undefined);
     expect(metadata.bearer_methods_supported).toEqual(['header']);
   });
 
@@ -51,7 +51,7 @@ describe('mcp metadata helpers', () => {
     expect(metadata.authorization_endpoint).toBe(`${supabaseOrigin}/auth/v1/oauth/authorize`);
     expect(metadata.token_endpoint).toBe(`${supabaseOrigin}/auth/v1/oauth/token`);
     expect(metadata.registration_endpoint).toBe(`${supabaseOrigin}/auth/v1/oauth/register`);
-    expect(metadata.scopes_supported).toEqual([MCP_DEFAULT_SCOPE]);
+    expect(metadata.scopes_supported).toEqual(MCP_DEFAULT_SCOPES.length > 0 ? MCP_DEFAULT_SCOPES : undefined);
     expect(metadata.code_challenge_methods_supported).toEqual(['S256']);
     expect(metadata.client_id_metadata_document_supported).toBe(false);
   });

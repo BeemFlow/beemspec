@@ -9,7 +9,7 @@ import { resourceUrlFromServerUrl } from '@modelcontextprotocol/sdk/shared/auth-
 import { env } from '@/lib/env';
 
 export const MCP_DEFAULT_RESOURCE_PATH = '/api/mcp';
-export const MCP_DEFAULT_SCOPE = 'openid';
+export const MCP_DEFAULT_SCOPES: string[] = [];
 
 function buildSupabaseOAuthIssuer(originFallback?: string): string {
   const supabaseUrl = env.supabaseUrl() ?? originFallback;
@@ -47,7 +47,7 @@ export function buildProtectedResourceMetadata(origin: string, resourcePath = MC
     resource: buildMcpResourceUrl(origin, resourcePath),
     authorization_servers: [issuer],
     bearer_methods_supported: ['header'],
-    scopes_supported: [MCP_DEFAULT_SCOPE],
+    ...(MCP_DEFAULT_SCOPES.length > 0 ? { scopes_supported: MCP_DEFAULT_SCOPES } : {}),
   };
 
   return OAuthProtectedResourceMetadataSchema.parse(metadata);
@@ -64,7 +64,7 @@ export function buildOAuthAuthorizationServerMetadata(origin: string): OAuthMeta
     grant_types_supported: ['authorization_code', 'refresh_token'],
     token_endpoint_auth_methods_supported: ['none'],
     code_challenge_methods_supported: ['S256'],
-    scopes_supported: [MCP_DEFAULT_SCOPE],
+    ...(MCP_DEFAULT_SCOPES.length > 0 ? { scopes_supported: MCP_DEFAULT_SCOPES } : {}),
     client_id_metadata_document_supported: false,
   };
 
