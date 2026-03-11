@@ -40,7 +40,7 @@ Legend:
 | Agent coding context | Yes (`story_context_get`) | No equivalent | MCP-only coding-context helper. |
 | Team admin (members/invites/settings/delete team) | No | Yes (`/api/teams/[id]/*`) | API-only operational/admin surface. |
 | Linear OAuth/webhook/sync management | No | Yes (`/api/integrations/linear/*`, `/api/story-maps/[id]/integrations/linear/*`) | API-only integration surface. |
-| MCP OAuth endpoints | Transport/auth support | N/A | `/api/mcp/oauth/register`, `/api/mcp/oauth/authorize`, `/api/mcp/oauth/token`. |
+| MCP OAuth endpoints | Transport/auth support | N/A | Uses Supabase OAuth server (`https://<project-ref>.supabase.co/auth/v1`) discovered via protected-resource metadata. Consent UI is app-hosted at `/oauth/consent` and submits decisions to `/api/oauth/decision`. |
 
 ## Multi-team Behavior
 

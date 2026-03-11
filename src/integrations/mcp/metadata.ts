@@ -6,9 +6,20 @@ import {
   OAuthProtectedResourceMetadataSchema,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { resourceUrlFromServerUrl } from '@modelcontextprotocol/sdk/shared/auth-utils.js';
+import { env } from '@/lib/env';
 
 export const MCP_DEFAULT_RESOURCE_PATH = '/api/mcp';
 export const MCP_DEFAULT_SCOPE = 'mcp:tools';
+
+function buildSupabaseOAuthIssuer(originFallback?: string): string {
+  const supabaseUrl = env.supabaseUrl() ?? originFallback;
+  if (!supabaseUrl) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL for MCP OAuth metadata');
+  }
+
+  const issuer = new URL('/auth/v1', supabaseUrl);
+  return issuer.toString().replace(/\/+$/, '');
+}
 
 function normalizePath(pathname: string): string {
   if (!pathname || pathname === '/') return '/';
@@ -31,9 +42,10 @@ export function buildProtectedResourceMetadataUrl(origin: string, resourcePath =
 }
 
 export function buildProtectedResourceMetadata(origin: string, resourcePath = MCP_DEFAULT_RESOURCE_PATH) {
+  const issuer = buildSupabaseOAuthIssuer(origin);
   const metadata: OAuthProtectedResourceMetadata = {
     resource: buildMcpResourceUrl(origin, resourcePath),
-    authorization_servers: [origin],
+    authorization_servers: [issuer],
     bearer_methods_supported: ['header'],
     scopes_supported: [MCP_DEFAULT_SCOPE],
   };
@@ -42,11 +54,12 @@ export function buildProtectedResourceMetadata(origin: string, resourcePath = MC
 }
 
 export function buildOAuthAuthorizationServerMetadata(origin: string): OAuthMetadata {
+  const issuer = buildSupabaseOAuthIssuer(origin);
   const metadata: OAuthMetadata = {
-    issuer: origin,
-    authorization_endpoint: `${origin}/api/mcp/oauth/authorize`,
-    token_endpoint: `${origin}/api/mcp/oauth/token`,
-    registration_endpoint: `${origin}/api/mcp/oauth/register`,
+    issuer,
+    authorization_endpoint: `${issuer}/oauth/authorize`,
+    token_endpoint: `${issuer}/oauth/token`,
+    registration_endpoint: `${issuer}/oauth/register`,
     response_types_supported: ['code'],
     grant_types_supported: ['authorization_code', 'refresh_token'],
     token_endpoint_auth_methods_supported: ['none'],
