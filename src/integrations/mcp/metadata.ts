@@ -9,7 +9,7 @@ import { resourceUrlFromServerUrl } from '@modelcontextprotocol/sdk/shared/auth-
 import { env } from '@/lib/env';
 
 export const MCP_DEFAULT_RESOURCE_PATH = '/api/mcp';
-export const MCP_DEFAULT_SCOPE = 'mcp:tools';
+export const MCP_DEFAULT_SCOPE = 'openid';
 
 function buildSupabaseOAuthIssuer(originFallback?: string): string {
   const supabaseUrl = env.supabaseUrl() ?? originFallback;
