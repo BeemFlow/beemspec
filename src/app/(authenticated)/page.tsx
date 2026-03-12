@@ -155,11 +155,11 @@ export default function Dashboard() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {storyMaps.map((map) => (
               <Link key={map.id} href={`/story-map/${map.id}`}>
-                <Card className="h-full min-h-[176px] aspect-[35/24] transition-colors hover:bg-muted/50">
+                <Card className="h-full min-h-[220px] aspect-[35/24] transition-colors hover:bg-muted/50">
                   <CardHeader className="h-full content-start">
-                    <CardTitle className="line-clamp-2 text-xl leading-tight">{map.name}</CardTitle>
+                    <CardTitle className="line-clamp-2 text-2xl leading-tight">{map.name}</CardTitle>
                     {map.description && (
-                      <CardDescription className="line-clamp-4 text-sm">{map.description}</CardDescription>
+                      <CardDescription className="line-clamp-5 text-base">{map.description}</CardDescription>
                     )}
                   </CardHeader>
                 </Card>
