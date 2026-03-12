@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { use, useCallback, useEffect, useState } from 'react';
 import { ActivityDialog } from '@/components/story-map/ActivityDialog';
-import { AgentKickoffPanel } from '@/components/story-map/AgentKickoffPanel';
 import { StoryDialog } from '@/components/story-map/StoryDialog';
 import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas';
 import { StoryMapSettingsDialog } from '@/components/story-map/StoryMapSettingsDialog';
@@ -396,6 +395,7 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         <div className="p-4">
           <StoryMapCanvas
             storyMap={storyMap}
+            storyMapName={storyMap.name}
             onAddStory={handleAddStory}
             onEditStory={handleEditStory}
             onAddActivity={handleAddActivity}
@@ -409,7 +409,6 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
             onError={setUiError}
             onStoryMapChange={setStoryMap}
           />
-          <AgentKickoffPanel storyMapId={storyMap.id} storyMapName={storyMap.name} releases={storyMap.releases} />
         </div>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
@@ -430,6 +429,8 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         onOpenChange={(open) => !open && closeDialog()}
         story={dialog.type === 'story:edit' ? dialog.story : null}
         releases={storyMap.releases}
+        storyMapId={storyMap.id}
+        storyMapName={storyMap.name}
         defaultReleaseId={dialog.type === 'story:create' ? dialog.releaseId : undefined}
         onSave={handleSaveStory}
         onDelete={dialog.type === 'story:edit' ? handleDeleteStory : undefined}

@@ -16,7 +16,7 @@ Lay out your product as a story map -- a grid where columns represent user activ
 
 ### Build with AI agents
 
-Use the Agent Kickoff panel to copy a starter prompt, paste it into your coding agent, and have the agent pull the latest release context via MCP (`storymap_get` and `story_context_get`). This keeps execution local to the developer's agent while BeemSpec stays the shared planning source of truth.
+Use the Agent Kickoff panel to copy a starter prompt, paste it into your coding agent, and have the agent pull the latest planning and implementation context via MCP. Agents use `storymap_get` for whole-map or release planning and `story_context_get` only for the specific story being implemented. This keeps execution local to the developer's agent while BeemSpec stays the shared planning source of truth.
 
 ### Stay in sync with Linear
 
@@ -50,8 +50,4 @@ BeemSpec sits at the top of this stack. It syncs planning state to Linear and ex
 
 ## Documentation
 
-Detailed docs live in the `docs/` directory:
-
-- `docs/linear-oauth-setup.md`: Linear OAuth app setup for multi-workspace onboarding
-- `docs/mcp-storymap-demo.md`: MCP setup and story map management demo flow
-- `docs/agent-kickoff.md`: release starter prompt and local-agent flow
+- `docs/mcp-api-capability-matrix.md`: MCP vs REST API coverage, recommended agent flows, and safety boundaries

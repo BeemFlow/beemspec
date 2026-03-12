@@ -111,6 +111,8 @@ describe('mcp server', () => {
           ok: boolean;
           data: {
             recommended_sequence: string[];
+            figma_rules: string[];
+            story_quality_checklist: string[];
           };
         };
       };
@@ -119,6 +121,92 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.ok).toBe(true);
     expect(payload.result.structuredContent.data.recommended_sequence[0]).toContain('storymap_list');
     expect(payload.result.structuredContent.data.recommended_sequence[1]).toContain('storymap_get');
+    expect(payload.result.structuredContent.data.figma_rules[0]).toContain('Figma MCP server');
+    expect(payload.result.structuredContent.data.story_quality_checklist[4]).toContain('Figma link');
+  });
+
+  it('returns story map insights with warnings and recommendations', async () => {
+    const mapSingle = vi.fn().mockResolvedValue({
+      data: { id: 'map-1', name: 'Core Product', description: 'Primary map' },
+      error: null,
+    });
+    const activitiesOrder3 = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: 'activity-1',
+          name: 'Frontend',
+          tasks: [
+            {
+              id: 'task-1',
+              name: 'API integration',
+              stories: [
+                {
+                  id: 'story-1',
+                  title: 'Build API endpoint',
+                  status: 'backlog',
+                  release_id: null,
+                  content: {
+                    acceptance_criteria: '- [ ] endpoint works',
+                    figma_link: 'https://figma.com/design/abc/Test?node-id=1-2',
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      error: null,
+    });
+    const activitiesOrder2 = vi.fn().mockReturnValue({ order: activitiesOrder3 });
+    const activitiesOrder1 = vi.fn().mockReturnValue({ order: activitiesOrder2 });
+    const releasesOrder = vi.fn().mockResolvedValue({
+      data: [{ id: 'release-1', name: 'Release 1' }],
+      error: null,
+    });
+    const personasOrder = vi.fn().mockResolvedValue({
+      data: [{ id: 'persona-1', name: 'Admin', goals: 'Ship safely' }],
+      error: null,
+    });
+
+    const fakeSupabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'story_maps') {
+          return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: mapSingle }) }) };
+        }
+        if (table === 'activities') {
+          return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ order: activitiesOrder1 }) }) };
+        }
+        if (table === 'releases') {
+          return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ order: releasesOrder }) }) };
+        }
+        if (table === 'personas') {
+          return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ order: personasOrder }) }) };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      }),
+      rpc: vi.fn(),
+    } as never;
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 31,
+        method: 'tools/call',
+        params: {
+          name: 'storymap_get',
+          arguments: { story_map_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4' },
+        },
+      }),
+      fakeSupabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('agent_insights');
+    expect(body).toContain('storiesWithFigmaCount');
+    expect(body).toContain('story_mapping_warnings');
+    expect(body).toContain('Figma MCP server');
   });
 
   it('calls storymap_list through shared service path', async () => {
@@ -192,6 +280,12 @@ describe('mcp server', () => {
         id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
         title: 'Implement sign-in',
         status: 'backlog',
+        task_id: 'task-1',
+        release_id: null,
+        content: {
+          acceptance_criteria: '- [ ] Sign in succeeds',
+          figma_link: 'https://figma.com/design/abc/Test?node-id=1-2',
+        },
       },
       error: null,
     } as never);
@@ -230,12 +324,13 @@ describe('mcp server', () => {
       result: {
         structuredContent: {
           ok: boolean;
-          data: { id: string; title: string };
+          data: { id: string; title: string; agent_guidance: { verification_hints: string[] } };
         };
       };
     };
     expect(payload.result.structuredContent.ok).toBe(true);
     expect(payload.result.structuredContent.data.title).toBe('Implement sign-in');
+    expect(payload.result.structuredContent.data.agent_guidance.verification_hints.join(' ')).toContain('Figma');
   });
 
   it('calls story_update and returns not-found as MCP error payload', async () => {
@@ -312,12 +407,15 @@ describe('mcp server', () => {
       result: {
         structuredContent: {
           ok: boolean;
-          data: { reordered: number };
+          data: { reordered: number; agent_guidance: { verification_hints: string[] } };
         };
       };
     };
     expect(payload.result.structuredContent.ok).toBe(true);
     expect(payload.result.structuredContent.data.reordered).toBe(2);
+    expect(payload.result.structuredContent.data.agent_guidance.verification_hints.join(' ')).toContain(
+      'destination lane',
+    );
   });
 
   it('calls task_move through shared service path', async () => {
@@ -457,22 +555,108 @@ describe('mcp server', () => {
   });
 
   it('returns context for a backlog story', async () => {
-    const single = vi.fn().mockResolvedValue({
-      data: {
-        id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
-        title: 'Backlog story',
-        release_id: null,
-        content: {
-          requirements: 'Do the backlog thing',
-          acceptance_criteria: 'It works from backlog',
-          technical_guidelines: 'Keep it simple',
-        },
-      },
-      error: null,
-    });
-    const eq = vi.fn().mockReturnValue({ single });
-    const select = vi.fn().mockReturnValue({ eq });
-    const fakeSupabase = { from: vi.fn().mockReturnValue({ select }) } as never;
+    const fakeSupabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'stories') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+                    task_id: 'task-1',
+                    title: 'Backlog story',
+                    status: 'backlog',
+                    sort_order: 3,
+                    release_id: null,
+                    content: {
+                      requirements: 'Do the backlog thing',
+                      acceptance_criteria: 'It works from backlog',
+                      edge_cases: 'Handle empty states',
+                      technical_guidelines: 'Keep it simple',
+                      figma_link: 'https://figma.com/design/abc/Test?node-id=1-2',
+                    },
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'tasks') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: 'task-1',
+                    activity_id: 'activity-1',
+                    name: 'Review backlog item',
+                    description: 'Review the story before development',
+                    sort_order: 2,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'activities') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: 'activity-1',
+                    story_map_id: 'map-1',
+                    name: 'Plan work',
+                    description: 'Plan the release',
+                    sort_order: 1,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'story_maps') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: 'map-1',
+                    name: 'Core Product',
+                    description: 'Primary planning map',
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'personas') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 'persona-1',
+                      name: 'Workspace Admin',
+                      description: 'Manages the rollout',
+                      goals: 'Ship safely',
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    } as never;
 
     const response = await handleMcpRequest(
       rpcRequest({
@@ -498,11 +682,25 @@ describe('mcp server', () => {
           ok: boolean;
           data: {
             releaseId: string | null;
+            releaseName: string | null;
             storyId: string;
             storyTitle: string;
+            storyStatus: string;
+            storyMapName: string;
+            activityName: string;
+            taskName: string;
             requirements: string;
             acceptanceCriteria: string;
+            edgeCases: string | null;
             technicalGuidelines: string | null;
+            figmaLink: string | null;
+            personas: Array<{ name: string }>;
+            agentGuidance: {
+              figma: {
+                hasFigmaLink: boolean;
+                recommendedTools: string[];
+              };
+            };
           };
         };
       };
@@ -510,7 +708,19 @@ describe('mcp server', () => {
 
     expect(payload.result.structuredContent.ok).toBe(true);
     expect(payload.result.structuredContent.data.releaseId).toBeNull();
+    expect(payload.result.structuredContent.data.releaseName).toBeNull();
     expect(payload.result.structuredContent.data.storyTitle).toBe('Backlog story');
+    expect(payload.result.structuredContent.data.storyStatus).toBe('backlog');
+    expect(payload.result.structuredContent.data.storyMapName).toBe('Core Product');
+    expect(payload.result.structuredContent.data.activityName).toBe('Plan work');
+    expect(payload.result.structuredContent.data.taskName).toBe('Review backlog item');
+    expect(payload.result.structuredContent.data.edgeCases).toBe('Handle empty states');
+    expect(payload.result.structuredContent.data.figmaLink).toContain('figma.com');
+    expect(payload.result.structuredContent.data.personas).toHaveLength(1);
+    expect(payload.result.structuredContent.data.agentGuidance.figma.hasFigmaLink).toBe(true);
+    expect(payload.result.structuredContent.data.agentGuidance.figma.recommendedTools).toContain(
+      'figma_get_design_context',
+    );
   });
 
   it('returns not found for missing story context', async () => {

@@ -22,6 +22,7 @@ import {
 import { ArrowDown, ArrowUp, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { AddButton } from '@/components/story-map/AddButton';
+import { AgentKickoffButton, buildReleaseKickoffPrompt } from '@/components/story-map/AgentKickoffButton';
 import { ADD_BUTTON_WIDTH, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, GROUP_GAP } from '@/components/story-map/constants';
 import { MapCard } from '@/components/story-map/MapCard';
 import { STATUS_LABELS, STATUS_VARIANTS } from '@/components/story-map/story-status';
@@ -99,6 +100,7 @@ function parseDragId(encoded: string): DragId | null {
 
 interface Props {
   storyMap: StoryMapFull;
+  storyMapName: string;
   onAddStory: (taskId: string, releaseId: string | null) => void;
   onEditStory: (story: Story) => void;
   onAddActivity: () => void;
@@ -263,6 +265,7 @@ function DropLine({ direction }: { direction: 'vertical' | 'horizontal' }) {
 
 export function StoryMapCanvas({
   storyMap,
+  storyMapName,
   onAddStory,
   onEditStory,
   onAddActivity,
@@ -568,6 +571,8 @@ export function StoryMapCanvas({
                   <ReleaseRow
                     label={release.name}
                     releaseId={release.id}
+                    storyMapId={storyMap.id}
+                    storyMapName={storyMapName}
                     activities={sortedActivities}
                     getTasksForActivity={getTasksForActivity}
                     getStoriesForCell={getStoriesForCell}
@@ -591,6 +596,8 @@ export function StoryMapCanvas({
               label="Backlog"
               labelMuted
               releaseId={null}
+              storyMapId={storyMap.id}
+              storyMapName={storyMapName}
               activities={sortedActivities}
               getTasksForActivity={getTasksForActivity}
               getStoriesForCell={getStoriesForCell}
@@ -742,6 +749,8 @@ interface ReleaseRowProps {
   label: string;
   labelMuted?: boolean;
   releaseId: string | null;
+  storyMapId: string;
+  storyMapName: string;
   activities: Activity[];
   getTasksForActivity: (activityId: string) => (TaskWithStories & { activityId: string })[];
   getStoriesForCell: (taskId: string, releaseId: string | null) => Story[];
@@ -774,6 +783,8 @@ function ReleaseRow({
   label,
   labelMuted,
   releaseId,
+  storyMapId,
+  storyMapName,
   activities,
   getTasksForActivity,
   getStoriesForCell,
@@ -838,12 +849,28 @@ function ReleaseRow({
                   <DeleteButton
                     onDelete={onDelete}
                     iconOnly
+                    className="cursor-pointer"
                     confirmTitle="Delete release?"
                     confirmDescription="All stories in this release will be permanently deleted."
                   />
                 </TooltipTrigger>
                 <TooltipContent>Delete</TooltipContent>
               </Tooltip>
+            )}
+            {releaseId && (
+              <AgentKickoffButton
+                prompt={buildReleaseKickoffPrompt({
+                  storyMapId,
+                  storyMapName,
+                  releaseId,
+                  releaseName: label,
+                })}
+                tooltip="Copy agent kickoff prompt for this release"
+                iconOnly
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 cursor-pointer"
+              />
             )}
           </div>
         )}

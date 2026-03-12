@@ -154,6 +154,219 @@ const destructiveAnnotations = {
   destructiveHint: true,
 } as const;
 
+type StoryLike = {
+  id: string;
+  title: string;
+  status: string;
+  release_id: string | null;
+  content?: {
+    acceptance_criteria?: string;
+    edge_cases?: string | null;
+    figma_link?: string | null;
+  } | null;
+};
+
+type TaskLike = {
+  id: string;
+  name: string;
+  stories?: StoryLike[];
+};
+
+type ActivityLike = {
+  id: string;
+  name: string;
+  tasks?: TaskLike[];
+};
+
+type ReleaseLike = {
+  id: string;
+  name: string;
+};
+
+type PersonaLike = {
+  id: string;
+  name: string;
+  goals?: string | null;
+};
+
+function buildStoryMapInsights(input: {
+  map: { id: string; name: string; description?: string | null };
+  activities: ActivityLike[];
+  releases: ReleaseLike[];
+  personas: PersonaLike[];
+}) {
+  const allTasks = input.activities.flatMap((activity) => activity.tasks ?? []);
+  const allStories = allTasks.flatMap((task) => task.stories ?? []);
+  const backlogStories = allStories.filter((story) => story.release_id === null);
+  const storiesWithFigma = allStories.filter((story) => Boolean(story.content?.figma_link));
+  const storiesMissingEdgeCases = allStories.filter((story) => !story.content?.edge_cases);
+
+  const statusCounts = allStories.reduce<Record<string, number>>((acc, story) => {
+    acc[story.status] = (acc[story.status] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const releaseSummaries = [
+    {
+      releaseId: null,
+      releaseName: 'Backlog',
+      storyCount: backlogStories.length,
+      unfinishedCount: backlogStories.filter((story) => story.status !== 'done').length,
+      storiesWithFigmaCount: backlogStories.filter((story) => Boolean(story.content?.figma_link)).length,
+    },
+    ...input.releases.map((release) => {
+      const stories = allStories.filter((story) => story.release_id === release.id);
+      return {
+        releaseId: release.id,
+        releaseName: release.name,
+        storyCount: stories.length,
+        unfinishedCount: stories.filter((story) => story.status !== 'done').length,
+        storiesWithFigmaCount: stories.filter((story) => Boolean(story.content?.figma_link)).length,
+      };
+    }),
+  ];
+
+  const storyMappingWarnings: string[] = [];
+  if (input.activities.length === 0)
+    storyMappingWarnings.push('This map has no activities yet, so the user workflow backbone is not defined.');
+  if (allTasks.length === 0)
+    storyMappingWarnings.push('This map has no tasks yet, so activities are not broken into user tasks.');
+  if (input.releases.length === 0)
+    storyMappingWarnings.push(
+      'This map has no named releases yet. Keep backlog-only planning if delivery slicing is still premature, but add releases once the team needs a concrete usable increment plan.',
+    );
+  if (input.releases.length > 0 && allStories.length > 0 && allStories.every((story) => story.release_id === null)) {
+    storyMappingWarnings.push(
+      'All stories are still in backlog even though releases exist. The release plan may be underspecified.',
+    );
+  }
+
+  const recommendedNextActions: string[] = [];
+  if (input.activities.length === 0) {
+    recommendedNextActions.push('Create workflow-first activities before adding more delivery detail.');
+  }
+  if (allTasks.length > 0 && allStories.length === 0) {
+    recommendedNextActions.push('Add thin end-to-end stories under the existing tasks so the map becomes actionable.');
+  }
+  if (input.releases.length > 0) {
+    recommendedNextActions.push(
+      'Choose a target release, then inspect unfinished stories in that lane before implementation.',
+    );
+  } else {
+    recommendedNextActions.push(
+      'Keep stories in backlog until you have enough clarity to define a usable release slice.',
+    );
+  }
+  if (storiesWithFigma.length > 0) {
+    recommendedNextActions.push(
+      'For stories with Figma links, fetch design context through the Figma MCP server before UI implementation.',
+    );
+  }
+  if (input.personas.length > 0) {
+    recommendedNextActions.push(
+      'Use persona goals to refine acceptance criteria and release choice when they materially affect the workflow.',
+    );
+  }
+
+  return {
+    map_summary: {
+      storyMapId: input.map.id,
+      storyMapName: input.map.name,
+      activityCount: input.activities.length,
+      taskCount: allTasks.length,
+      releaseCount: input.releases.length,
+      personaCount: input.personas.length,
+      storyCount: allStories.length,
+      backlogStoryCount: backlogStories.length,
+      storiesWithFigmaCount: storiesWithFigma.length,
+      storiesMissingEdgeCasesCount: storiesMissingEdgeCases.length,
+      statusCounts,
+    },
+    release_summaries: releaseSummaries,
+    persona_summary: input.personas.map((persona) => ({
+      personaId: persona.id,
+      name: persona.name,
+      goals: persona.goals ?? null,
+    })),
+    story_mapping_warnings: storyMappingWarnings,
+    recommended_next_actions: recommendedNextActions,
+  };
+}
+
+function buildMutationGuidance(input: {
+  entityType: 'story' | 'task' | 'activity' | 'release' | 'storymap';
+  operation: 'create' | 'update' | 'move' | 'reorder';
+  ids?: Record<string, string | null | undefined>;
+  entity?: Record<string, unknown> | null;
+}) {
+  const nextRecommendedReads: string[] = [];
+  const verificationHints: string[] = [];
+  const warnings: string[] = [];
+
+  if (input.entityType === 'story') {
+    if (input.operation === 'create' && input.ids?.story_id)
+      nextRecommendedReads.push(
+        'Call story_context_get(story_id) only if this story is the next one you plan to implement or refine deeply.',
+      );
+    if (input.operation === 'move' || input.operation === 'reorder') {
+      nextRecommendedReads.push(
+        'Call storymap_get(story_map_id) after the current structural mutation batch to verify release coherence and ordering.',
+      );
+    }
+    verificationHints.push(
+      'Confirm the story still reads as a thin user-visible slice with testable acceptance criteria.',
+    );
+    verificationHints.push(
+      'Confirm the story is in the correct task and release cell, including backlog vs named release.',
+    );
+
+    const content = typeof input.entity?.content === 'object' && input.entity?.content ? input.entity.content : null;
+    const figmaLink = content && 'figma_link' in content ? Reflect.get(content, 'figma_link') : null;
+    const edgeCases = content && 'edge_cases' in content ? Reflect.get(content, 'edge_cases') : null;
+
+    if (!edgeCases) {
+      warnings.push('No edge cases are captured for this story yet; add them if failure modes matter.');
+    }
+    if (typeof figmaLink === 'string' && figmaLink.length > 0) {
+      verificationHints.push(
+        'A Figma link is present. If Figma MCP is connected, fetch design context before UI implementation.',
+      );
+    }
+  }
+
+  if (input.entityType === 'task' || input.entityType === 'activity') {
+    if (input.operation === 'create' || input.operation === 'move' || input.operation === 'reorder') {
+      nextRecommendedReads.push(
+        'Call storymap_get(story_map_id) after the current structural mutation batch to verify workflow order left-to-right.',
+      );
+    }
+    verificationHints.push(
+      'Confirm names describe user workflow steps rather than internal components or team ownership.',
+    );
+  }
+
+  if (input.entityType === 'release') {
+    if (input.operation === 'create' || input.operation === 'reorder') {
+      nextRecommendedReads.push(
+        'Call storymap_get(story_map_id) after the current structural mutation batch to verify release ordering and story placement.',
+      );
+    }
+    verificationHints.push(
+      'Confirm the release still represents a usable increment rather than an internal implementation phase.',
+    );
+  }
+
+  if (input.operation === 'move' || input.operation === 'reorder') {
+    verificationHints.push('Verify ordering in the destination lane after this structural change.');
+  }
+
+  return {
+    next_recommended_reads: nextRecommendedReads,
+    verification_hints: verificationHints,
+    warnings,
+  };
+}
+
 async function resolveAccessibleTeamId(
   supabase: Supabase,
   userId: string,
@@ -255,17 +468,58 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     },
     withToolErrorBoundary('storymap_workflow_guide', async () => {
       return successResult({
-        objective: 'Understand full context in one read, then apply targeted mutations.',
+        objective:
+          'Learn how to shape a strong story map and how to implement stories with enough context to code correctly, while minimizing redundant MCP calls.',
         recommended_sequence: [
           '1) Call storymap_list(team_id?) to discover candidate maps (team_id optional when user has one team).',
-          '2) Call storymap_get(story_map_id) to load complete map graph (activities, tasks, stories, releases, personas).',
-          '3) Perform create/update/reorder/delete operations as needed.',
-          '4) Call storymap_get(story_map_id) again to verify final state and ordering.',
+          '2) Call storymap_get(story_map_id) once to load complete map graph for planning, release selection, or structural edits.',
+          '3) If implementing or deeply refining one story, call story_context_get(story_id) for story-level coding and design context.',
+          '4) Perform targeted create/update/move/reorder/delete operations as needed.',
+          '5) Re-read with storymap_get(story_map_id) only after a structural mutation batch or when release planning context has changed.',
         ],
-        notes: [
-          'Prefer storymap_get over many small reads when planning.',
-          'Use *_reorder tools only after IDs are known from storymap_get.',
-          'Use story_context_get only when you need coding-focused context for a specific story.',
+        decision_rules: [
+          'Call team_list when team context is unknown or the user may have access to multiple teams.',
+          'Call storymap_get before structural edits or release planning so you can preserve activity, task, story, and release ordering.',
+          'Use story_update for content or status changes; use story_move/task_move for placement changes; use *_reorder only when you already know the full ordered ID list.',
+          'Use story_context_get only when one story needs full implementation context, including workflow placement, personas, and any Figma link.',
+          'Avoid redundant reads: if you already have the needed story or map context in the current session, continue working instead of re-fetching it.',
+          'Treat inferred requirements, acceptance criteria, personas, and release plans as drafts unless the user explicitly asks you to synthesize them.',
+        ],
+        story_mapping_principles: [
+          'Keep the backbone as user workflow steps in narrative order, not engineering components or team ownership lanes.',
+          'Place tasks under activities as user tasks, then slice stories into thin end-to-end increments that deliver observable value.',
+          'Use releases as usable learning increments or backlog separation, not internal implementation phases.',
+          'Keep personas lightweight and only use them when they materially change workflow, story selection, or acceptance criteria.',
+        ],
+        release_rules: [
+          'release_id = null means backlog. Do not invent releases prematurely when backlog is the more honest state.',
+          'When building an entire release, use storymap_get to inspect all stories in that release before choosing implementation order.',
+          'Favor a walking skeleton or critical-path release slice before adding breadth, polish, or component completeness.',
+        ],
+        story_quality_checklist: [
+          'Title expresses user-visible value or outcome, not just an implementation task.',
+          'Requirements describe what should happen.',
+          'Acceptance criteria are specific, observable, and testable.',
+          'Edge cases and technical guidelines are included when they materially reduce ambiguity or implementation risk.',
+          'If a Figma link is present, treat it as required design context for UI work.',
+        ],
+        figma_rules: [
+          'When a story includes a figma_link, prefer using the Figma MCP server if it is connected to the current agent session.',
+          'Use figma_get_design_context first when possible, then figma_get_screenshot if a visual check is still needed.',
+          'Do not invent UI details that the linked design can answer directly.',
+        ],
+        anti_patterns: [
+          'Do not reorganize a story map around frontend/backend/database components.',
+          'Do not create giant unsliced stories when thinner end-to-end slices are possible.',
+          'Do not delete and recreate entities when move/update preserves history and ordering more safely.',
+          'Do not treat personas as decorative metadata if they do not change decisions.',
+        ],
+        verification_checklist: [
+          'Backbone still reads as a coherent user journey from left to right.',
+          'Task ordering within each activity still matches workflow order.',
+          'Stories are in the correct task and release cell, including backlog vs named release.',
+          'Release rows still represent usable increments rather than internal implementation phases.',
+          'Any story with a figma_link has enough design context for implementation.',
         ],
       });
     }),
@@ -346,11 +600,21 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         return errorResult('Failed to load personas', describeDbError(personasResult.error));
       }
 
-      return successResult({
+      const data = {
         ...mapResult.data,
         activities: activitiesResult.data ?? [],
         releases: releasesResult.data ?? [],
         personas: personasResult.data ?? [],
+      };
+
+      return successResult({
+        ...data,
+        agent_insights: buildStoryMapInsights({
+          map: data,
+          activities: data.activities,
+          releases: data.releases,
+          personas: data.personas,
+        }),
       });
     }),
   );
@@ -422,7 +686,14 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       const { data, error } = await createActivity(supabase, input);
 
       if (error) return errorResult('Failed to create activity', describeDbError(error));
-      return successResult(data);
+      return successResult({
+        ...data,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'activity',
+          operation: 'create',
+          entity: data,
+        }),
+      });
     }),
   );
 
@@ -448,7 +719,14 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         if (isNotFound(error)) return errorResult('Activity not found');
         return errorResult('Failed to update activity', describeDbError(error));
       }
-      return successResult(data);
+      return successResult({
+        ...data,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'activity',
+          operation: 'update',
+          entity: data,
+        }),
+      });
     }),
   );
 
@@ -487,7 +765,14 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       const { error } = await reorderActivities(supabase, { story_map_id, order });
 
       if (error) return errorResult('Failed to reorder activities', describeDbError(error));
-      return successResult({ reordered: order.length });
+      return successResult({
+        reordered: order.length,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'activity',
+          operation: 'reorder',
+          ids: { story_map_id },
+        }),
+      });
     }),
   );
 
@@ -504,7 +789,14 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       const { data, error } = await createTask(supabase, input);
 
       if (error) return errorResult('Failed to create task', describeDbError(error));
-      return successResult(data);
+      return successResult({
+        ...data,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'task',
+          operation: 'create',
+          entity: data,
+        }),
+      });
     }),
   );
 
@@ -530,7 +822,14 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         if (isNotFound(error)) return errorResult('Task not found');
         return errorResult('Failed to update task', describeDbError(error));
       }
-      return successResult(data);
+      return successResult({
+        ...data,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'task',
+          operation: 'update',
+          entity: data,
+        }),
+      });
     }),
   );
 
@@ -569,7 +868,14 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       const { error } = await reorderTasks(supabase, { activity_id, order });
 
       if (error) return errorResult('Failed to reorder tasks', describeDbError(error));
-      return successResult({ reordered: order.length });
+      return successResult({
+        reordered: order.length,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'task',
+          operation: 'reorder',
+          ids: { activity_id },
+        }),
+      });
     }),
   );
 
@@ -589,7 +895,16 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       const { error } = await moveTask(supabase, task_id, input);
 
       if (error) return errorResult('Failed to move task', describeDbError(error));
-      return successResult({ moved: task_id });
+      return successResult({
+        moved: task_id,
+        target_activity_id: input.target_activity_id,
+        target_order_size: input.target_order.length,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'task',
+          operation: 'move',
+          ids: { task_id, target_activity_id: input.target_activity_id },
+        }),
+      });
     }),
   );
 
@@ -606,7 +921,14 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       const { data, error } = await createRelease(supabase, input);
 
       if (error) return errorResult('Failed to create release', describeDbError(error));
-      return successResult(data);
+      return successResult({
+        ...data,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'release',
+          operation: 'create',
+          entity: data,
+        }),
+      });
     }),
   );
 
@@ -632,7 +954,14 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         if (isNotFound(error)) return errorResult('Release not found');
         return errorResult('Failed to update release', describeDbError(error));
       }
-      return successResult(data);
+      return successResult({
+        ...data,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'release',
+          operation: 'update',
+          entity: data,
+        }),
+      });
     }),
   );
 
@@ -671,7 +1000,14 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       const { error } = await reorderReleases(supabase, { story_map_id, order });
 
       if (error) return errorResult('Failed to reorder releases', describeDbError(error));
-      return successResult({ reordered: order.length });
+      return successResult({
+        reordered: order.length,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'release',
+          operation: 'reorder',
+          ids: { story_map_id },
+        }),
+      });
     }),
   );
 
@@ -693,7 +1029,11 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         if (isNotFound(error)) return errorResult('Story not found');
         return errorResult('Failed to load story', describeDbError(error));
       }
-      return successResult(data);
+      const context = await getStoryContext(supabase, story_id);
+      return successResult({
+        ...data,
+        agent_context: context,
+      });
     }),
   );
 
@@ -710,7 +1050,15 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       const { data, error } = await createStory(supabase, input);
 
       if (error) return errorResult('Failed to create story', describeDbError(error));
-      return successResult(data);
+      return successResult({
+        ...data,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'story',
+          operation: 'create',
+          ids: { story_id: data.id, task_id: data.task_id, release_id: data.release_id },
+          entity: data,
+        }),
+      });
     }),
   );
 
@@ -737,7 +1085,15 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         if (isNotFound(error)) return errorResult('Story not found');
         return errorResult('Failed to update story', describeDbError(error));
       }
-      return successResult(data);
+      return successResult({
+        ...data,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'story',
+          operation: 'update',
+          ids: { story_id: data.id, task_id: data.task_id, release_id: data.release_id },
+          entity: data,
+        }),
+      });
     }),
   );
 
@@ -777,7 +1133,16 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       const { error } = await reorderStories(supabase, { task_id, release_id, order });
 
       if (error) return errorResult('Failed to reorder stories', describeDbError(error));
-      return successResult({ reordered: order.length });
+      return successResult({
+        reordered: order.length,
+        task_id,
+        release_id,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'story',
+          operation: 'reorder',
+          ids: { task_id, release_id },
+        }),
+      });
     }),
   );
 
@@ -797,7 +1162,17 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       const { error } = await moveStory(supabase, story_id, input);
 
       if (error) return errorResult('Failed to move story', describeDbError(error));
-      return successResult({ moved: story_id });
+      return successResult({
+        moved: story_id,
+        target_task_id: input.target_task_id,
+        target_release_id: input.target_release_id,
+        target_order_size: input.target_order.length,
+        agent_guidance: buildMutationGuidance({
+          entityType: 'story',
+          operation: 'move',
+          ids: { story_id, task_id: input.target_task_id, release_id: input.target_release_id },
+        }),
+      });
     }),
   );
 
@@ -892,7 +1267,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     {
       title: 'Get Story Context',
       description:
-        'Coding-focused context for one story. Use after selecting a story via storymap_get, not as full-map discovery.',
+        'Full implementation context for one story, including workflow placement, personas, and Figma hints when present. Use after selecting a story via storymap_get.',
       inputSchema: {
         story_id: z.string().uuid().describe('BeemSpec story UUID'),
       },

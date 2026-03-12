@@ -2,6 +2,7 @@
 
 import { createContent, type StoryContent } from '@beemspec/storymap';
 import { useEffect, useState } from 'react';
+import { AgentKickoffButton, buildStoryKickoffPrompt } from '@/components/story-map/AgentKickoffButton';
 import { STATUS_OPTIONS } from '@/components/story-map/story-status';
 import { Button } from '@/components/ui/button';
 import { DeleteButton } from '@/components/ui/delete-button';
@@ -24,6 +25,8 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   story: Story | null;
   releases: Release[];
+  storyMapId: string;
+  storyMapName: string;
   defaultReleaseId?: string | null;
   onSave: (story: Partial<StoryFormData>) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
@@ -31,7 +34,17 @@ interface Props {
 
 const NO_RELEASE = '__none__';
 
-export function StoryDialog({ open, onOpenChange, story, releases, defaultReleaseId, onSave, onDelete }: Props) {
+export function StoryDialog({
+  open,
+  onOpenChange,
+  story,
+  releases,
+  storyMapId,
+  storyMapName,
+  defaultReleaseId,
+  onSave,
+  onDelete,
+}: Props) {
   const [title, setTitle] = useState('');
   const [requirements, setRequirements] = useState('');
   const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
@@ -183,7 +196,7 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-4 sm:hidden">
             <div className="space-y-2">
               <Label>Status</Label>
               <Select value={status} onValueChange={(v) => setStatus(v as StoryStatus)} disabled={isSubmitting}>
@@ -216,17 +229,78 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          <div className="flex justify-between pt-4">
-            {onDelete && (
-              <DeleteButton
-                onDelete={handleDelete}
-                confirmTitle="Delete story?"
-                confirmDescription="This story will be permanently deleted."
-                loading={isSubmitting}
+            {story && (
+              <AgentKickoffButton
+                prompt={buildStoryKickoffPrompt({ storyMapId, storyMapName, story })}
+                label="Copy Agent Prompt"
+                tooltip="Copy agent kickoff prompt for this story"
+                variant="ghost"
+                size="default"
               />
             )}
+          </div>
+
+          <div className="hidden sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:grid-rows-[auto_auto] sm:items-start sm:gap-x-4 sm:gap-y-2">
+            <Label className="sm:col-start-1 sm:row-start-1">Status</Label>
+            <Label className="sm:col-start-2 sm:row-start-1">Release</Label>
+            {story && <div className="sm:col-start-3 sm:row-start-1" aria-hidden="true" />}
+
+            <div className="sm:col-start-1 sm:row-start-2">
+              <Select value={status} onValueChange={(v) => setStatus(v as StoryStatus)} disabled={isSubmitting}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="min-w-0 sm:col-start-2 sm:row-start-2">
+              <Select value={releaseId} onValueChange={setReleaseId} disabled={isSubmitting}>
+                <SelectTrigger className="w-full min-w-0">
+                  <SelectValue placeholder="No release" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_RELEASE}>No release</SelectItem>
+                  {releases.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {story && (
+              <div className="shrink-0 sm:col-start-3 sm:row-start-2 sm:self-start">
+                <AgentKickoffButton
+                  prompt={buildStoryKickoffPrompt({ storyMapId, storyMapName, story })}
+                  label="Copy Agent Prompt"
+                  tooltip="Copy agent kickoff prompt for this story"
+                  variant="ghost"
+                  size="default"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-end justify-between pt-4">
+            <div className="flex items-center gap-2">
+              {onDelete && (
+                <DeleteButton
+                  onDelete={handleDelete}
+                  confirmTitle="Delete story?"
+                  confirmDescription="This story will be permanently deleted."
+                  loading={isSubmitting}
+                />
+              )}
+            </div>
             <div className="ml-auto flex gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancel

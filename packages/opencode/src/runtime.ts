@@ -38,13 +38,25 @@ interface StoryRow {
   content?: {
     requirements?: string;
     acceptance_criteria?: string;
+    edge_cases?: string | null;
     technical_guidelines?: string | null;
+    figma_link?: string | null;
   };
 }
 
 interface StoryMapToolResult {
+  releases?: Array<{
+    id: string;
+    name: string;
+  }>;
+  personas?: Array<{
+    name: string;
+    goals?: string | null;
+  }>;
   activities?: Array<{
+    name?: string;
     tasks?: Array<{
+      name?: string;
       stories?: StoryRow[];
     }>;
   }>;
@@ -98,6 +110,7 @@ async function callMcpStoryMapGet(): Promise<StoryMapToolResult | null> {
 
 function toSessionStories(toolResult: StoryMapToolResult): OpenCodeSessionContext[] {
   const releaseId = getTargetReleaseId();
+  const releaseNames = new Map((toolResult.releases ?? []).map((release) => [release.id, release.name]));
   const stories: OpenCodeSessionContext[] = [];
 
   for (const activity of toolResult.activities ?? []) {
@@ -108,11 +121,16 @@ function toSessionStories(toolResult: StoryMapToolResult): OpenCodeSessionContex
 
         stories.push({
           releaseId: story.release_id ?? '',
+          releaseName: story.release_id ? (releaseNames.get(story.release_id) ?? null) : null,
           storyId: story.id,
           storyTitle: story.title,
+          activityName: activity.name ?? '',
+          taskName: task.name ?? '',
           requirements: story.content?.requirements ?? '',
           acceptanceCriteria: story.content?.acceptance_criteria ?? '',
+          edgeCases: story.content?.edge_cases ?? null,
           technicalGuidelines: story.content?.technical_guidelines ?? null,
+          figmaLink: story.content?.figma_link ?? null,
         });
       }
     }
@@ -125,11 +143,20 @@ export const BeemSpecPlugin: Plugin = async () => {
   return {
     'experimental.session.compacting': async (_input, output) => {
       output.context.push(
-        'BeemSpec workflow: call MCP tool storymap_get first, then story_context_get per story before coding.',
+        'BeemSpec workflow: use storymap_get for whole-map or release planning, then use story_context_get only for the specific story you are implementing or deeply refining.',
       );
 
       const toolResult = await callMcpStoryMapGet();
       if (!toolResult) return;
+
+      if ((toolResult.personas ?? []).length > 0) {
+        const personaSummary = toolResult.personas
+          ?.map((persona) => `${persona.name}${persona.goals ? ` - Goals: ${persona.goals}` : ''}`)
+          .join(' | ');
+        if (personaSummary) {
+          output.context.push(`BeemSpec personas: ${personaSummary}`);
+        }
+      }
 
       const stories = toSessionStories(toolResult);
       if (stories.length === 0) return;

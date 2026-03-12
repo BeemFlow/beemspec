@@ -37,7 +37,7 @@ Legend:
 | Persona list/create/update | Yes (`persona_list/create/update`) | Partial (`POST /api/personas`, `PUT /api/personas/[id]`) | REST has no dedicated persona list route. |
 | Persona delete | Yes (`persona_delete`) | Yes (`DELETE /api/personas/[id]`) | Parity. |
 | Agent workflow guide | Yes (`storymap_workflow_guide`) | No | MCP-only agent helper. |
-| Agent coding context | Yes (`story_context_get`) | No equivalent | MCP-only coding-context helper. |
+| Agent coding context | Yes (`story_context_get`) | No equivalent | MCP-only story implementation helper; now includes backlog stories, workflow placement, personas, and Figma hints when present. |
 | Team admin (members/invites/settings/delete team) | No | Yes (`/api/teams/[id]/*`) | API-only operational/admin surface. |
 | Linear OAuth/webhook/sync management | No | Yes (`/api/integrations/linear/*`, `/api/story-maps/[id]/integrations/linear/*`) | API-only integration surface. |
 | MCP OAuth endpoints | Transport/auth support | N/A | Uses Supabase OAuth server (`https://<project-ref>.supabase.co/auth/v1`) discovered via protected-resource metadata. Consent UI is app-hosted at `/oauth/consent` and submits decisions to `/oauth/decision`. |
@@ -56,10 +56,11 @@ Legend:
 1. Authenticate client (Bearer or MCP OAuth).
 2. `team_list` (only when team is unknown / multi-team context).
 3. `storymap_list`.
-4. `storymap_get` for full graph context.
-5. `story_context_get` for selected story before implementation.
-6. Mutate with focused tools (`story_update`, move/reorder/create as needed).
-7. `storymap_get` again to verify final state.
+4. `storymap_get` once for full graph context when planning a release, choosing work, or making structural edits.
+5. `story_context_get` only for the selected story being implemented or deeply refined.
+6. If the story includes a Figma link and the agent session has Figma MCP connected, fetch Figma design context before UI implementation.
+7. Mutate with focused tools (`story_update`, move/reorder/create as needed).
+8. `storymap_get` again only after a structural mutation batch or changed release-planning context.
 
 ### API-first (app/integration/backend)
 

@@ -11,11 +11,11 @@ It does not inject custom tools. BeemSpec tools are served by the app's HTTP MCP
 The BeemSpec MCP endpoint exposes full story map management operations:
 
 - Workflow helper: `storymap_workflow_guide`
-- Story maps: list/get/create/update/delete
+- Story maps: list/get/create/update (`delete` remains API-only)
 - Activities: create/update/delete/reorder
-- Tasks: create/update/delete/reorder
+- Tasks: create/update/delete/reorder/move
 - Releases: create/update/delete/reorder
-- Stories: get/create/update/delete/reorder
+- Stories: get/create/update/delete/reorder/move
 - Personas: list/create/update/delete
 - Build agent helper: `story_context_get`
 
@@ -74,4 +74,4 @@ Optional:
 - `BEEMSPEC_MCP_URL` (defaults to `${BEEMSPEC_API_URL}/api/mcp`)
 - `BEEMSPEC_RELEASE_ID` (limit compaction to one release)
 
-The plugin calls MCP `tools/call` with `storymap_get` on each compaction to pull the latest story data instead of relying on local cache.
+The plugin calls MCP `tools/call` with `storymap_get` on each compaction to pull fresh planning context instead of relying on local cache.
