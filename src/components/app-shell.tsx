@@ -1,9 +1,9 @@
 'use client';
 
 import { Check, ChevronDown, LogOut, Plus, Settings, User } from 'lucide-react';
-import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { Logo } from '@/components/logo';
 import { TeamSettingsDialog } from '@/components/team-settings-dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -75,12 +75,7 @@ export function AppShell({ children, userEmail }: AppShellProps) {
       <header className="border-b bg-background">
         <div className="flex h-[var(--header-height)] items-center justify-between px-4">
           {/* Left: Logo */}
-          <Link href="/" className="flex items-center">
-            {/* prettier-ignore */}
-            <span className="font-mono font-medium text-[15px] tracking-[-0.01em]">
-              beemspec<span className="text-primary -ml-[0.08em]">.</span>
-            </span>
-          </Link>
+          <Logo />
 
           {/* Right: Team Selector + User Menu */}
           <div className="flex items-center gap-3">

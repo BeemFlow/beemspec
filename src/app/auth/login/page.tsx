@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
+import { Logo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -65,9 +66,12 @@ function AuthForm() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold">{isLogin ? 'Welcome back' : 'Create an account'}</h1>
+          <Logo
+            className="mb-6 inline-flex items-center justify-center"
+            wordmarkClassName="font-mono text-4xl font-medium tracking-[-0.02em] sm:text-5xl"
+          />
           <p className="mt-2 text-sm text-muted-foreground">
-            {isLogin ? 'Sign in to your account' : 'Get started with BeemSpec'}
+            {isLogin ? 'Welcome back.' : 'Get started with BeemSpec'}
           </p>
         </div>
 
