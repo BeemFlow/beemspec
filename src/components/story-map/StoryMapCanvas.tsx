@@ -184,7 +184,85 @@ export function StoryMapCanvas({
     await fetchJson(url, init, fallbackMessage);
   }
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Drag-drop handler must branch on entity types (activity, task, story) and drop targets - complexity is inherent to multi-type DnD
+  async function persistDragChange(url: string, body: unknown, fallbackMessage: string): Promise<void> {
+    await performRequest(
+      url,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+      fallbackMessage,
+    );
+
+    setDragError(null);
+    onRefresh();
+  }
+
+  async function handleActivityDrop(activeActivityId: string, overActivityId: string): Promise<void> {
+    const newOrder = reorderItems(
+      sortedActivities.map((activity) => activity.id),
+      activeActivityId,
+      overActivityId,
+    );
+
+    await persistDragChange(
+      '/api/activities',
+      { story_map_id: storyMap.id, order: newOrder },
+      'Failed to reorder activities',
+    );
+  }
+
+  async function handleTaskDrop(
+    activeTaskId: string,
+    overTarget: Extract<DragId, { type: 'task' | 'task-end' }>,
+  ): Promise<void> {
+    const targetActivityId =
+      overTarget.type === 'task'
+        ? allTasksOrdered.find((task) => task.id === overTarget.id)?.activityId
+        : overTarget.activityId;
+    if (!targetActivityId) return;
+
+    const newOrder = reorderItems(
+      getTasksForActivity(targetActivityId).map((task) => task.id),
+      activeTaskId,
+      overTarget.type === 'task' ? overTarget.id : undefined,
+    );
+
+    await persistDragChange(
+      `/api/tasks/${activeTaskId}/move`,
+      { target_activity_id: targetActivityId, target_order: newOrder },
+      'Failed to move task',
+    );
+  }
+
+  async function handleStoryDrop(
+    activeStoryId: string,
+    overTarget: Extract<DragId, { type: 'story' | 'story-end' }>,
+  ): Promise<void> {
+    const targetCell =
+      overTarget.type === 'story'
+        ? sortedStories.find((story) => story.id === overTarget.id)
+        : { task_id: overTarget.taskId, release_id: overTarget.releaseId };
+    if (!targetCell) return;
+
+    const newOrder = reorderItems(
+      getStoriesForCell(targetCell.task_id, targetCell.release_id).map((story) => story.id),
+      activeStoryId,
+      overTarget.type === 'story' ? overTarget.id : undefined,
+    );
+
+    await persistDragChange(
+      `/api/stories/${activeStoryId}/move`,
+      {
+        target_task_id: targetCell.task_id,
+        target_release_id: targetCell.release_id,
+        target_order: newOrder,
+      },
+      'Failed to move story',
+    );
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     setActiveDrag(null);
@@ -200,146 +278,19 @@ export function StoryMapCanvas({
     if (!activeParsed || !overParsed) return;
 
     try {
-      // Activity reordering
       if (activeParsed.type === 'activity' && overParsed.type === 'activity') {
-        const newOrder = reorderItems(
-          sortedActivities.map((a) => a.id),
-          activeParsed.id,
-          overParsed.id,
-        );
-
-        await performRequest(
-          '/api/activities',
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ story_map_id: storyMap.id, order: newOrder }),
-          },
-          'Failed to reorder activities',
-        );
-
-        setDragError(null);
-        onRefresh();
+        await handleActivityDrop(activeParsed.id, overParsed.id);
         return;
       }
 
-      // Task movement
-      if (activeParsed.type === 'task') {
-        const activeTask = allTasksOrdered.find((t) => t.id === activeParsed.id);
-        if (!activeTask) return;
-
-        if (overParsed.type === 'task') {
-          const overTask = allTasksOrdered.find((t) => t.id === overParsed.id);
-          if (!overTask) return;
-
-          const targetActivityId = overTask.activityId;
-          const tasksInTarget = getTasksForActivity(targetActivityId);
-          const newOrder = reorderItems(
-            tasksInTarget.map((t) => t.id),
-            activeParsed.id,
-            overParsed.id,
-          );
-
-          await performRequest(
-            `/api/tasks/${activeParsed.id}/move`,
-            {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ target_activity_id: targetActivityId, target_order: newOrder }),
-            },
-            'Failed to move task',
-          );
-
-          setDragError(null);
-          onRefresh();
-          return;
-        }
-
-        if (overParsed.type === 'task-end') {
-          const targetActivityId = overParsed.activityId;
-          const tasksInTarget = getTasksForActivity(targetActivityId);
-          const newOrder = reorderItems(
-            tasksInTarget.map((t) => t.id),
-            activeParsed.id,
-          );
-
-          await performRequest(
-            `/api/tasks/${activeParsed.id}/move`,
-            {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ target_activity_id: targetActivityId, target_order: newOrder }),
-            },
-            'Failed to move task',
-          );
-
-          setDragError(null);
-          onRefresh();
-          return;
-        }
+      if (activeParsed.type === 'task' && (overParsed.type === 'task' || overParsed.type === 'task-end')) {
+        await handleTaskDrop(activeParsed.id, overParsed);
+        return;
       }
 
-      // Story movement
-      if (activeParsed.type === 'story') {
-        const activeStory = sortedStories.find((s) => s.id === activeParsed.id);
-        if (!activeStory) return;
-
-        if (overParsed.type === 'story') {
-          const overStory = sortedStories.find((s) => s.id === overParsed.id);
-          if (!overStory) return;
-
-          const targetStories = getStoriesForCell(overStory.task_id, overStory.release_id);
-          const newOrder = reorderItems(
-            targetStories.map((s) => s.id),
-            activeParsed.id,
-            overParsed.id,
-          );
-
-          await performRequest(
-            `/api/stories/${activeParsed.id}/move`,
-            {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                target_task_id: overStory.task_id,
-                target_release_id: overStory.release_id,
-                target_order: newOrder,
-              }),
-            },
-            'Failed to move story',
-          );
-
-          setDragError(null);
-          onRefresh();
-          return;
-        }
-
-        if (overParsed.type === 'story-end') {
-          const { taskId, releaseId } = overParsed;
-          const targetStories = getStoriesForCell(taskId, releaseId);
-          const newOrder = reorderItems(
-            targetStories.map((s) => s.id),
-            activeParsed.id,
-          );
-
-          await performRequest(
-            `/api/stories/${activeParsed.id}/move`,
-            {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                target_task_id: taskId,
-                target_release_id: releaseId,
-                target_order: newOrder,
-              }),
-            },
-            'Failed to move story',
-          );
-
-          setDragError(null);
-          onRefresh();
-          return;
-        }
+      if (activeParsed.type === 'story' && (overParsed.type === 'story' || overParsed.type === 'story-end')) {
+        await handleStoryDrop(activeParsed.id, overParsed);
+        return;
       }
     } catch (err) {
       const message = errorMessage(err);

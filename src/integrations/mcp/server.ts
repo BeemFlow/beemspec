@@ -121,6 +121,21 @@ function withToolErrorBoundary<Input>(name: string, handler: ToolCall<Input>): T
   };
 }
 
+function validateToolInput<T>(
+  schema: z.ZodSchema<T>,
+  input: unknown,
+): { ok: true; data: T } | { ok: false; result: ReturnType<typeof errorResult> } {
+  const parsed = schema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      result: errorResult('Validation failed', parsed.error.flatten()),
+    };
+  }
+
+  return { ok: true, data: parsed.data };
+}
+
 const readAnnotations = {
   readOnlyHint: true,
   idempotentHint: true,
@@ -415,7 +430,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     'activity_update',
     {
       title: 'Update Activity',
-      description: 'Update activity fields (name/description/sort_order). Use when ID is already known.',
+      description: 'Update activity fields like name or description. Use reorder tools for position changes.',
       inputSchema: {
         activity_id: z.string().uuid(),
         ...updateActivitySchema.shape,
@@ -423,8 +438,11 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('activity_update', async ({ activity_id, ...changes }) => {
+      const validation = validateToolInput(updateActivitySchema, changes);
+      if (!validation.ok) return validation.result;
+
       const supabase = getUserScopedClient();
-      const { data, error } = await updateActivity(supabase, activity_id, changes);
+      const { data, error } = await updateActivity(supabase, activity_id, validation.data);
 
       if (error) {
         if (isNotFound(error)) return errorResult('Activity not found');
@@ -494,7 +512,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     'task_update',
     {
       title: 'Update Task',
-      description: 'Update task fields (name/description/sort_order/activity_id). Use when task ID is known.',
+      description: 'Update task fields like name or description. Use move/reorder tools for position changes.',
       inputSchema: {
         task_id: z.string().uuid(),
         ...updateTaskSchema.shape,
@@ -502,8 +520,11 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('task_update', async ({ task_id, ...changes }) => {
+      const validation = validateToolInput(updateTaskSchema, changes);
+      if (!validation.ok) return validation.result;
+
       const supabase = getUserScopedClient();
-      const { data, error } = await updateTask(supabase, task_id, changes);
+      const { data, error } = await updateTask(supabase, task_id, validation.data);
 
       if (error) {
         if (isNotFound(error)) return errorResult('Task not found');
@@ -593,7 +614,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     'release_update',
     {
       title: 'Update Release',
-      description: 'Update release fields (name/description/sort_order).',
+      description: 'Update release fields like name or description. Use reorder tools for position changes.',
       inputSchema: {
         release_id: z.string().uuid(),
         ...updateReleaseSchema.shape,
@@ -601,8 +622,11 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('release_update', async ({ release_id, ...changes }) => {
+      const validation = validateToolInput(updateReleaseSchema, changes);
+      if (!validation.ok) return validation.result;
+
       const supabase = getUserScopedClient();
-      const { data, error } = await updateRelease(supabase, release_id, changes);
+      const { data, error } = await updateRelease(supabase, release_id, validation.data);
 
       if (error) {
         if (isNotFound(error)) return errorResult('Release not found');
@@ -694,7 +718,8 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     'story_update',
     {
       title: 'Update Story',
-      description: 'Update story fields/status/placement. Use to move between releases or change execution state.',
+      description:
+        'Update story fields like title, status, or content. Use story_move for task/release placement changes.',
       inputSchema: {
         story_id: z.string().uuid(),
         ...updateStorySchema.shape,
@@ -702,8 +727,11 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('story_update', async ({ story_id, ...changes }) => {
+      const validation = validateToolInput(updateStorySchema, changes);
+      if (!validation.ok) return validation.result;
+
       const supabase = getUserScopedClient();
-      const { data, error } = await updateStory(supabase, story_id, changes);
+      const { data, error } = await updateStory(supabase, story_id, validation.data);
 
       if (error) {
         if (isNotFound(error)) return errorResult('Story not found');
@@ -813,7 +841,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     'persona_update',
     {
       title: 'Update Persona',
-      description: 'Update persona fields (name/description/goals/sort_order).',
+      description: 'Update persona fields like name, description, or goals.',
       inputSchema: {
         persona_id: z.string().uuid(),
         ...updatePersonaSchema.shape,
@@ -821,8 +849,11 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('persona_update', async ({ persona_id, ...changes }) => {
+      const validation = validateToolInput(updatePersonaSchema, changes);
+      if (!validation.ok) return validation.result;
+
       const supabase = getUserScopedClient();
-      const { data, error } = await updatePersona(supabase, persona_id, changes);
+      const { data, error } = await updatePersona(supabase, persona_id, validation.data);
 
       if (error) {
         if (isNotFound(error)) return errorResult('Persona not found');

@@ -45,7 +45,7 @@ export async function getStoryMapGraph(
       .order('sort_order', { referencedTable: 'tasks.stories' }),
     supabase.from('releases').select('*').eq('story_map_id', storyMapId).order('sort_order'),
     includePersonas
-      ? supabase.from('personas').select('*').eq('story_map_id', storyMapId).order('sort_order')
+      ? supabase.from('personas').select('*').eq('story_map_id', storyMapId).order('created_at')
       : Promise.resolve({ data: [], error: null }),
   ]);
 
@@ -290,7 +290,7 @@ export async function moveStory(supabase: Supabase, storyId: string, input: Move
 }
 
 export async function listPersonas(supabase: Supabase, storyMapId: string) {
-  return supabase.from('personas').select('*').eq('story_map_id', storyMapId).order('sort_order');
+  return supabase.from('personas').select('*').eq('story_map_id', storyMapId).order('created_at');
 }
 
 export async function createPersona(supabase: Supabase, input: CreatePersona) {
@@ -307,27 +307,7 @@ export async function createPersona(supabase: Supabase, input: CreatePersona) {
 }
 
 export async function updatePersona(supabase: Supabase, personaId: string, changes: UpdatePersona) {
-  const { sort_order, ...rest } = changes;
-  const updateFields = pickDefined(rest);
-
-  if (Object.keys(updateFields).length > 0) {
-    const metadataUpdate = await supabase.from('personas').update(updateFields).eq('id', personaId);
-    if (metadataUpdate.error) {
-      return { data: null, error: metadataUpdate.error };
-    }
-  }
-
-  if (typeof sort_order === 'number') {
-    const reorderResult = await supabase.rpc('move_persona_to_sort_order', {
-      p_persona_id: personaId,
-      p_target_sort_order: sort_order,
-    });
-    if (reorderResult.error) {
-      return { data: null, error: reorderResult.error };
-    }
-  }
-
-  return supabase.from('personas').select('*').eq('id', personaId).single();
+  return supabase.from('personas').update(pickDefined(changes)).eq('id', personaId).select().single();
 }
 
 export async function deletePersona(supabase: Supabase, personaId: string) {

@@ -387,4 +387,72 @@ describe('mcp server', () => {
       target_order: ['d7f34189-5d27-4dc0-b2c5-23d11796add4'],
     });
   });
+
+  it('rejects parent changes through task_update tool input validation', async () => {
+    const fakeSupabase = { from: vi.fn(), rpc: vi.fn() } as never;
+    const updateTaskSpy = vi.spyOn(storymapService, 'updateTask');
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 10,
+        method: 'tools/call',
+        params: {
+          name: 'task_update',
+          arguments: {
+            task_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+            activity_id: '34e8bb98-8f40-4331-8df2-8f83fd8c7af4',
+          },
+        },
+      }),
+      fakeSupabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      result: {
+        isError: boolean;
+        structuredContent: { ok: boolean; error: string; details?: unknown };
+      };
+    };
+    expect(payload.result.isError).toBe(true);
+    expect(payload.result.structuredContent.ok).toBe(false);
+    expect(payload.result.structuredContent.error).toBe('Validation failed');
+    expect(updateTaskSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects placement changes through story_update tool input validation', async () => {
+    const fakeSupabase = { from: vi.fn(), rpc: vi.fn() } as never;
+    const updateStorySpy = vi.spyOn(storymapService, 'updateStory');
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 11,
+        method: 'tools/call',
+        params: {
+          name: 'story_update',
+          arguments: {
+            story_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+            release_id: null,
+          },
+        },
+      }),
+      fakeSupabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      result: {
+        isError: boolean;
+        structuredContent: { ok: boolean; error: string; details?: unknown };
+      };
+    };
+    expect(payload.result.isError).toBe(true);
+    expect(payload.result.structuredContent.ok).toBe(false);
+    expect(payload.result.structuredContent.error).toBe('Validation failed');
+    expect(updateStorySpy).not.toHaveBeenCalled();
+  });
 });
