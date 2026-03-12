@@ -40,6 +40,7 @@ import type { Activity, Story, StoryMapFull, Task, TaskWithStories } from '@/typ
  */
 type DragId =
   | { type: 'activity'; id: string }
+  | { type: 'activity-end'; afterActivityId: string }
   | { type: 'task'; id: string }
   | { type: 'story'; id: string }
   | { type: 'task-end'; activityId: string }
@@ -51,6 +52,8 @@ function encodeDragId(dragId: DragId): string {
   switch (dragId.type) {
     case 'activity':
       return `activity:${dragId.id}`;
+    case 'activity-end':
+      return `activity-end:${dragId.afterActivityId}`;
     case 'task':
       return `task:${dragId.id}`;
     case 'story':
@@ -71,6 +74,8 @@ function parseDragId(encoded: string): DragId | null {
   switch (type) {
     case 'activity':
       return parts[1] ? { type: 'activity', id: parts[1] } : null;
+    case 'activity-end':
+      return parts[1] ? { type: 'activity-end', afterActivityId: parts[1] } : null;
     case 'task':
       return parts[1] ? { type: 'task', id: parts[1] } : null;
     case 'story':
@@ -346,11 +351,20 @@ export function StoryMapCanvas({
     }
   }
 
-  async function handleActivityDrop(activeActivityId: string, overActivityId: string): Promise<void> {
+  async function handleActivityDrop(
+    activeActivityId: string,
+    overTarget: Extract<DragId, { type: 'activity' | 'activity-end' }>,
+  ): Promise<void> {
+    const targetId =
+      overTarget.type === 'activity'
+        ? overTarget.id
+        : sortedActivities[sortedActivities.findIndex((activity) => activity.id === overTarget.afterActivityId) + 1]
+            ?.id;
+
     const newOrder = reorderItems(
       sortedActivities.map((activity) => activity.id),
       activeActivityId,
-      overActivityId,
+      targetId,
     );
 
     await persistDragChange(
@@ -428,8 +442,8 @@ export function StoryMapCanvas({
     if (!activeParsed || !overParsed) return;
 
     try {
-      if (activeParsed.type === 'activity' && overParsed.type === 'activity') {
-        await handleActivityDrop(activeParsed.id, overParsed.id);
+      if (activeParsed.type === 'activity' && (overParsed.type === 'activity' || overParsed.type === 'activity-end')) {
+        await handleActivityDrop(activeParsed.id, overParsed);
         return;
       }
 
@@ -503,11 +517,10 @@ export function StoryMapCanvas({
                     onClick={() => onEditActivity(activity)}
                     showIndicator={isDropTarget(encodeDragId({ type: 'activity', id: activity.id }))}
                   />
-                  <AddButton
-                    label="Activity"
-                    orientation="vertical"
-                    style={{ width: ADD_BUTTON_WIDTH, height: CARD_HEIGHT }}
-                    onClick={onAddActivity}
+                  <AddActivityDropZone
+                    afterActivityId={activity.id}
+                    onAddActivity={onAddActivity}
+                    showIndicator={isDropTarget(encodeDragId({ type: 'activity-end', afterActivityId: activity.id }))}
                   />
                 </div>
               );
@@ -615,6 +628,33 @@ export function StoryMapCanvas({
         )}
       </DragOverlay>
     </DndContext>
+  );
+}
+
+function AddActivityDropZone({
+  afterActivityId,
+  onAddActivity,
+  showIndicator,
+}: {
+  afterActivityId: string;
+  onAddActivity: () => void;
+  showIndicator: boolean;
+}) {
+  const { setNodeRef } = useDroppable({
+    id: encodeDragId({ type: 'activity-end', afterActivityId }),
+  });
+
+  return (
+    <div className="flex gap-1">
+      {showIndicator && <DropLine direction="vertical" />}
+      <AddButton
+        ref={setNodeRef}
+        label="Activity"
+        orientation="vertical"
+        style={{ width: ADD_BUTTON_WIDTH, height: CARD_HEIGHT }}
+        onClick={onAddActivity}
+      />
+    </div>
   );
 }
 
