@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLinearOAuthConnectionForTeam, isExpired } from '@/integrations/linear/connections';
+import { resolveLinearAuthTokenForTeam } from '@/integrations/linear/auth';
+import { getLinearOAuthConnectionForTeam } from '@/integrations/linear/connections';
 import { applySuggestedLinearSettings, resolveLinearOptions } from '@/integrations/linear/discovery';
 import { requireAuth } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isTeamOwnerForRequest } from '@/lib/teams';
 import { GET } from './route';
+
+vi.mock('@/integrations/linear/auth', () => ({
+  resolveLinearAuthTokenForTeam: vi.fn(),
+}));
 
 vi.mock('@/lib/auth', () => ({
   requireAuth: vi.fn(),
@@ -20,13 +25,6 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 vi.mock('@/integrations/linear/connections', () => ({
   getLinearOAuthConnectionForTeam: vi.fn(),
-  isExpired: vi.fn(),
-  toExpiresAt: vi.fn(),
-  upsertLinearOAuthConnection: vi.fn(),
-}));
-
-vi.mock('@/integrations/linear/oauth-token', () => ({
-  refreshLinearOAuthAccessToken: vi.fn(),
 }));
 
 vi.mock('@/integrations/linear/discovery', () => ({
@@ -41,7 +39,7 @@ describe('team linear options route', () => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
     vi.mocked(isTeamOwnerForRequest).mockResolvedValue(true);
-    vi.mocked(isExpired).mockReturnValue(false);
+    vi.mocked(resolveLinearAuthTokenForTeam).mockResolvedValue('token_1');
   });
 
   it('returns 403 for non-owners', async () => {

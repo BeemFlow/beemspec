@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
-import {
-  getLinearOAuthConnectionForTeam,
-  isExpired,
-  toExpiresAt,
-  upsertLinearOAuthConnection,
-} from '@/integrations/linear/connections';
+import { resolveLinearAuthTokenForTeam } from '@/integrations/linear/auth';
+import { getLinearOAuthConnectionForTeam } from '@/integrations/linear/connections';
 import { applySuggestedLinearSettings, resolveLinearOptions } from '@/integrations/linear/discovery';
-import { refreshLinearOAuthAccessToken } from '@/integrations/linear/oauth-token';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -65,28 +60,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       });
     }
 
-    let accessToken = connection.accessToken;
-    if (isExpired(connection.expiresAt)) {
-      if (!connection.refreshToken) {
-        return NextResponse.json({
-          connected: false,
-          settings: toSettingsPayload(teamId, settingsResult.data),
-          options: { workspace_id: null, workspace_name: null, teams: [], projects: [], states: [] },
-          applied_defaults: false,
-        });
-      }
-
-      const refreshed = await refreshLinearOAuthAccessToken(connection.refreshToken);
-      await upsertLinearOAuthConnection(admin, {
-        teamId,
-        accessToken: refreshed.accessToken,
-        refreshToken: refreshed.refreshToken ?? connection.refreshToken,
-        tokenType: refreshed.tokenType,
-        scope: refreshed.scope,
-        expiresAt: toExpiresAt(refreshed.expiresIn),
-        userId: auth.user.id,
+    const accessToken = await resolveLinearAuthTokenForTeam(teamId);
+    if (!accessToken) {
+      return NextResponse.json({
+        connected: false,
+        settings: toSettingsPayload(teamId, settingsResult.data),
+        options: { workspace_id: null, workspace_name: null, teams: [], projects: [], states: [] },
+        applied_defaults: false,
       });
-      accessToken = refreshed.accessToken;
     }
 
     const options = await resolveLinearOptions(accessToken);

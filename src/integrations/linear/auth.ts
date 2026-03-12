@@ -19,38 +19,9 @@ export interface LinearSyncContext {
   linearIssueSync: IssueSync | null;
 }
 
-async function resolveOAuthIssueSync(teamId: string): Promise<IssueSync | null> {
+export async function resolveLinearAuthTokenForTeam(teamId: string): Promise<string | null> {
   const admin = createAdminClient();
-  try {
-    const connection = await getLinearOAuthConnectionForTeam(admin, teamId);
-    if (!connection) return null;
 
-    if (!isExpired(connection.expiresAt)) {
-      return createLinearClient(true, { accessToken: connection.accessToken });
-    }
-
-    if (!connection.refreshToken) {
-      return null;
-    }
-
-    const refreshed = await refreshLinearOAuthAccessToken(connection.refreshToken);
-    await upsertLinearOAuthConnection(admin, {
-      teamId,
-      accessToken: refreshed.accessToken,
-      refreshToken: refreshed.refreshToken ?? connection.refreshToken,
-      tokenType: refreshed.tokenType,
-      scope: refreshed.scope,
-      expiresAt: toExpiresAt(refreshed.expiresIn),
-    });
-
-    return createLinearClient(true, { accessToken: refreshed.accessToken });
-  } catch {
-    return null;
-  }
-}
-
-async function resolveOAuthAccessToken(teamId: string): Promise<string | null> {
-  const admin = createAdminClient();
   try {
     const connection = await getLinearOAuthConnectionForTeam(admin, teamId);
     if (!connection) return null;
@@ -79,8 +50,10 @@ async function resolveOAuthAccessToken(teamId: string): Promise<string | null> {
   }
 }
 
-export async function resolveLinearAuthTokenForTeam(teamId: string): Promise<string | null> {
-  return resolveOAuthAccessToken(teamId);
+async function resolveOAuthIssueSync(teamId: string): Promise<IssueSync | null> {
+  const accessToken = await resolveLinearAuthTokenForTeam(teamId);
+  if (!accessToken) return null;
+  return createLinearClient(true, { accessToken });
 }
 
 async function resolveContextFromStoryMap(supabase: SupabaseLike, storyMapId: string): Promise<LinearSyncContext> {
