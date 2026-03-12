@@ -76,8 +76,9 @@ export function AppShell({ children, userEmail }: AppShellProps) {
         <div className="flex h-[var(--header-height)] items-center justify-between px-4">
           {/* Left: Logo */}
           <Link href="/" className="flex items-center">
+            {/* prettier-ignore */}
             <span className="font-mono font-medium text-[15px] tracking-[-0.01em]">
-              beemspec<span className="text-primary">.</span>
+              beemspec<span className="text-primary -ml-[0.08em]">.</span>
             </span>
           </Link>
 
