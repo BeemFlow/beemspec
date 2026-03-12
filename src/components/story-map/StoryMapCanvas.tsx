@@ -818,13 +818,7 @@ function ReleaseRow({
             {onDelete && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <DeleteButton
-                    onDelete={onDelete}
-                    iconOnly
-                    className="cursor-pointer"
-                    confirmTitle="Delete release?"
-                    confirmDescription="All stories in this release will be permanently deleted."
-                  />
+                  <DeleteButton onDelete={onDelete} iconOnly className="cursor-pointer" />
                 </TooltipTrigger>
                 <TooltipContent>Delete</TooltipContent>
               </Tooltip>
