@@ -104,8 +104,144 @@ interface Props {
   onRenameRelease: (releaseId: string, currentName: string) => void;
   onMoveRelease: (releaseId: string, direction: 'up' | 'down') => void;
   onDeleteRelease: (releaseId: string) => void;
-  onRefresh: () => void;
   onError?: (message: string) => void;
+  onStoryMapChange: React.Dispatch<React.SetStateAction<StoryMapFull | null>>;
+}
+
+function matchesReleaseId(story: Story, releaseId: string | null): boolean {
+  return releaseId ? story.release_id === releaseId : !story.release_id;
+}
+
+function reorderActivitiesInStoryMap(storyMap: StoryMapFull, orderedIds: string[]): StoryMapFull {
+  const activitiesById = new Map(storyMap.activities.map((activity) => [activity.id, activity]));
+
+  return {
+    ...storyMap,
+    activities: orderedIds
+      .map((activityId, index) => {
+        const activity = activitiesById.get(activityId);
+        return activity ? { ...activity, sort_order: index } : null;
+      })
+      .filter((activity): activity is StoryMapFull['activities'][number] => activity !== null),
+  };
+}
+
+function moveTaskInStoryMap(
+  storyMap: StoryMapFull,
+  taskId: string,
+  targetActivityId: string,
+  orderedIds: string[],
+): StoryMapFull {
+  const activities = storyMap.activities.map((activity) => ({
+    ...activity,
+    tasks: [...activity.tasks],
+  }));
+
+  const sourceActivity = activities.find((activity) => activity.tasks.some((task) => task.id === taskId));
+  const targetActivity = activities.find((activity) => activity.id === targetActivityId);
+  if (!sourceActivity || !targetActivity) return storyMap;
+
+  const sourceIndex = sourceActivity.tasks.findIndex((task) => task.id === taskId);
+  if (sourceIndex === -1) return storyMap;
+
+  const [movedTask] = sourceActivity.tasks.splice(sourceIndex, 1);
+  if (!movedTask) return storyMap;
+
+  const nextMovedTask = { ...movedTask, activity_id: targetActivityId };
+  const targetTasks = [...targetActivity.tasks, nextMovedTask];
+  const targetTasksById = new Map(targetTasks.map((task) => [task.id, task]));
+
+  targetActivity.tasks = orderedIds
+    .map((orderedId) => targetTasksById.get(orderedId))
+    .filter((task): task is (typeof targetTasks)[number] => Boolean(task))
+    .map((task, index) => ({ ...task, sort_order: index }));
+
+  sourceActivity.tasks = sourceActivity.tasks.map((task, index) => ({ ...task, sort_order: index }));
+
+  return {
+    ...storyMap,
+    activities,
+  };
+}
+
+function reorderStoriesForCell(
+  stories: Story[],
+  releaseId: string | null,
+  orderedIds: string[],
+  insertedStory?: Story,
+): Story[] {
+  const otherStories = stories.filter((story) => !matchesReleaseId(story, releaseId));
+  const cellStories = stories.filter((story) => matchesReleaseId(story, releaseId));
+  const cellStoriesById = new Map(cellStories.map((story) => [story.id, story]));
+
+  if (insertedStory) {
+    cellStoriesById.set(insertedStory.id, insertedStory);
+  }
+
+  const reorderedCellStories = orderedIds
+    .map((storyId) => cellStoriesById.get(storyId))
+    .filter((story): story is Story => Boolean(story))
+    .map((story, index) => ({ ...story, sort_order: index }));
+
+  return [...otherStories, ...reorderedCellStories];
+}
+
+function moveStoryInStoryMap(
+  storyMap: StoryMapFull,
+  storyId: string,
+  targetTaskId: string,
+  targetReleaseId: string | null,
+  orderedIds: string[],
+): StoryMapFull {
+  const activities = storyMap.activities.map((activity) => ({
+    ...activity,
+    tasks: activity.tasks.map((task) => ({
+      ...task,
+      stories: [...task.stories],
+    })),
+  }));
+
+  let sourceTask: (typeof activities)[number]['tasks'][number] | undefined;
+  let movedStory: Story | undefined;
+
+  for (const activity of activities) {
+    const task = activity.tasks.find((candidate) => candidate.stories.some((story) => story.id === storyId));
+    if (!task) continue;
+    const sourceIndex = task.stories.findIndex((story) => story.id === storyId);
+    if (sourceIndex === -1) break;
+    sourceTask = task;
+    const [removedStory] = task.stories.splice(sourceIndex, 1);
+    movedStory = removedStory;
+    break;
+  }
+
+  if (!sourceTask || !movedStory) return storyMap;
+
+  const sourceReleaseId = movedStory.release_id ?? null;
+  const targetTask = activities.flatMap((activity) => activity.tasks).find((task) => task.id === targetTaskId);
+  if (!targetTask) return storyMap;
+
+  const nextMovedStory = {
+    ...movedStory,
+    task_id: targetTaskId,
+    release_id: targetReleaseId,
+  };
+
+  if (sourceTask.id === targetTask.id && sourceReleaseId === targetReleaseId) {
+    sourceTask.stories = reorderStoriesForCell(sourceTask.stories, targetReleaseId, orderedIds, nextMovedStory);
+  } else {
+    sourceTask.stories = reorderStoriesForCell(
+      sourceTask.stories,
+      sourceReleaseId,
+      sourceTask.stories.filter((story) => matchesReleaseId(story, sourceReleaseId)).map((story) => story.id),
+    );
+    targetTask.stories = reorderStoriesForCell(targetTask.stories, targetReleaseId, orderedIds, nextMovedStory);
+  }
+
+  return {
+    ...storyMap,
+    activities,
+  };
 }
 
 function getGroupWidth(taskCount: number): number {
@@ -132,8 +268,8 @@ export function StoryMapCanvas({
   onRenameRelease,
   onMoveRelease,
   onDeleteRelease,
-  onRefresh,
   onError,
+  onStoryMapChange,
 }: Props) {
   const { activities, releases } = storyMap;
   const [activeDrag, setActiveDrag] = useState<DragId | null>(null);
@@ -184,19 +320,30 @@ export function StoryMapCanvas({
     await fetchJson(url, init, fallbackMessage);
   }
 
-  async function persistDragChange(url: string, body: unknown, fallbackMessage: string): Promise<void> {
-    await performRequest(
-      url,
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      },
-      fallbackMessage,
-    );
+  async function persistDragChange(
+    optimisticStoryMap: StoryMapFull,
+    url: string,
+    body: unknown,
+    fallbackMessage: string,
+  ): Promise<void> {
+    const previousStoryMap = storyMap;
+    onStoryMapChange(optimisticStoryMap);
 
-    setDragError(null);
-    onRefresh();
+    try {
+      await performRequest(
+        url,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+        fallbackMessage,
+      );
+      setDragError(null);
+    } catch (error) {
+      onStoryMapChange(previousStoryMap);
+      throw error;
+    }
   }
 
   async function handleActivityDrop(activeActivityId: string, overActivityId: string): Promise<void> {
@@ -207,6 +354,7 @@ export function StoryMapCanvas({
     );
 
     await persistDragChange(
+      reorderActivitiesInStoryMap(storyMap, newOrder),
       '/api/activities',
       { story_map_id: storyMap.id, order: newOrder },
       'Failed to reorder activities',
@@ -230,6 +378,7 @@ export function StoryMapCanvas({
     );
 
     await persistDragChange(
+      moveTaskInStoryMap(storyMap, activeTaskId, targetActivityId, newOrder),
       `/api/tasks/${activeTaskId}/move`,
       { target_activity_id: targetActivityId, target_order: newOrder },
       'Failed to move task',
@@ -253,6 +402,7 @@ export function StoryMapCanvas({
     );
 
     await persistDragChange(
+      moveStoryInStoryMap(storyMap, activeStoryId, targetCell.task_id, targetCell.release_id, newOrder),
       `/api/stories/${activeStoryId}/move`,
       {
         target_task_id: targetCell.task_id,
@@ -296,7 +446,6 @@ export function StoryMapCanvas({
       const message = errorMessage(err);
       setDragError(message);
       onError?.(message);
-      onRefresh();
     }
   }
 

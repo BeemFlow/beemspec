@@ -26,16 +26,12 @@ import type { Activity, Story, StoryMapFull, Task } from '@/types';
  */
 type DialogState =
   | { type: 'closed' }
-  // Story dialogs
   | { type: 'story:edit'; story: Story }
   | { type: 'story:create'; taskId: string; releaseId: string | null }
-  // Activity dialogs
   | { type: 'activity:edit'; activity: Activity }
   | { type: 'activity:create' }
-  // Task dialogs
   | { type: 'task:edit'; task: Task }
   | { type: 'task:create'; activityId: string }
-  // Release dialogs
   | { type: 'release:create' }
   | { type: 'release:rename'; releaseId: string; currentName: string }
   | { type: 'release:delete'; releaseId: string };
@@ -71,7 +67,6 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
 
   const closeDialog = () => setDialog(CLOSED);
 
-  // Story handlers
   const handleAddStory = (taskId: string, releaseId: string | null) => {
     setDialog({ type: 'story:create', taskId, releaseId });
   };
@@ -125,7 +120,6 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     }
   }
 
-  // Activity handlers
   const handleAddActivity = () => {
     setDialog({ type: 'activity:create' });
   };
@@ -175,7 +169,6 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     }
   }
 
-  // Task handlers
   const handleAddTask = (activityId: string) => {
     setDialog({ type: 'task:create', activityId });
   };
@@ -225,7 +218,6 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     }
   }
 
-  // Release handlers
   const handleAddRelease = () => {
     setDialog({ type: 'release:create' });
   };
@@ -290,8 +282,20 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     const swapIndex = direction === 'up' ? index - 1 : index + 1;
     const newOrder = sortedReleases.map((r) => r.id);
     [newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]];
+    const releasesById = new Map(storyMap.releases.map((release) => [release.id, release]));
+    const previousStoryMap = storyMap;
+    const optimisticStoryMap: StoryMapFull = {
+      ...storyMap,
+      releases: newOrder
+        .map((orderedReleaseId, orderedIndex) => {
+          const release = releasesById.get(orderedReleaseId);
+          return release ? { ...release, sort_order: orderedIndex } : null;
+        })
+        .filter((release): release is StoryMapFull['releases'][number] => release !== null),
+    };
 
     try {
+      setStoryMap(optimisticStoryMap);
       await request(
         '/api/releases',
         {
@@ -301,8 +305,8 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         },
         'Failed to reorder releases',
       );
-      loadStoryMap();
     } catch (err) {
+      setStoryMap(previousStoryMap);
       setUiError(errorMessage(err));
     }
   }
@@ -324,7 +328,6 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     router.push('/');
   }
 
-  // Derive prompt dialog props from state
   function getPromptProps(): { title: string; placeholder: string; defaultValue: string } {
     switch (dialog.type) {
       case 'release:create':
@@ -340,7 +343,6 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
     }
   }
 
-  // Render states
   if (loadError) {
     return (
       <div className="flex h-[calc(100vh-var(--header-height))] items-center justify-center">
@@ -404,8 +406,8 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
             onRenameRelease={handleRenameRelease}
             onMoveRelease={handleMoveRelease}
             onDeleteRelease={handleDeleteRelease}
-            onRefresh={loadStoryMap}
             onError={setUiError}
+            onStoryMapChange={setStoryMap}
           />
           <AgentKickoffPanel storyMapId={storyMap.id} storyMapName={storyMap.name} releases={storyMap.releases} />
         </div>
