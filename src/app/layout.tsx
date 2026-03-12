@@ -25,6 +25,7 @@ const newsreader = Newsreader({
 export const metadata: Metadata = {
   title: 'BeemSpec',
   description: 'Context and prompt engine for coding agents',
+  icons: { icon: '/favicon.svg' },
   other: {
     'theme-color': '#F8F5F0',
   },
