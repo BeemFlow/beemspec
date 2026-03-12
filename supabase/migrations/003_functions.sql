@@ -660,3 +660,35 @@ BEGIN
   RETURN QUERY SELECT false;
 END;
 $$;
+
+
+-- =============================================================================
+-- Linear Connection Cleanup
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION disconnect_linear_for_team(p_team_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+BEGIN
+  DELETE FROM public.linear_oauth_connections
+  WHERE team_id = p_team_id;
+
+  UPDATE public.integration_settings
+  SET
+    linear_workspace_id = NULL,
+    linear_team_id = NULL,
+    linear_status_mapping = '{}'::jsonb
+  WHERE team_id = p_team_id;
+
+  UPDATE public.story_map_integration_settings
+  SET
+    linear_project_id = NULL,
+    use_team_status_mapping = TRUE,
+    linear_status_mapping = '{}'::jsonb,
+    auto_import_labeled_issues = TRUE,
+    import_label_name = 'Story'
+  WHERE team_id = p_team_id;
+END;
+$$;

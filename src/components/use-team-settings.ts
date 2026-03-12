@@ -403,6 +403,15 @@ export function useTeamSettings({
         },
         'Failed to disconnect Linear',
       );
+      setLinearConnected(false);
+      setLinearScope(null);
+      setLinearExpiresAt(null);
+      setLinearWorkspaceId('');
+      setLinearWorkspaceName('');
+      setLinearTeamIdState('');
+      setLinearStatusMapping({});
+      setLinearTeamOptions([]);
+      setLinearStateOptions([]);
       await loadData();
       setLinearStatus({ type: 'success', message: 'Linear disconnected' });
     } catch (err) {

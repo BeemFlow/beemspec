@@ -1,9 +1,11 @@
 import { updateStoryMapLinearSettingsSchema } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
+import { getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/connections';
 import { DEFAULT_AUTO_IMPORT_LABELED_ISSUES, DEFAULT_LINEAR_IMPORT_LABEL } from '@/integrations/linear/settings';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { normalize } from '@/lib/strings';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { isTeamOwnerForRequest } from '@/lib/teams';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
@@ -60,7 +62,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
   if (!storyMap) return notFoundResponse('Story map');
 
-  const [teamSettingsResult, storyMapSettingsResult, canEdit] = await Promise.all([
+  const [teamSettingsResult, storyMapSettingsResult, canEdit, connection] = await Promise.all([
     supabase
       .from('integration_settings')
       .select('linear_team_id, linear_status_mapping')
@@ -74,6 +76,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       .eq('story_map_id', storyMapId)
       .maybeSingle<StoryMapSettingsRow>(),
     isTeamOwnerForRequest(auth.user.id, storyMap.team_id),
+    getLinearOAuthConnectionStatusForTeam(createAdminClient(), storyMap.team_id),
   ]);
 
   if (teamSettingsResult.error) {
@@ -91,6 +94,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     team_id: storyMap.team_id,
     can_edit: canEdit,
     team_settings: {
+      linear_connected: Boolean(connection),
       linear_team_id: teamSettings?.linear_team_id ?? null,
       linear_status_mapping: teamSettings?.linear_status_mapping ?? {},
     },

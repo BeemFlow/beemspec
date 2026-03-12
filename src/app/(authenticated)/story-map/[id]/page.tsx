@@ -417,6 +417,8 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         onOpenChange={setSettingsOpen}
         storyMapId={storyMap.id}
         storyMapName={storyMap.name}
+        storyMapDescription={storyMap.description}
+        onStoryMapUpdated={loadStoryMap}
         onSyncComplete={loadStoryMap}
         onDeleteStoryMap={handleDeleteStoryMap}
       />

@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-import {
-  deleteLinearOAuthConnectionForTeam,
-  getLinearOAuthConnectionStatusForTeam,
-} from '@/integrations/linear/connections';
+import { getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/connections';
 import { requireAuth } from '@/lib/auth';
+import { serverErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isTeamOwnerForRequest } from '@/lib/teams';
 import { isValidUuid } from '@/lib/validations';
@@ -45,6 +43,9 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Only team owners can disconnect Linear' }, { status: 403 });
   }
 
-  await deleteLinearOAuthConnectionForTeam(createAdminClient(), teamId);
+  const admin = createAdminClient();
+  const { error } = await admin.rpc('disconnect_linear_for_team', { p_team_id: teamId });
+  if (error) return serverErrorResponse('Failed to disconnect Linear', error);
+
   return NextResponse.json({ success: true, team_id: teamId, connected: false });
 }

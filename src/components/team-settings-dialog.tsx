@@ -6,12 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DangerZone } from '@/components/ui/danger-zone';
 import { DeleteButton } from '@/components/ui/delete-button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { IntegrationSection } from '@/components/ui/integration-section';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SettingsDialog } from '@/components/ui/settings-dialog';
 import {
   type InviteStatus,
   type LinearStatus,
@@ -126,6 +126,9 @@ function LinearConnectionSummary(input: { connected: boolean; scope: string | nu
           {input.connected ? 'connected' : 'not connected'}
         </Badge>
       </div>
+      {input.connected && (
+        <p className="mt-2 text-xs text-muted-foreground">Ready to configure workspace defaults and status mapping.</p>
+      )}
       {input.scope && <p className="mt-2 text-xs text-muted-foreground">Scopes: {input.scope}</p>}
       {input.expiresAt && <p className="mt-1 text-xs text-muted-foreground">Expires: {input.expiresAt}</p>}
     </div>
@@ -225,7 +228,7 @@ function LinearSettingsForm(input: {
       </div>
       {input.isOwner && (
         <Button type="submit" disabled={input.saving || !input.teamId.trim()}>
-          {input.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Linear settings'}
+          {input.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
         </Button>
       )}
     </form>
@@ -253,39 +256,36 @@ function TeamIntegrationsTab({
   onLinearStatusMappingChange,
 }: TeamIntegrationsTabProps) {
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <h3 className="text-sm font-medium">Linear Integration</h3>
-        <p className="text-sm text-muted-foreground">
-          Connect a team-scoped Linear OAuth account and choose default targets.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <IntegrationSection title="Linear" description="Connect Linear and configure team-wide defaults.">
+        <LinearConnectionSummary connected={linearConnected} scope={linearScope} expiresAt={linearExpiresAt} />
 
-      <LinearConnectionSummary connected={linearConnected} scope={linearScope} expiresAt={linearExpiresAt} />
+        <LinearConnectionActions
+          isOwner={isOwner}
+          connected={linearConnected}
+          disconnecting={disconnectingLinear}
+          onConnect={onConnectLinear}
+          onDisconnect={onDisconnectLinear}
+        />
 
-      <LinearConnectionActions
-        isOwner={isOwner}
-        connected={linearConnected}
-        disconnecting={disconnectingLinear}
-        onConnect={onConnectLinear}
-        onDisconnect={onDisconnectLinear}
-      />
+        {linearConnected ? (
+          <LinearSettingsForm
+            isOwner={isOwner}
+            workspaceName={linearWorkspaceName || linearWorkspaceId}
+            teamId={linearTeamId}
+            optionsLoading={linearOptionsLoading}
+            teamOptions={linearTeamOptions}
+            stateOptions={linearStateOptions}
+            statusMapping={linearStatusMapping}
+            saving={savingLinearSettings}
+            onSave={onSaveLinearSettings}
+            onStatusMappingChange={onLinearStatusMappingChange}
+          />
+        ) : null}
 
-      <LinearSettingsForm
-        isOwner={isOwner}
-        workspaceName={linearWorkspaceName || linearWorkspaceId}
-        teamId={linearTeamId}
-        optionsLoading={linearOptionsLoading}
-        teamOptions={linearTeamOptions}
-        stateOptions={linearStateOptions}
-        statusMapping={linearStatusMapping}
-        saving={savingLinearSettings}
-        onSave={onSaveLinearSettings}
-        onStatusMappingChange={onLinearStatusMappingChange}
-      />
-
-      {linearStatus.type === 'success' && <p className="text-sm text-success">{linearStatus.message}</p>}
-      {linearStatus.type === 'error' && <p className="text-sm text-destructive">{linearStatus.message}</p>}
+        {linearStatus.type === 'success' && <p className="text-sm text-success">{linearStatus.message}</p>}
+        {linearStatus.type === 'error' && <p className="text-sm text-destructive">{linearStatus.message}</p>}
+      </IntegrationSection>
     </div>
   );
 }
@@ -476,82 +476,84 @@ export function TeamSettingsDialog({
 
   if (!team) return null;
 
+  const tabs = [
+    {
+      value: 'general',
+      label: 'General',
+      content: (
+        <TeamGeneralTab
+          isOwner={isOwner}
+          teamName={team.name}
+          name={name}
+          onNameChange={setName}
+          onSubmit={handleRename}
+        />
+      ),
+    },
+    {
+      value: 'integrations',
+      label: 'Integrations',
+      content: (
+        <TeamIntegrationsTab
+          isOwner={isOwner}
+          linearConnected={linearConnected}
+          linearScope={linearScope}
+          linearExpiresAt={linearExpiresAt}
+          linearWorkspaceId={linearWorkspaceId}
+          linearWorkspaceName={linearWorkspaceName}
+          linearTeamId={linearTeamId}
+          linearOptionsLoading={linearOptionsLoading}
+          linearTeamOptions={linearTeamOptions}
+          linearStateOptions={linearStateOptions}
+          linearStatusMapping={linearStatusMapping}
+          savingLinearSettings={savingLinearSettings}
+          disconnectingLinear={disconnectingLinear}
+          linearStatus={linearStatus}
+          onConnectLinear={handleConnectLinear}
+          onDisconnectLinear={handleDisconnectLinear}
+          onSaveLinearSettings={handleSaveLinearSettings}
+          onLinearStatusMappingChange={setLinearStatusMappingValue}
+        />
+      ),
+    },
+    {
+      value: 'members',
+      label: 'Members',
+      content: (
+        <TeamMembersTab
+          isOwner={isOwner}
+          loading={loading}
+          inviteEmail={inviteEmail}
+          inviteStatus={inviteStatus}
+          members={members}
+          invites={invites}
+          removingId={removingId}
+          cancelingId={cancelingId}
+          onInviteEmailChange={setInviteEmail}
+          onInviteSubmit={handleInvite}
+          onRemoveMember={handleRemoveMember}
+          onCancelInvite={handleCancelInvite}
+        />
+      ),
+    },
+    {
+      value: 'danger',
+      label: 'Danger',
+      content: (
+        <TeamDangerTab isOwner={isOwner} teamName={team.name} deleting={deleting} onDeleteTeam={handleDeleteTeam} />
+      ),
+    },
+  ];
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[540px]">
-        <DialogHeader>
-          <DialogTitle>Team Settings</DialogTitle>
-        </DialogHeader>
-
-        {error && (
-          <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {error}
-          </p>
-        )}
-
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTab)} className="mt-2">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="integrations">Integrations</TabsTrigger>
-            <TabsTrigger value="members">Members</TabsTrigger>
-            <TabsTrigger value="danger">Danger</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="general" className="mt-4">
-            <TeamGeneralTab
-              isOwner={isOwner}
-              teamName={team.name}
-              name={name}
-              onNameChange={setName}
-              onSubmit={handleRename}
-            />
-          </TabsContent>
-
-          <TabsContent value="integrations" className="mt-4">
-            <TeamIntegrationsTab
-              isOwner={isOwner}
-              linearConnected={linearConnected}
-              linearScope={linearScope}
-              linearExpiresAt={linearExpiresAt}
-              linearWorkspaceId={linearWorkspaceId}
-              linearWorkspaceName={linearWorkspaceName}
-              linearTeamId={linearTeamId}
-              linearOptionsLoading={linearOptionsLoading}
-              linearTeamOptions={linearTeamOptions}
-              linearStateOptions={linearStateOptions}
-              linearStatusMapping={linearStatusMapping}
-              savingLinearSettings={savingLinearSettings}
-              disconnectingLinear={disconnectingLinear}
-              linearStatus={linearStatus}
-              onConnectLinear={handleConnectLinear}
-              onDisconnectLinear={handleDisconnectLinear}
-              onSaveLinearSettings={handleSaveLinearSettings}
-              onLinearStatusMappingChange={setLinearStatusMappingValue}
-            />
-          </TabsContent>
-
-          <TabsContent value="members" className="mt-4">
-            <TeamMembersTab
-              isOwner={isOwner}
-              loading={loading}
-              inviteEmail={inviteEmail}
-              inviteStatus={inviteStatus}
-              members={members}
-              invites={invites}
-              removingId={removingId}
-              cancelingId={cancelingId}
-              onInviteEmailChange={setInviteEmail}
-              onInviteSubmit={handleInvite}
-              onRemoveMember={handleRemoveMember}
-              onCancelInvite={handleCancelInvite}
-            />
-          </TabsContent>
-
-          <TabsContent value="danger" className="mt-4">
-            <TeamDangerTab isOwner={isOwner} teamName={team.name} deleting={deleting} onDeleteTeam={handleDeleteTeam} />
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
+    <SettingsDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Team Settings"
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={(value) => setActiveTab(value as SettingsTab)}
+      error={error}
+    />
   );
 }

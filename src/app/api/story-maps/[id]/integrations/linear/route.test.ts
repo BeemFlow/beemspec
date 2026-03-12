@@ -1,11 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/connections';
 import { requireAuth } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { isTeamOwnerForRequest } from '@/lib/teams';
 import { GET, PUT } from './route';
 
+vi.mock('@/integrations/linear/connections', () => ({
+  getLinearOAuthConnectionStatusForTeam: vi.fn(),
+}));
+
 vi.mock('@/lib/auth', () => ({
   requireAuth: vi.fn(),
+}));
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -31,6 +41,12 @@ describe('story map linear integration settings route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
+    vi.mocked(createAdminClient).mockReturnValue({} as never);
+    vi.mocked(getLinearOAuthConnectionStatusForTeam).mockResolvedValue({
+      teamId: TEAM_ID,
+      scope: 'read,write',
+      expiresAt: null,
+    });
   });
 
   it('returns story map settings with effective fallback', async () => {
@@ -77,6 +93,9 @@ describe('story map linear integration settings route', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       team_id: TEAM_ID,
+      team_settings: {
+        linear_connected: true,
+      },
       story_map_settings: {
         linear_project_id: 'map_project_1',
         use_team_status_mapping: true,
