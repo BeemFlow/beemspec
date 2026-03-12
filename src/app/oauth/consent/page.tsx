@@ -80,7 +80,7 @@ export default async function OAuthConsentPage({ searchParams }: ConsentPageProp
       <main className="w-full rounded-xl border bg-card p-6 shadow-sm">
         <h1 className="text-2xl font-semibold">Authorize app access</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Review this request before allowing the app to access your Beemspec data.
+          Review this request before allowing the app to access your BeemSpec data.
         </p>
 
         <dl className="mt-6 space-y-3 text-sm">
