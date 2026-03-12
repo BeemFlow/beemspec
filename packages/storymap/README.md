@@ -97,10 +97,6 @@ const { map, activities, tasks, releases, stories } = flattenTree(storyMapFull);
 // Persist each array to your DB however you want
 ```
 
-## Reference SQL schemas
-
-Reference schemas are provided in `sql/` for Postgres and SQLite. These are starting points — copy and adapt for your project. The package has no runtime dependency on any database.
-
 ## Why these content fields
 
 These fields exist because they are the minimum structured context a human or AI agent needs to build from a story:
