@@ -52,7 +52,7 @@ function createStoryMapGetClient() {
     throw new Error(`Unexpected table: ${table}`);
   });
 
-  return { client: { from }, from };
+  return { client: { from }, from, personasOrder };
 }
 
 describe('story maps [id] route', () => {
@@ -62,7 +62,7 @@ describe('story maps [id] route', () => {
   });
 
   it('returns full story map payload including personas', async () => {
-    const { client, from } = createStoryMapGetClient();
+    const { client, from, personasOrder } = createStoryMapGetClient();
     vi.mocked(createClient).mockResolvedValue(client as never);
 
     const response = await getStoryMapById(new Request('http://localhost/api/story-maps/id'), {
@@ -81,6 +81,7 @@ describe('story maps [id] route', () => {
     expect(from).toHaveBeenCalledWith('activities');
     expect(from).toHaveBeenCalledWith('releases');
     expect(from).toHaveBeenCalledWith('personas');
+    expect(personasOrder).toHaveBeenCalledWith('created_at');
   });
 
   it('returns 400 for invalid story map id', async () => {

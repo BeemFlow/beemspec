@@ -69,14 +69,10 @@ CREATE TABLE personas (
   name TEXT NOT NULL,
   description TEXT,
   goals TEXT,
-  sort_order INTEGER DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_personas_story_map ON personas(story_map_id);
-CREATE UNIQUE INDEX uq_personas_story_map_sort
-  ON personas(story_map_id, sort_order)
-  WHERE sort_order IS NOT NULL;
 
 
 -- =============================================================================
