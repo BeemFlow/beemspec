@@ -4,90 +4,191 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* ── Surface & text tokens (mapped from shadcn conventions) ── */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-success: var(--success);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* ── Brand-extended tokens ── */
+  --color-text-faint: var(--text-faint);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-hover-subtle: var(--accent-hover-subtle);
+  --color-border-accent: var(--border-accent);
+  --color-input-bg: var(--input-bg);
+
+  /* ── Typography ── */
+  --font-sans: var(--font-outfit);
+  --font-serif: var(--font-newsreader);
+  --font-mono: var(--font-ibm-plex-mono);
+
+  /* ── Radius (brand: 2px base) ── */
+  --radius-sm: calc(var(--radius) - 1px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
   --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+  --radius-2xl: calc(var(--radius) + 6px);
+  --radius-3xl: calc(var(--radius) + 8px);
+  --radius-4xl: calc(var(--radius) + 12px);
 }
 
 :root {
-  /* Layout */
+  /* ── Layout ── */
   --header-height: 3.5rem;
 
-  /* Border radius */
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /* ── Radius ── */
+  --radius: 0.125rem; /* 2px — brand guide: minimal radii */
+
+  /* ── Surfaces ── */
+  --background: #f8f5f0; /* warm parchment */
+  --foreground: #1a1714; /* primary text */
+  --card: #ffffff; /* elevated surfaces */
+  --card-foreground: #1a1714;
+  --popover: #ffffff;
+  --popover-foreground: #1a1714;
+
+  /* ── Primary = brand accent (amber CTA) ── */
+  --primary: #b45309;
+  --primary-foreground: #ffffff;
+
+  /* ── Secondary = subtle fill ── */
+  --secondary: rgba(26, 23, 20, 0.018);
+  --secondary-foreground: #1a1714;
+
+  /* ── Muted ── */
+  --muted: rgba(26, 23, 20, 0.03);
+  --muted-foreground: #6b6560;
+
+  /* ── Accent = soft amber highlights ── */
+  --accent: rgba(180, 83, 9, 0.06);
+  --accent-foreground: #9a4408;
+
+  /* ── Semantic status ── */
   --destructive: oklch(0.577 0.245 27.325);
   --success: oklch(0.527 0.154 150.069);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --warning: rgba(180, 83, 9, 0.06);
+  --warning-foreground: #92400e;
+
+  /* ── Borders ── */
+  --border: rgba(26, 23, 20, 0.1);
+  --input: rgba(26, 23, 20, 0.12);
+  --ring: rgba(180, 83, 9, 0.3);
+
+  /* ── Brand-extended ── */
+  --text-faint: #918b84;
+  --accent-hover: #92400e;
+  --accent-hover-subtle: rgba(180, 83, 9, 0.1);
+  --border-accent: rgba(180, 83, 9, 0.2);
+  --input-bg: rgba(26, 23, 20, 0.03);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: #1a1714;
+  --foreground: #ede9e3;
+  --card: #252119;
+  --card-foreground: #ede9e3;
+  --popover: #252119;
+  --popover-foreground: #ede9e3;
+  --primary: #d97706;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(255, 255, 255, 0.04);
+  --secondary-foreground: #ede9e3;
+  --muted: rgba(255, 255, 255, 0.06);
+  --muted-foreground: #948e86;
+  --accent: rgba(217, 119, 6, 0.1);
+  --accent-foreground: #d97706;
   --destructive: oklch(0.704 0.191 22.216);
   --success: oklch(0.627 0.194 149.214);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --warning: rgba(217, 119, 6, 0.1);
+  --warning-foreground: #d97706;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: rgba(217, 119, 6, 0.4);
+  --text-faint: #6b6560;
+  --accent-hover: #d97706;
+  --accent-hover-subtle: rgba(217, 119, 6, 0.15);
+  --border-accent: rgba(217, 119, 6, 0.25);
+  --input-bg: rgba(255, 255, 255, 0.06);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+  }
+
+  /* ── Grain overlay (brand signature texture) ── */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10000;
+    opacity: 1;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    mix-blend-mode: multiply;
+  }
+
+  /* ── Text selection ── */
+  ::selection {
+    background: rgba(180, 83, 9, 0.14);
+    color: var(--foreground);
+  }
+
+  /* ── Typographic hierarchy (brand guide §3) ── */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-serif);
+    letter-spacing: -0.02em;
+    color: var(--foreground);
+  }
+
+  h1,
+  h2 {
+    font-weight: 400;
+  }
+
+  h3,
+  h4 {
+    font-weight: 500;
+  }
+
+  p,
+  li {
+    color: var(--muted-foreground);
+  }
+
+  /* ── Reduced motion ── */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

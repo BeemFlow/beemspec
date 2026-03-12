@@ -75,8 +75,10 @@ export function AppShell({ children, userEmail }: AppShellProps) {
       <header className="border-b bg-background">
         <div className="flex h-[var(--header-height)] items-center justify-between px-4">
           {/* Left: Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-lg font-semibold">BeemSpec</span>
+          <Link href="/" className="flex items-center">
+            <span className="font-mono font-medium text-[15px] tracking-[-0.01em]">
+              beemspec<span className="text-primary">.</span>
+            </span>
           </Link>
 
           {/* Right: Team Selector + User Menu */}
@@ -113,7 +115,7 @@ export function AppShell({ children, userEmail }: AppShellProps) {
             {/* User Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full">
+                <Button variant="ghost" size="icon">
                   <User className="h-5 w-5" />
                   <span className="sr-only">User menu</span>
                 </Button>

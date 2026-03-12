@@ -115,9 +115,9 @@ function getGroupWidth(taskCount: number): number {
 
 function DropLine({ direction }: { direction: 'vertical' | 'horizontal' }) {
   if (direction === 'vertical') {
-    return <div className="w-0.5 h-full bg-primary rounded-full min-h-[96px]" />;
+    return <div className="w-0.5 h-full bg-primary min-h-[96px]" />;
   }
-  return <div className="h-0.5 w-full bg-primary rounded-full" />;
+  return <div className="h-0.5 w-full bg-primary" />;
 }
 
 export function StoryMapCanvas({

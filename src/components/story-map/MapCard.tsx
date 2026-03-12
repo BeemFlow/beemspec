@@ -5,8 +5,8 @@ import { cn } from '@/components/ui/utils';
 type MapCardVariant = 'activity' | 'task' | 'story';
 
 const variantStyles: Record<MapCardVariant, string> = {
-  activity: 'bg-amber-100 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800',
-  task: 'bg-sky-100 border-sky-200 dark:bg-sky-900/30 dark:border-sky-800',
+  activity: 'bg-accent-hover-subtle border-border-accent',
+  task: 'bg-input-bg border-border',
   story: 'bg-card border shadow-sm',
 };
 

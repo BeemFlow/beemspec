@@ -284,7 +284,7 @@ function TeamIntegrationsTab({
         onStatusMappingChange={onLinearStatusMappingChange}
       />
 
-      {linearStatus.type === 'success' && <p className="text-sm text-green-600">{linearStatus.message}</p>}
+      {linearStatus.type === 'success' && <p className="text-sm text-success">{linearStatus.message}</p>}
       {linearStatus.type === 'error' && <p className="text-sm text-destructive">{linearStatus.message}</p>}
     </div>
   );
@@ -325,7 +325,7 @@ function TeamMembersTab({
                 )}
               </Button>
             </div>
-            {inviteStatus.type === 'success' && <p className="text-sm text-green-600">{inviteStatus.message}</p>}
+            {inviteStatus.type === 'success' && <p className="text-sm text-success">{inviteStatus.message}</p>}
             {inviteStatus.type === 'error' && <p className="text-sm text-destructive">{inviteStatus.message}</p>}
           </form>
           <Separator />

@@ -293,13 +293,13 @@ export function StoryMapSettingsDialog({
         ) : (
           <form onSubmit={handleSave} className="space-y-4">
             {!teamLinearTeamId && (
-              <p className="rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <p className="rounded-md border border-border-accent bg-warning px-3 py-2 text-sm text-warning-foreground">
                 Configure a Linear team in Team Settings before setting map defaults.
               </p>
             )}
 
             {error && <p className="text-sm text-destructive">{error}</p>}
-            {notice && <p className="text-sm text-emerald-700">{notice}</p>}
+            {notice && <p className="text-sm text-success">{notice}</p>}
 
             <div className="space-y-2">
               <Label>Linear project (required for sync)</Label>
@@ -421,7 +421,9 @@ export function StoryMapSettingsDialog({
               <p className="text-xs text-muted-foreground">
                 Run a one-time reconciliation sync for all stories in this map.
               </p>
-              {hasUnsavedChanges && <p className="text-xs text-amber-700">Save settings before running manual sync.</p>}
+              {hasUnsavedChanges && (
+                <p className="text-xs text-warning-foreground">Save settings before running manual sync.</p>
+              )}
               {!effectiveProjectId && !hasUnsavedChanges && (
                 <p className="text-xs text-muted-foreground">Choose and save a Linear project to enable sync.</p>
               )}
