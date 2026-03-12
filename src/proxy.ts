@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env';
 
+const GUEST_ONLY_AUTH_ROUTES = new Set(['/auth/login', '/auth/signup']);
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -34,9 +36,11 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthPage = request.nextUrl.pathname.startsWith('/auth');
-  const isApiRoute = request.nextUrl.pathname.startsWith('/api');
-  const isWellKnownRoute = request.nextUrl.pathname.startsWith('/.well-known/');
+  const pathname = request.nextUrl.pathname;
+  const isAuthRoute = pathname.startsWith('/auth');
+  const isGuestOnlyAuthRoute = GUEST_ONLY_AUTH_ROUTES.has(pathname);
+  const isApiRoute = pathname.startsWith('/api');
+  const isWellKnownRoute = pathname.startsWith('/.well-known/');
 
   const nextTarget = request.nextUrl.searchParams.get('next');
   const safeNextUrl = (() => {
@@ -55,16 +59,16 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // Redirect unauthenticated users to login (except auth pages)
-  if (!user && !isAuthPage) {
+  // Redirect unauthenticated users to login (except auth routes)
+  if (!user && !isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/login';
     url.searchParams.set('next', request.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users away from auth pages
-  if (user && isAuthPage) {
+  // Redirect authenticated users away from guest-only auth pages
+  if (user && isGuestOnlyAuthRoute) {
     if (safeNextUrl) {
       return NextResponse.redirect(safeNextUrl);
     }
