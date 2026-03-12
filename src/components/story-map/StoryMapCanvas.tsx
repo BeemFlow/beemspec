@@ -483,7 +483,7 @@ export function StoryMapCanvas({
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="inline-flex flex-col">
+      <div className="inline-flex min-w-full flex-col">
         {activities.length === 0 && (
           <div className="mb-6 flex flex-col items-center justify-center py-12 text-muted-foreground">
             <p className="mb-4">Add an activity to get started.</p>
