@@ -80,8 +80,8 @@ export default function Dashboard() {
 
   return (
     <div className="p-8">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-8 flex items-center justify-between">
+      <div className="mx-auto max-w-[912px]">
+        <div className="mb-8 flex items-center justify-between gap-6">
           <h1 className="text-3xl font-bold">Story Maps</h1>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -152,14 +152,14 @@ export default function Dashboard() {
             </Button>
           </Card>
         ) : showGrid ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,280px))] justify-center gap-6">
             {storyMaps.map((map) => (
-              <Link key={map.id} href={`/story-map/${map.id}`}>
-                <Card className="h-full min-h-[220px] aspect-[35/24] transition-colors hover:bg-muted/50">
+              <Link key={map.id} href={`/story-map/${map.id}`} className="block w-[280px] max-w-full">
+                <Card className="h-full min-h-[192px] w-full transition-colors hover:bg-muted/50">
                   <CardHeader className="h-full content-start">
-                    <CardTitle className="line-clamp-2 text-2xl leading-tight">{map.name}</CardTitle>
+                    <CardTitle className="line-clamp-2 text-xl leading-tight">{map.name}</CardTitle>
                     {map.description && (
-                      <CardDescription className="line-clamp-5 text-base">{map.description}</CardDescription>
+                      <CardDescription className="line-clamp-4 text-sm">{map.description}</CardDescription>
                     )}
                   </CardHeader>
                 </Card>
