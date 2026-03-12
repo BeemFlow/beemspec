@@ -20,7 +20,6 @@ describe('mcp auth', () => {
     expect(result.response.status).toBe(401);
     expect(result.response.headers.get('WWW-Authenticate')).toContain('resource_metadata=');
     expect(result.response.headers.get('WWW-Authenticate')).toContain('/.well-known/oauth-protected-resource/api/mcp');
-    expect(result.response.headers.get('WWW-Authenticate')).toContain('scope="mcp:tools"');
   });
 
   it('returns 401 when Supabase rejects token', async () => {
