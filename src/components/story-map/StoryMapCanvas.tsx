@@ -815,6 +815,20 @@ function ReleaseRow({
               </TooltipTrigger>
               <TooltipContent>Rename</TooltipContent>
             </Tooltip>
+            {onDelete && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DeleteButton
+                    onDelete={onDelete}
+                    iconOnly
+                    className="cursor-pointer"
+                    confirmTitle="Delete release?"
+                    confirmDescription="All stories in this release will be permanently deleted."
+                  />
+                </TooltipTrigger>
+                <TooltipContent>Delete</TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -843,20 +857,6 @@ function ReleaseRow({
               </TooltipTrigger>
               <TooltipContent>Move down</TooltipContent>
             </Tooltip>
-            {onDelete && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DeleteButton
-                    onDelete={onDelete}
-                    iconOnly
-                    className="cursor-pointer"
-                    confirmTitle="Delete release?"
-                    confirmDescription="All stories in this release will be permanently deleted."
-                  />
-                </TooltipTrigger>
-                <TooltipContent>Delete</TooltipContent>
-              </Tooltip>
-            )}
             {releaseId && (
               <AgentKickoffButton
                 prompt={buildReleaseKickoffPrompt({

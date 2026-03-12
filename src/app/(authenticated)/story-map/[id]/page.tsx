@@ -1,10 +1,11 @@
 'use client';
 
-import { ArrowLeft, Settings } from 'lucide-react';
+import { ArrowLeft, Bot, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { use, useCallback, useEffect, useState } from 'react';
 import { ActivityDialog } from '@/components/story-map/ActivityDialog';
+import { McpSetupDialog } from '@/components/story-map/McpSetupDialog';
 import { StoryDialog } from '@/components/story-map/StoryDialog';
 import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas';
 import { StoryMapSettingsDialog } from '@/components/story-map/StoryMapSettingsDialog';
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { PromptDialog } from '@/components/ui/prompt-dialog';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { errorMessage } from '@/lib/errors';
 import { fetchJson } from '@/lib/http';
 import type { Activity, Story, StoryMapFull, Task } from '@/types';
@@ -45,6 +47,7 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
   const [uiError, setUiError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogState>(CLOSED);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mcpSetupOpen, setMcpSetupOpen] = useState(false);
 
   async function request(input: RequestInfo | URL, init: RequestInit | undefined, fallback: string) {
     await fetchJson(input, init, fallback);
@@ -376,6 +379,14 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         </Link>
         <h1 className="truncate text-base font-semibold sm:text-xl">{storyMap.name}</h1>
         <div className="ml-auto flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={() => setMcpSetupOpen(true)} aria-label="Connect MCP Client">
+                <Bot className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">Connect MCP Client</TooltipContent>
+          </Tooltip>
           <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Story map settings">
             <Settings className="h-4 w-4" />
           </Button>
@@ -422,6 +433,12 @@ export default function StoryMapPage({ params }: { params: Promise<{ id: string 
         onStoryMapUpdated={loadStoryMap}
         onSyncComplete={loadStoryMap}
         onDeleteStoryMap={handleDeleteStoryMap}
+      />
+
+      <McpSetupDialog
+        open={mcpSetupOpen}
+        onOpenChange={setMcpSetupOpen}
+        appOrigin={typeof window === 'undefined' ? '' : window.location.origin}
       />
 
       <StoryDialog
