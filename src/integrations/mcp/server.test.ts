@@ -455,4 +455,96 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.error).toBe('Validation failed');
     expect(updateStorySpy).not.toHaveBeenCalled();
   });
+
+  it('returns context for a backlog story', async () => {
+    const single = vi.fn().mockResolvedValue({
+      data: {
+        id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+        title: 'Backlog story',
+        release_id: null,
+        content: {
+          requirements: 'Do the backlog thing',
+          acceptance_criteria: 'It works from backlog',
+          technical_guidelines: 'Keep it simple',
+        },
+      },
+      error: null,
+    });
+    const eq = vi.fn().mockReturnValue({ single });
+    const select = vi.fn().mockReturnValue({ eq });
+    const fakeSupabase = { from: vi.fn().mockReturnValue({ select }) } as never;
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 12,
+        method: 'tools/call',
+        params: {
+          name: 'story_context_get',
+          arguments: {
+            story_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+          },
+        },
+      }),
+      fakeSupabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+
+    const payload = (await response.json()) as {
+      result: {
+        structuredContent: {
+          ok: boolean;
+          data: {
+            releaseId: string | null;
+            storyId: string;
+            storyTitle: string;
+            requirements: string;
+            acceptanceCriteria: string;
+            technicalGuidelines: string | null;
+          };
+        };
+      };
+    };
+
+    expect(payload.result.structuredContent.ok).toBe(true);
+    expect(payload.result.structuredContent.data.releaseId).toBeNull();
+    expect(payload.result.structuredContent.data.storyTitle).toBe('Backlog story');
+  });
+
+  it('returns not found for missing story context', async () => {
+    const single = vi.fn().mockResolvedValue({ data: null, error: null });
+    const eq = vi.fn().mockReturnValue({ single });
+    const select = vi.fn().mockReturnValue({ eq });
+    const fakeSupabase = { from: vi.fn().mockReturnValue({ select }) } as never;
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 13,
+        method: 'tools/call',
+        params: {
+          name: 'story_context_get',
+          arguments: {
+            story_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+          },
+        },
+      }),
+      fakeSupabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+
+    const payload = (await response.json()) as {
+      result: {
+        isError: boolean;
+        structuredContent: { ok: boolean; error: string };
+      };
+    };
+
+    expect(payload.result.isError).toBe(true);
+    expect(payload.result.structuredContent.error).toBe('Story not found');
+  });
 });

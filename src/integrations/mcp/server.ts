@@ -903,7 +903,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       const context = await getStoryContext(supabase, story_id);
 
       if (!context) {
-        return errorResult('Story not found or not assigned to a release');
+        return errorResult('Story not found');
       }
 
       return successResult(context);

@@ -1,11 +1,15 @@
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/app-shell';
 import { TeamProvider } from '@/contexts/team-context';
 import { createClient } from '@/lib/supabase/server';
 import type { TeamWithRole } from '@/types';
 
+const TEAM_COOKIE_KEY = 'beemspec_current_team_id';
+
 export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
+  const cookieStore = await cookies();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -28,9 +32,11 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
       const t = m.teams as unknown as TeamRow;
       return { id: t.id, name: t.name, created_at: t.created_at, updated_at: t.updated_at, role: m.role };
     });
+  const cookieTeamId = cookieStore.get(TEAM_COOKIE_KEY)?.value ?? null;
+  const initialCurrentTeamId = teams.some((team) => team.id === cookieTeamId) ? cookieTeamId : (teams[0]?.id ?? null);
 
   return (
-    <TeamProvider initialTeams={teams}>
+    <TeamProvider initialTeams={teams} initialCurrentTeamId={initialCurrentTeamId}>
       <AppShell userEmail={user.email ?? null}>{children}</AppShell>
     </TeamProvider>
   );

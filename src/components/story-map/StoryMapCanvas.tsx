@@ -472,18 +472,6 @@ export function StoryMapCanvas({
     return dropTargetId === itemId;
   }
 
-  if (activities.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-        <p className="mb-4">Add an activity to get started.</p>
-        <Button variant="outline" onClick={onAddActivity}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Activity
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <DndContext
       sensors={sensors}
@@ -493,6 +481,15 @@ export function StoryMapCanvas({
       onDragEnd={handleDragEnd}
     >
       <div className="inline-flex flex-col">
+        {activities.length === 0 && (
+          <div className="mb-6 flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <p className="mb-4">Add an activity to get started.</p>
+            <Button variant="outline" onClick={onAddActivity}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Activity
+            </Button>
+          </div>
+        )}
         {dragError && (
           <div className="mb-3 flex items-center justify-between rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             <span>{dragError}</span>

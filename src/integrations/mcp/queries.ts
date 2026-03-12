@@ -1,7 +1,7 @@
 import type { SupabaseLike } from '@/lib/supabase/types';
 
 interface StoryContext {
-  releaseId: string;
+  releaseId: string | null;
   storyId: string;
   storyTitle: string;
   requirements: string;
@@ -23,7 +23,7 @@ interface StoryContextRow {
 function mapStoryToContext(story: StoryContextRow): StoryContext {
   const content = story.content ?? {};
   return {
-    releaseId: story.release_id ?? '',
+    releaseId: story.release_id ?? null,
     storyId: story.id,
     storyTitle: story.title,
     requirements: content.requirements ?? '',
@@ -43,7 +43,6 @@ export async function getStoryContext(supabase: SupabaseLike, storyId: string): 
   const { data: story, error } = await table.select('id, release_id, title, content').eq('id', storyId).single();
 
   if (error || !story) return null;
-  if (!story.release_id) return null;
 
   return mapStoryToContext(story);
 }
