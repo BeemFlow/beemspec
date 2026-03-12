@@ -1,5 +1,6 @@
 'use client';
 
+import { reorderItems } from '@beemspec/storymap';
 import {
   DndContext,
   type DragEndEvent,
@@ -22,7 +23,6 @@ import { ArrowDown, ArrowUp, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { AddButton } from '@/components/story-map/AddButton';
 import { ADD_BUTTON_WIDTH, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, GROUP_GAP } from '@/components/story-map/constants';
-import { moveIdInOrder } from '@/components/story-map/drag-order';
 import { MapCard } from '@/components/story-map/MapCard';
 import { STATUS_LABELS, STATUS_VARIANTS } from '@/components/story-map/story-status';
 import { Badge } from '@/components/ui/badge';
@@ -202,7 +202,7 @@ export function StoryMapCanvas({
     try {
       // Activity reordering
       if (activeParsed.type === 'activity' && overParsed.type === 'activity') {
-        const newOrder = moveIdInOrder(
+        const newOrder = reorderItems(
           sortedActivities.map((a) => a.id),
           activeParsed.id,
           overParsed.id,
@@ -234,7 +234,7 @@ export function StoryMapCanvas({
 
           const targetActivityId = overTask.activityId;
           const tasksInTarget = getTasksForActivity(targetActivityId);
-          const newOrder = moveIdInOrder(
+          const newOrder = reorderItems(
             tasksInTarget.map((t) => t.id),
             activeParsed.id,
             overParsed.id,
@@ -258,7 +258,7 @@ export function StoryMapCanvas({
         if (overParsed.type === 'task-end') {
           const targetActivityId = overParsed.activityId;
           const tasksInTarget = getTasksForActivity(targetActivityId);
-          const newOrder = moveIdInOrder(
+          const newOrder = reorderItems(
             tasksInTarget.map((t) => t.id),
             activeParsed.id,
           );
@@ -289,7 +289,7 @@ export function StoryMapCanvas({
           if (!overStory) return;
 
           const targetStories = getStoriesForCell(overStory.task_id, overStory.release_id);
-          const newOrder = moveIdInOrder(
+          const newOrder = reorderItems(
             targetStories.map((s) => s.id),
             activeParsed.id,
             overParsed.id,
@@ -317,7 +317,7 @@ export function StoryMapCanvas({
         if (overParsed.type === 'story-end') {
           const { taskId, releaseId } = overParsed;
           const targetStories = getStoriesForCell(taskId, releaseId);
-          const newOrder = moveIdInOrder(
+          const newOrder = reorderItems(
             targetStories.map((s) => s.id),
             activeParsed.id,
           );

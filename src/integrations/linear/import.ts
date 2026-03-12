@@ -1,4 +1,5 @@
 import { buildStoryPatchFromLinearIssue } from '@beemspec/linear';
+import { emptyContent } from '@beemspec/storymap';
 import { toStoryMapLinearImportSettings } from '@/integrations/linear/settings';
 import { upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import type { StoryStatus } from '@/integrations/sync';
@@ -209,11 +210,7 @@ export async function importLinearIssueIntoStoryMap(input: {
   const dbUpdate = buildDbUpdateFromPatch(patch, null);
   const title = normalize(patch.title) ?? normalize(input.title) ?? input.linearIssueIdentifier ?? input.linearIssueId;
   const status = (patch.status ?? 'backlog') as StoryStatus;
-  const content = (dbUpdate.content as Record<string, unknown> | null) ?? {
-    _version: 1,
-    requirements: '',
-    acceptance_criteria: '',
-  };
+  const content = (dbUpdate.content as Record<string, unknown> | null) ?? emptyContent();
 
   const { data: createdStory, error: createStoryError } = await input.supabase
     .from('stories')

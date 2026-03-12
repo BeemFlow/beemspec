@@ -1,23 +1,7 @@
 // Content helpers
 export { CONTENT_VERSION, createContent, emptyContent, isStoryContent } from './content';
 // Spatial operations
-export {
-  addActivity,
-  addRelease,
-  addStory,
-  addTask,
-  findStory,
-  getStoriesForCell,
-  getTasksForActivity,
-  moveStory,
-  moveTask,
-  removeActivity,
-  removeRelease,
-  removeStory,
-  removeTask,
-  reorderItems,
-  updateStory,
-} from './operations';
+export { reorderItems } from './operations';
 export type {
   CreateActivity,
   CreatePersona,
@@ -67,8 +51,6 @@ export {
   updateStorySchema,
   updateTaskSchema,
 } from './schemas';
-// Tree transformations
-export { buildTree, flattenTree } from './tree';
 export type {
   Activity,
   ActivityWithTasks,

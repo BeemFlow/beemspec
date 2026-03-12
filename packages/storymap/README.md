@@ -1,6 +1,6 @@
 # @beemspec/storymap
 
-Headless story map kernel — types, spatial operations, and tree transforms for Jeff Patton-style story mapping.
+Headless story map kernel — types, validation schemas, and pure ordering/content helpers for Jeff Patton-style story mapping.
 
 ## What this is
 
@@ -30,7 +30,7 @@ Each story carries structured content:
 | Field | Location | Required | Purpose |
 |---|---|---|---|
 | `title` | scalar | yes | Identity — what is this story |
-| `status` | scalar | yes | Workflow state (backlog, ready, in_progress, review, done) |
+| `status` | scalar | yes | Workflow state (backlog, todo, in_progress, in_review, done) |
 | `requirements` | content JSON | yes | The "what" — what should be built |
 | `acceptance_criteria` | content JSON | yes | The "done" — how to verify it works |
 | `figma_link` | content JSON | no | Design reference |
@@ -53,27 +53,13 @@ npm install @beemspec/storymap
 import type { Story, StoryContent, StoryMapFull, Activity, Task, Release } from '@beemspec/storymap';
 ```
 
-### Build a tree from flat DB rows
+### Ordering helper
 
 ```typescript
-import { buildTree } from '@beemspec/storymap';
-
-const map = buildTree(mapRow, activityRows, taskRows, releaseRows, storyRows);
-```
-
-### Spatial operations
-
-```typescript
-import { reorderItems, moveStory, moveTask, findStory } from '@beemspec/storymap';
+import { reorderItems } from '@beemspec/storymap';
 
 // Reorder items in a lane
 const newOrder = reorderItems(['a', 'b', 'c'], 'c', 'a'); // ['c', 'a', 'b']
-
-// Move a story to a different cell
-const moved = moveStory(story, newTaskId, newReleaseId);
-
-// Move a task to a different activity
-const movedTask = moveTask(task, newActivityId);
 ```
 
 ### Content helpers
@@ -86,15 +72,8 @@ const content = createContent({
   acceptance_criteria: '- [ ] Google OAuth button on login page',
   technical_guidelines: 'Use NextAuth.js with Google provider',
 });
-```
 
-### Flatten tree back for persistence
-
-```typescript
-import { flattenTree } from '@beemspec/storymap';
-
-const { map, activities, tasks, releases, stories } = flattenTree(storyMapFull);
-// Persist each array to your DB however you want
+const blank = emptyContent();
 ```
 
 ## Why these content fields

@@ -1,4 +1,4 @@
-import type { StoryContent } from '@beemspec/storymap';
+import { emptyContent, type StoryContent } from '@beemspec/storymap';
 import type { StoryPatchFromRemote } from './types';
 
 /**
@@ -30,11 +30,7 @@ export function buildDbUpdateFromPatch(
   if (patch.status) dbUpdate.status = patch.status;
 
   if (patch.content) {
-    const base = (currentContent as Record<string, unknown> | null) ?? {
-      _version: 1,
-      requirements: '',
-      acceptance_criteria: '',
-    };
+    const base = (currentContent as Record<string, unknown> | null) ?? emptyContent();
     dbUpdate.content = { ...base, ...patch.content };
   }
 

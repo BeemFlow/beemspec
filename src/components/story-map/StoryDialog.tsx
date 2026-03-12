@@ -1,5 +1,6 @@
 'use client';
 
+import { createContent, type StoryContent } from '@beemspec/storymap';
 import { useEffect, useState } from 'react';
 import { STATUS_OPTIONS } from '@/components/story-map/story-status';
 import { Button } from '@/components/ui/button';
@@ -13,14 +14,7 @@ import type { Release, Story, StoryStatus } from '@/types';
 
 interface StoryFormData {
   title: string;
-  content: {
-    _version: 1;
-    requirements: string;
-    acceptance_criteria: string;
-    figma_link?: string | null;
-    edge_cases?: string | null;
-    technical_guidelines?: string | null;
-  };
+  content: StoryContent;
   status: StoryStatus;
   release_id: string | null;
 }
@@ -80,14 +74,13 @@ export function StoryDialog({ open, onOpenChange, story, releases, defaultReleas
       setIsSubmitting(true);
       await onSave({
         title,
-        content: {
-          _version: 1,
+        content: createContent({
           requirements,
           acceptance_criteria: acceptanceCriteria,
           figma_link: figmaLink || null,
           edge_cases: edgeCases || null,
           technical_guidelines: technicalGuidelines || null,
-        },
+        }),
         status,
         release_id: releaseId === NO_RELEASE ? null : releaseId,
       });
