@@ -36,7 +36,7 @@ interface StoryRow {
   title: string;
   status: string;
   content?: {
-    requirements?: string;
+    user_story?: string;
     acceptance_criteria?: string;
     edge_cases?: string | null;
     technical_guidelines?: string | null;
@@ -126,7 +126,7 @@ function toSessionStories(toolResult: StoryMapToolResult): OpenCodeSessionContex
           storyTitle: story.title,
           activityName: activity.name ?? '',
           taskName: task.name ?? '',
-          requirements: story.content?.requirements ?? '',
+          userStory: story.content?.user_story ?? '',
           acceptanceCriteria: story.content?.acceptance_criteria ?? '',
           edgeCases: story.content?.edge_cases ?? null,
           technicalGuidelines: story.content?.technical_guidelines ?? null,

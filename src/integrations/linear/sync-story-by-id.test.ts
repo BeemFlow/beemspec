@@ -51,7 +51,7 @@ describe('processStoryLinearSyncById', () => {
         story: {
           id: 'story_1',
           title: 'Story',
-          content: { _version: 1, requirements: 'r', acceptance_criteria: 'a' },
+          content: { _version: 1, user_story: 'r', acceptance_criteria: 'a' },
           status: 'todo',
         },
       },

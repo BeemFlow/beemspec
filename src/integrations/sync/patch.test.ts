@@ -4,7 +4,7 @@ import { buildDbUpdateFromPatch, hasMutableStoryFields } from './patch';
 describe('hasMutableStoryFields', () => {
   it('returns true when patch has title, content, or status', () => {
     expect(hasMutableStoryFields({ title: 'x', updated_at: '' })).toBe(true);
-    expect(hasMutableStoryFields({ content: { requirements: 'r' }, updated_at: '' })).toBe(true);
+    expect(hasMutableStoryFields({ content: { user_story: 'r' }, updated_at: '' })).toBe(true);
     expect(hasMutableStoryFields({ status: 'done', updated_at: '' })).toBe(true);
   });
 
@@ -24,25 +24,22 @@ describe('buildDbUpdateFromPatch', () => {
   });
 
   it('merges content patch into existing content', () => {
-    const existing = { _version: 1 as const, requirements: 'old', acceptance_criteria: 'old ac' };
+    const existing = { _version: 1 as const, user_story: 'old', acceptance_criteria: 'old ac' };
     const result = buildDbUpdateFromPatch(
-      { content: { requirements: 'new' }, updated_at: '2026-01-01T00:00:00Z' },
+      { content: { user_story: 'new' }, updated_at: '2026-01-01T00:00:00Z' },
       existing,
     );
     expect(result).toEqual({
       updated_at: '2026-01-01T00:00:00Z',
-      content: { _version: 1, requirements: 'new', acceptance_criteria: 'old ac' },
+      content: { _version: 1, user_story: 'new', acceptance_criteria: 'old ac' },
     });
   });
 
   it('uses default empty content when no current content exists', () => {
-    const result = buildDbUpdateFromPatch(
-      { content: { requirements: 'new' }, updated_at: '2026-01-01T00:00:00Z' },
-      null,
-    );
+    const result = buildDbUpdateFromPatch({ content: { user_story: 'new' }, updated_at: '2026-01-01T00:00:00Z' }, null);
     expect(result).toEqual({
       updated_at: '2026-01-01T00:00:00Z',
-      content: { _version: 1, requirements: 'new', acceptance_criteria: '' },
+      content: { _version: 1, user_story: 'new', acceptance_criteria: '' },
     });
   });
 });

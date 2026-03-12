@@ -46,7 +46,7 @@ export function StoryDialog({
   onDelete,
 }: Props) {
   const [title, setTitle] = useState('');
-  const [requirements, setRequirements] = useState('');
+  const [userStory, setUserStory] = useState('');
   const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
   const [figmaLink, setFigmaLink] = useState('');
   const [edgeCases, setEdgeCases] = useState('');
@@ -59,7 +59,7 @@ export function StoryDialog({
   useEffect(() => {
     if (story) {
       setTitle(story.title);
-      setRequirements(story.content.requirements);
+      setUserStory(story.content.user_story);
       setAcceptanceCriteria(story.content.acceptance_criteria);
       setFigmaLink(story.content.figma_link || '');
       setEdgeCases(story.content.edge_cases || '');
@@ -68,7 +68,7 @@ export function StoryDialog({
       setReleaseId(story.release_id || NO_RELEASE);
     } else {
       setTitle('');
-      setRequirements('');
+      setUserStory('');
       setAcceptanceCriteria('');
       setFigmaLink('');
       setEdgeCases('');
@@ -88,7 +88,7 @@ export function StoryDialog({
       await onSave({
         title,
         content: createContent({
-          requirements,
+          user_story: userStory,
           acceptance_criteria: acceptanceCriteria,
           figma_link: figmaLink || null,
           edge_cases: edgeCases || null,
@@ -136,11 +136,11 @@ export function StoryDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="requirements">Requirements * (What should be built?)</Label>
+            <Label htmlFor="user-story">User Story * (Who wants what and why?)</Label>
             <Textarea
-              id="requirements"
-              value={requirements}
-              onChange={(e) => setRequirements(e.target.value)}
+              id="user-story"
+              value={userStory}
+              onChange={(e) => setUserStory(e.target.value)}
               placeholder="As a user, I want to sign in with my Google account so that..."
               rows={3}
               disabled={isSubmitting}

@@ -5,7 +5,7 @@ export interface OpenCodeSessionContext {
   storyTitle: string;
   activityName: string;
   taskName: string;
-  requirements: string;
+  userStory: string;
   acceptanceCriteria: string;
   edgeCases: string | null;
   technicalGuidelines: string | null;

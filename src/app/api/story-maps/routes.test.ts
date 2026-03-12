@@ -130,7 +130,7 @@ describe('story map domain routes', () => {
       jsonRequest({
         task_id: VALID_ID,
         title: 'Login',
-        content: { requirements: 'As a user...', acceptance_criteria: '- [ ] Can log in' },
+        content: { user_story: 'As a user...', acceptance_criteria: '- [ ] Can log in' },
       }),
     );
 
@@ -149,7 +149,7 @@ describe('story map domain routes', () => {
     const { client } = createInsertClient({
       id: VALID_ID,
       title: 'Login',
-      content: { _version: 1, requirements: 'r', acceptance_criteria: 'a' },
+      content: { _version: 1, user_story: 'r', acceptance_criteria: 'a' },
       status: 'backlog',
     });
     vi.mocked(createClient).mockResolvedValue(client as never);
@@ -158,7 +158,7 @@ describe('story map domain routes', () => {
       jsonRequest({
         task_id: VALID_ID,
         title: 'Login',
-        content: { requirements: 'As a user...', acceptance_criteria: '- [ ] Can log in' },
+        content: { user_story: 'As a user...', acceptance_criteria: '- [ ] Can log in' },
       }),
     );
     expect(processStoryLinearSyncById).toHaveBeenCalled();

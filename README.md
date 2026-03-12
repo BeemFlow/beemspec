@@ -4,7 +4,7 @@ BeemSpec is the planning layer for AI-native software teams. It connects product
 
 ## The problem
 
-Product teams spend significant effort translating plans into work that developers (or AI agents) can act on. Requirements live in one tool, tasks in another, and context is lost at every handoff. When AI coding agents enter the picture, the gap gets worse -- they need structured, complete context to produce good output, and most planning tools weren't built to provide that.
+Product teams spend significant effort translating plans into work that developers (or AI agents) can act on. User stories live in one tool, tasks in another, and context is lost at every handoff. When AI coding agents enter the picture, the gap gets worse -- they need structured, complete context to produce good output, and most planning tools weren't built to provide that.
 
 ## What BeemSpec does
 
@@ -12,7 +12,7 @@ BeemSpec is a **story mapping and release planning tool** with an **agent-ready 
 
 ### Plan visually with story maps
 
-Lay out your product as a story map -- a grid where columns represent user activities and tasks, and rows represent releases. Drop stories into the grid to define what ships when. Each story captures requirements, acceptance criteria, design links, edge cases, and technical guidelines in structured fields that both humans and AI agents can consume.
+Lay out your product as a story map -- a grid where columns represent user activities and tasks, and rows represent releases. Drop stories into the grid to define what ships when. Each story captures a user story, acceptance criteria, design links, edge cases, and technical guidelines in structured fields that both humans and AI agents can consume.
 
 ### Build with AI agents
 
@@ -35,7 +35,7 @@ BeemSpec sits at the top of this stack. It syncs planning state to Linear and ex
 ## Key capabilities
 
 - **Story map management**: activities, tasks, stories, and release slicing with full drag-and-drop
-- **Structured story specs**: requirements, acceptance criteria, design links, edge cases, and technical notes
+- **Structured story specs**: user story, acceptance criteria, design links, edge cases, and technical notes
 - **Agent kickoff prompts**: copy a release-targeted starter prompt that instructs agents to fetch current context through MCP
 - **Linear integration**: bidirectional sync with OAuth, webhook ingestion, and batch backfill for drift correction
 - **Team collaboration**: authentication, team switching, member invites, role-based access

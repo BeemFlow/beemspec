@@ -301,7 +301,7 @@ describe('mcp server', () => {
             task_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
             title: 'Implement sign-in',
             content: {
-              requirements: 'User can sign in',
+              user_story: 'User can sign in',
               acceptance_criteria: '- [ ] Sign in succeeds',
             },
             status: 'backlog',
@@ -570,7 +570,7 @@ describe('mcp server', () => {
                     sort_order: 3,
                     release_id: null,
                     content: {
-                      requirements: 'Do the backlog thing',
+                      user_story: 'Do the backlog thing',
                       acceptance_criteria: 'It works from backlog',
                       edge_cases: 'Handle empty states',
                       technical_guidelines: 'Keep it simple',
@@ -689,7 +689,7 @@ describe('mcp server', () => {
             storyMapName: string;
             activityName: string;
             taskName: string;
-            requirements: string;
+            userStory: string;
             acceptanceCriteria: string;
             edgeCases: string | null;
             technicalGuidelines: string | null;

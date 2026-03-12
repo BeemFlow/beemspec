@@ -11,7 +11,7 @@ export const CONTENT_VERSION = 1 as const;
 export function emptyContent(): StoryContent {
   return {
     _version: CONTENT_VERSION,
-    requirements: '',
+    user_story: '',
     acceptance_criteria: '',
   };
 }
@@ -20,7 +20,7 @@ export function emptyContent(): StoryContent {
 export function createContent(input: Omit<StoryContent, '_version'> & { _version?: number }): StoryContent {
   return {
     _version: CONTENT_VERSION,
-    requirements: input.requirements,
+    user_story: input.user_story,
     acceptance_criteria: input.acceptance_criteria,
     figma_link: input.figma_link ?? null,
     edge_cases: input.edge_cases ?? null,
@@ -34,7 +34,7 @@ export function isStoryContent(value: unknown): value is StoryContent {
   const obj = value as Record<string, unknown>;
   return (
     typeof obj._version === 'number' &&
-    typeof obj.requirements === 'string' &&
+    typeof obj.user_story === 'string' &&
     typeof obj.acceptance_criteria === 'string'
   );
 }

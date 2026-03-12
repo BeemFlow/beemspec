@@ -58,8 +58,8 @@ export type StoryStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'do
  */
 export interface StoryContent {
   _version: 1;
-  /** The "what" — what should be built. */
-  requirements: string;
+  /** The user story — who wants what and why. */
+  user_story: string;
   /** The "done" — how do we verify it works. */
   acceptance_criteria: string;
   /** Design reference — what it should look like. */

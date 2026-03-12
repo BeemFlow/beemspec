@@ -26,8 +26,8 @@ export function buildStoryPatchFromLinearIssue(input: LinearIssueForSync): Story
   // Build content patch from parsed description fields
   const contentPatch: Partial<StoryContent> = {};
   let hasContentFields = false;
-  if (typeof fromDescription.requirements === 'string') {
-    contentPatch.requirements = fromDescription.requirements;
+  if (typeof fromDescription.user_story === 'string') {
+    contentPatch.user_story = fromDescription.user_story;
     hasContentFields = true;
   }
   if (typeof fromDescription.acceptance_criteria === 'string') {

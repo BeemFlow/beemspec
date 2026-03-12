@@ -5,7 +5,7 @@ describe('buildStoryPatchFromLinearIssue', () => {
   it('builds patch from linear issue snapshot fields', () => {
     const patch = buildStoryPatchFromLinearIssue({
       title: 'Remote title',
-      description: '## Requirements\nReq\n\n## Acceptance Criteria\n- [ ] AC',
+      description: '## User Story\nReq\n\n## Acceptance Criteria\n- [ ] AC',
       stateName: 'In Progress',
       updatedAt: '2026-02-14T11:00:00.000Z',
     });
@@ -13,7 +13,7 @@ describe('buildStoryPatchFromLinearIssue', () => {
     expect(patch).toMatchObject({
       title: 'Remote title',
       content: {
-        requirements: 'Req',
+        user_story: 'Req',
         acceptance_criteria: '- [ ] AC',
       },
       status: 'in_progress',

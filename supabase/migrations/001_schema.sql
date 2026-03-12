@@ -142,7 +142,7 @@ CREATE TABLE stories (
   release_id UUID REFERENCES releases(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   status TEXT DEFAULT 'backlog' CHECK(status IN ('backlog', 'todo', 'in_progress', 'in_review', 'done')),
-  content JSONB NOT NULL DEFAULT '{"_version": 1, "requirements": "", "acceptance_criteria": ""}',
+  content JSONB NOT NULL DEFAULT '{"_version": 1, "user_story": "", "acceptance_criteria": ""}',
   sort_order INTEGER DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

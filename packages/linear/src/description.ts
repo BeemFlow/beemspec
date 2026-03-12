@@ -43,7 +43,7 @@ function normalizeFigmaLink(value: string | null): string | null {
 export function buildLinearDescription(story: StoryForSync): string {
   const { content } = story;
   const parts = [
-    section('Requirements', content.requirements),
+    section('User Story', content.user_story),
     section('Acceptance Criteria', content.acceptance_criteria),
     section('Figma', content.figma_link),
     section('Edge Cases', content.edge_cases),
@@ -59,7 +59,7 @@ export function buildLinearDescription(story: StoryForSync): string {
 // ---------------------------------------------------------------------------
 
 export interface ParsedLinearStoryFields {
-  requirements?: string;
+  user_story?: string;
   acceptance_criteria?: string;
   figma_link?: string | null;
   edge_cases?: string | null;
@@ -70,14 +70,14 @@ export interface ParsedLinearStoryFields {
 export function parseLinearDescriptionToStoryFields(description: string | null): ParsedLinearStoryFields {
   if (!description) return {};
 
-  const requirements = sectionBody(description, 'Requirements');
+  const userStory = sectionBody(description, 'User Story') ?? sectionBody(description, 'Requirements');
   const acceptanceCriteria = sectionBody(description, 'Acceptance Criteria');
   const figmaLink = sectionBody(description, 'Figma');
   const edgeCases = sectionBody(description, 'Edge Cases');
   const technicalGuidelines = sectionBody(description, 'Technical Guidelines');
 
   return {
-    requirements: requirements ?? undefined,
+    user_story: userStory ?? undefined,
     acceptance_criteria: acceptanceCriteria ?? undefined,
     ...(figmaLink !== null ? { figma_link: normalizeFigmaLink(figmaLink) } : {}),
     edge_cases: edgeCases ?? undefined,

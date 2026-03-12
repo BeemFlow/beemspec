@@ -20,7 +20,7 @@ interface StoryContext {
   releaseName: string | null;
   releaseDescription: string | null;
   releaseSortOrder: number | null;
-  requirements: string;
+  userStory: string;
   acceptanceCriteria: string;
   edgeCases: string | null;
   technicalGuidelines: string | null;
@@ -51,7 +51,7 @@ interface StoryContextRow {
   status: string;
   title: string;
   content: {
-    requirements?: string;
+    user_story?: string;
     acceptance_criteria?: string;
     edge_cases?: string | null;
     technical_guidelines?: string | null;
@@ -209,7 +209,7 @@ export async function getStoryContext(supabase: SupabaseLike, storyId: string): 
     releaseName: release?.name ?? null,
     releaseDescription: release?.description ?? null,
     releaseSortOrder: release?.sort_order ?? null,
-    requirements: content.requirements ?? '',
+    userStory: content.user_story ?? '',
     acceptanceCriteria: content.acceptance_criteria ?? '',
     edgeCases: content.edge_cases ?? null,
     technicalGuidelines: content.technical_guidelines ?? null,

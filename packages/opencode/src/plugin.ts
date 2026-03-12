@@ -11,8 +11,8 @@ function compactedContextForStories(stories: OpenCodeSessionContext[]): string[]
         `Placement: release=${story.releaseName ?? 'backlog'}, activity=${story.activityName || 'unknown'}, task=${story.taskName || 'unknown'}`,
       );
     }
-    if (story.requirements) {
-      lines.push(`Requirements: ${story.requirements}`);
+    if (story.userStory) {
+      lines.push(`User Story: ${story.userStory}`);
     }
     lines.push(`Acceptance Criteria: ${story.acceptanceCriteria}`);
     if (story.edgeCases) {

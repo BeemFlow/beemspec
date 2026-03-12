@@ -160,6 +160,7 @@ type StoryLike = {
   status: string;
   release_id: string | null;
   content?: {
+    user_story?: string;
     acceptance_criteria?: string;
     edge_cases?: string | null;
     figma_link?: string | null;
@@ -483,7 +484,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
           'Use story_update for content or status changes; use story_move/task_move for placement changes; use *_reorder only when you already know the full ordered ID list.',
           'Use story_context_get only when one story needs full implementation context, including workflow placement, personas, and any Figma link.',
           'Avoid redundant reads: if you already have the needed story or map context in the current session, continue working instead of re-fetching it.',
-          'Treat inferred requirements, acceptance criteria, personas, and release plans as drafts unless the user explicitly asks you to synthesize them.',
+          'Treat inferred user stories, acceptance criteria, personas, and release plans as drafts unless the user explicitly asks you to synthesize them.',
         ],
         story_mapping_principles: [
           'Keep the backbone as user workflow steps in narrative order, not engineering components or team ownership lanes.',
@@ -498,7 +499,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         ],
         story_quality_checklist: [
           'Title expresses user-visible value or outcome, not just an implementation task.',
-          'Requirements describe what should happen.',
+          'User story explains who wants what and why.',
           'Acceptance criteria are specific, observable, and testable.',
           'Edge cases and technical guidelines are included when they materially reduce ambiguity or implementation risk.',
           'If a Figma link is present, treat it as required design context for UI work.',

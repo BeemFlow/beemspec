@@ -7,7 +7,7 @@ const story = {
   title: 'Login',
   content: {
     _version: 1 as const,
-    requirements: 'As a user, I can log in.',
+    user_story: 'As a user, I can log in.',
     acceptance_criteria: '- [ ] Can submit credentials',
     edge_cases: 'Locked account',
     technical_guidelines: 'Use existing auth API',
@@ -24,18 +24,18 @@ describe('linear description formatting', () => {
 
     expect(input.title).toBe('Login');
     expect(input.teamId).toBe('team_1');
-    expect(input.description).toContain('## Requirements');
+    expect(input.description).toContain('## User Story');
     expect(input.description).toContain('## Acceptance Criteria');
     expect(input.description).toContain('## BeemSpec Story ID');
   });
 
   it('parses mirrored story fields from linear description', () => {
     const parsed = parseLinearDescriptionToStoryFields(
-      ['## Requirements', 'As a user...', '', '## Acceptance Criteria', '- [ ] Works'].join('\n'),
+      ['## User Story', 'As a user...', '', '## Acceptance Criteria', '- [ ] Works'].join('\n'),
     );
 
     expect(parsed).toMatchObject({
-      requirements: 'As a user...',
+      user_story: 'As a user...',
       acceptance_criteria: '- [ ] Works',
     });
   });

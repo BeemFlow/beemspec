@@ -86,7 +86,7 @@ function createWebhookAdminClient(
       updated_at: options.localStoryUpdatedAt ?? '2026-02-14T10:00:00.000Z',
       content: {
         _version: 1,
-        requirements: 'Existing req',
+        user_story: 'Existing req',
         acceptance_criteria: 'Existing AC',
       },
     },
@@ -203,8 +203,7 @@ describe('linear webhook route', () => {
         id: 'lin_1',
         identifier: 'ENG-101',
         title: 'Story title updated from Linear',
-        description:
-          '## Requirements\nUpdated req\n\n## Acceptance Criteria\n- [ ] Updated AC\n\n## Status\nIn Progress',
+        description: '## User Story\nUpdated req\n\n## Acceptance Criteria\n- [ ] Updated AC\n\n## Status\nIn Progress',
         state: { name: 'In Progress' },
         updatedAt: '2026-02-14T11:00:00.000Z',
       },

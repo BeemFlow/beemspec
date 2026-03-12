@@ -31,7 +31,7 @@ Each story carries structured content:
 |---|---|---|---|
 | `title` | scalar | yes | Identity — what is this story |
 | `status` | scalar | yes | Workflow state (backlog, todo, in_progress, in_review, done) |
-| `requirements` | content JSON | yes | The "what" — what should be built |
+| `user_story` | content JSON | yes | The user story — who wants what and why |
 | `acceptance_criteria` | content JSON | yes | The "done" — how to verify it works |
 | `figma_link` | content JSON | no | Design reference |
 | `edge_cases` | content JSON | no | Failure modes to handle |
@@ -68,7 +68,7 @@ const newOrder = reorderItems(['a', 'b', 'c'], 'c', 'a'); // ['c', 'a', 'b']
 import { createContent, emptyContent, isStoryContent } from '@beemspec/storymap';
 
 const content = createContent({
-  requirements: 'As a user, I want to sign in with Google...',
+  user_story: 'As a user, I want to sign in with Google...',
   acceptance_criteria: '- [ ] Google OAuth button on login page',
   technical_guidelines: 'Use NextAuth.js with Google provider',
 });
@@ -80,7 +80,7 @@ const blank = emptyContent();
 
 These fields exist because they are the minimum structured context a human or AI agent needs to build from a story:
 
-- **Requirements**: What should be built. Without this, the story is just a title.
+- **User story**: Who wants what and why. Without this, the story loses its core user value.
 - **Acceptance criteria**: How to verify it works. Without this, no one can confirm the work is done.
 - **Edge cases**: What could go wrong. Prevents both humans and AI from missing failure modes.
 - **Technical guidelines**: Implementation constraints. Keeps the work within architectural boundaries.

@@ -12,7 +12,7 @@ export interface StoryContextRow {
   task_name?: string;
   release_id?: string | null;
   content: {
-    requirements?: string;
+    user_story?: string;
     acceptance_criteria?: string;
     edge_cases?: string | null;
     technical_guidelines?: string | null;
@@ -30,7 +30,7 @@ export function mapStoryToSessionContext(story: StoryContextRow): OpenCodeSessio
     storyTitle: story.title,
     activityName: story.activity_name ?? '',
     taskName: story.task_name ?? '',
-    requirements: content.requirements ?? '',
+    userStory: content.user_story ?? '',
     acceptanceCriteria: content.acceptance_criteria ?? '',
     edgeCases: content.edge_cases ?? null,
     technicalGuidelines: content.technical_guidelines ?? null,

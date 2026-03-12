@@ -25,7 +25,7 @@ export const storyStatus = z.enum(['backlog', 'todo', 'in_progress', 'in_review'
 export const storyContentSchema = z
   .object({
     _version: z.literal(1).optional().default(1),
-    requirements: z.string().min(1, 'Required'),
+    user_story: z.string().min(1, 'Required'),
     acceptance_criteria: z.string().min(1, 'Required'),
     figma_link: z.url().nullable().optional(),
     edge_cases: nullableString.optional(),

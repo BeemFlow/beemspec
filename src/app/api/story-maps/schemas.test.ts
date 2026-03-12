@@ -14,7 +14,7 @@ describe('story-map schemas', () => {
       task_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
       title: 'Story title',
       content: {
-        requirements: 'Reqs',
+        user_story: 'Reqs',
         acceptance_criteria: 'AC',
       },
     });
