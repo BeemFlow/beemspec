@@ -6,11 +6,12 @@ import { applySuggestedLinearSettings, resolveLinearOptions } from '@/integratio
 import { OAUTH_STATE_COOKIE, parseStateCookie } from '@/integrations/linear/oauth';
 import { exchangeLinearOAuthCode } from '@/integrations/linear/oauth-token';
 import { requireAuth } from '@/lib/auth';
+import { resolveRequestOrigin } from '@/lib/request-url';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isTeamOwnerForRequest } from '@/lib/teams';
 
 function redirectWithState(request: Request, returnTo: string, status: 'success' | 'error', reason?: string) {
-  const base = new URL(returnTo, request.url);
+  const base = new URL(returnTo, resolveRequestOrigin(request));
   if (status === 'success') {
     base.searchParams.set('linear_oauth', 'success');
   } else {

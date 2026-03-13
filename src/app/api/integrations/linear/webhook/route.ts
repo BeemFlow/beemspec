@@ -119,7 +119,6 @@ function parseAndVerifyEvent(request: Request, rawBody: string): WebhookEvent | 
   return event;
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: webhook event orchestration is intentionally centralized
 async function processIssueEvent(
   supabase: ReturnType<typeof createAdminClient>,
   event: WebhookEvent,

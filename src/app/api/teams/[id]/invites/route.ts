@@ -1,8 +1,8 @@
-import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { inviteEmailSchema } from '@/app/api/teams/schemas';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
+import { resolveRequestOrigin } from '@/lib/request-url';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
@@ -72,11 +72,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return serverErrorResponse('Failed to create invite', inviteError);
   }
 
-  // Get origin for redirect URL
-  const headersList = await headers();
-  const host = headersList.get('host') || 'localhost:3000';
-  const protocol = host.includes('localhost') ? 'http' : 'https';
-  const origin = `${protocol}://${host}`;
+  const origin = resolveRequestOrigin(request);
 
   // Call Supabase inviteUserByEmail
   const adminClient = createAdminClient();

@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server';
 import { OAUTH_STATE_COOKIE, serializeStateCookie } from '@/integrations/linear/oauth';
 import { createLinearOAuthAuthorizeUrl } from '@/integrations/linear/oauth-token';
 import { requireAuth } from '@/lib/auth';
+import { resolveRequestOrigin, resolveSafeRedirectPath } from '@/lib/request-url';
 import { isTeamOwnerForRequest } from '@/lib/teams';
 import { isValidUuid } from '@/lib/validations';
 
 function resolveReturnTo(request: Request): string {
   const value = new URL(request.url).searchParams.get('return_to');
-  if (!value || !value.startsWith('/')) return '/';
-  return value;
+  return resolveSafeRedirectPath(value);
 }
 
 export async function GET(request: Request) {
@@ -26,6 +26,7 @@ export async function GET(request: Request) {
 
   const state = crypto.randomUUID();
   const returnTo = resolveReturnTo(request);
+  const isSecure = new URL(resolveRequestOrigin(request)).protocol === 'https:';
   let authorizeUrl: string;
 
   try {
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
     value: serializeStateCookie({ state, teamId, userId: auth.user.id, returnTo }),
     httpOnly: true,
     sameSite: 'lax',
-    secure: new URL(request.url).protocol === 'https:',
+    secure: isSecure,
     path: '/',
     maxAge: 10 * 60,
   });

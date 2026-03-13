@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { resolveRequestUrl } from '@/lib/request-url';
 import { createClient } from '@/lib/supabase/server';
 
 type OAuthDecisionResponse = {
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    const loginUrl = new URL('/auth/login', request.url);
+    const loginUrl = resolveRequestUrl(request, '/auth/login');
     loginUrl.searchParams.set('next', `/oauth/consent?authorization_id=${encodeURIComponent(authorizationId)}`);
     return NextResponse.redirect(loginUrl);
   }

@@ -25,7 +25,12 @@ export default function Dashboard() {
   const [isCreating, setIsCreating] = useState(false);
 
   const loadStoryMaps = useCallback(async () => {
-    if (!currentTeam) return;
+    if (!currentTeam) {
+      setStoryMaps([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
@@ -77,6 +82,7 @@ export default function Dashboard() {
 
   const showEmpty = !loading && currentTeam && storyMaps.length === 0;
   const showGrid = !loading && currentTeam && storyMaps.length > 0;
+  const showNoTeamState = !loading && !currentTeam;
 
   return (
     <div className="p-8">
@@ -135,6 +141,13 @@ export default function Dashboard() {
             >
               Retry
             </Button>
+          </Card>
+        ) : showNoTeamState ? (
+          <Card className="border-dashed p-8 text-center">
+            <h3 className="font-medium">Create or select a team to get started</h3>
+            <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
+              Use the team menu in the top right to create your first workspace before making story maps.
+            </p>
           </Card>
         ) : loading ? (
           <p className="text-muted-foreground">Loading...</p>
