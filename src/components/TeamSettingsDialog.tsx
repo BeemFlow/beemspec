@@ -55,6 +55,7 @@ interface TeamIntegrationsTabProps {
   onConnectLinear: () => void;
   onDisconnectLinear: () => Promise<void>;
   onSaveLinearSettings: (event: React.FormEvent) => Promise<void>;
+  onLinearTeamChange: (value: string) => void;
   onLinearStatusMappingChange: (
     status: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done',
     value: string,
@@ -171,6 +172,7 @@ function LinearSettingsForm(input: {
   statusMapping: Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>;
   saving: boolean;
   onSave: (event: React.FormEvent) => Promise<void>;
+  onTeamChange: (value: string) => void;
   onStatusMappingChange: (status: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', value: string) => void;
 }) {
   const NO_SELECTION = '__none__';
@@ -186,7 +188,6 @@ function LinearSettingsForm(input: {
   ];
 
   const selectedTeam = input.teamOptions.find((team) => team.id === input.teamId);
-  const teamDisplay = selectedTeam ? `${selectedTeam.name}${selectedTeam.key ? ` (${selectedTeam.key})` : ''}` : '';
 
   return (
     <form onSubmit={input.onSave} className="space-y-3">
@@ -196,7 +197,30 @@ function LinearSettingsForm(input: {
       </div>
       <div className="space-y-2">
         <Label>Linear team</Label>
-        <Input id="linear-team-name" value={teamDisplay} disabled readOnly placeholder="No team selected" />
+        <Select
+          value={input.teamId || NO_SELECTION}
+          onValueChange={(value) => input.onTeamChange(value === NO_SELECTION ? '' : value)}
+          disabled={!input.isOwner || input.saving || input.optionsLoading || input.teamOptions.length === 0}
+        >
+          <SelectTrigger id="linear-team-name" className="w-full">
+            <SelectValue placeholder={input.optionsLoading ? 'Loading teams...' : 'No team selected'} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_SELECTION}>No team selected</SelectItem>
+            {input.teamOptions.map((team) => (
+              <SelectItem key={team.id} value={team.id}>
+                {team.name}
+                {team.key ? ` (${team.key})` : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {!input.optionsLoading && selectedTeam && (
+          <p className="text-xs text-muted-foreground">
+            Selected: {selectedTeam.name}
+            {selectedTeam.key ? ` (${selectedTeam.key})` : ''}
+          </p>
+        )}
       </div>
       <div className="space-y-2">
         <Label>Status mapping</Label>
@@ -253,6 +277,7 @@ function TeamIntegrationsTab({
   onConnectLinear,
   onDisconnectLinear,
   onSaveLinearSettings,
+  onLinearTeamChange,
   onLinearStatusMappingChange,
 }: TeamIntegrationsTabProps) {
   return (
@@ -279,6 +304,7 @@ function TeamIntegrationsTab({
             statusMapping={linearStatusMapping}
             saving={savingLinearSettings}
             onSave={onSaveLinearSettings}
+            onTeamChange={onLinearTeamChange}
             onStatusMappingChange={onLinearStatusMappingChange}
           />
         ) : null}
@@ -445,6 +471,7 @@ export function TeamSettingsDialog({
     linearWorkspaceId,
     linearWorkspaceName,
     linearTeamId,
+    setLinearTeamId,
     linearStatusMapping,
     setLinearStatusMappingValue,
     linearConnected,
@@ -512,6 +539,7 @@ export function TeamSettingsDialog({
           onConnectLinear={handleConnectLinear}
           onDisconnectLinear={handleDisconnectLinear}
           onSaveLinearSettings={handleSaveLinearSettings}
+          onLinearTeamChange={setLinearTeamId}
           onLinearStatusMappingChange={setLinearStatusMappingValue}
         />
       ),
