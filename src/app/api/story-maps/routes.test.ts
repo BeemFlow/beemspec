@@ -1,9 +1,13 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas';
 import { isLinearSyncAvailableForStoryMap, resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
 import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { loadStoryWithStoryMap } from '@/storymap/story-context';
+import type { StoryMapFull } from '@/types';
 import { DELETE as deleteActivityById, PUT as putActivityById } from '../activities/[id]/route';
 import { POST as postActivities, PUT as putActivities } from '../activities/route';
 import { DELETE as deleteReleaseById, PUT as putReleaseById } from '../releases/[id]/route';
@@ -77,6 +81,26 @@ function createDeleteClient(returnData: unknown, linkedLinearIssueId?: string | 
   return { client: { from }, remove };
 }
 
+function buildStoryMapCanvasMarkup(storyMap: StoryMapFull) {
+  return renderToStaticMarkup(
+    createElement(StoryMapCanvas, {
+      storyMap,
+      storyMapName: storyMap.name,
+      onAddStory: vi.fn(),
+      onEditStory: vi.fn(),
+      onAddActivity: vi.fn(),
+      onEditActivity: vi.fn(),
+      onAddTask: vi.fn(),
+      onEditTask: vi.fn(),
+      onAddRelease: vi.fn(),
+      onRenameRelease: vi.fn(),
+      onMoveRelease: vi.fn(),
+      onDeleteRelease: vi.fn(),
+      onStoryMapChange: vi.fn(),
+    }),
+  );
+}
+
 describe('story map domain routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -103,6 +127,48 @@ describe('story map domain routes', () => {
     await putReleases(jsonRequest({ story_map_id: VALID_ID, order: [VALID_ID] }));
     const response = await putStories(jsonRequest({ task_id: VALID_ID, release_id: null, order: [VALID_ID] }));
     expect(response.status).toBe(200);
+  });
+
+  it('hides release rows when a map has no activities', () => {
+    const storyMapWithoutActivities: StoryMapFull = {
+      id: VALID_ID,
+      name: 'Map',
+      description: null,
+      activities: [],
+      releases: [{ id: 'release-1', story_map_id: VALID_ID, name: 'Release 1', description: null, sort_order: 0 }],
+    };
+    const emptyMarkup = buildStoryMapCanvasMarkup(storyMapWithoutActivities);
+
+    expect(emptyMarkup).toContain('Add an activity to get started.');
+    expect(emptyMarkup).not.toContain('Release 1');
+    expect(emptyMarkup).not.toContain('Backlog');
+
+    const storyMapWithActivity: StoryMapFull = {
+      ...storyMapWithoutActivities,
+      activities: [
+        {
+          id: 'activity-1',
+          story_map_id: VALID_ID,
+          name: 'Browse',
+          description: null,
+          sort_order: 0,
+          tasks: [
+            {
+              id: 'task-1',
+              activity_id: 'activity-1',
+              name: 'View catalog',
+              description: null,
+              sort_order: 0,
+              stories: [],
+            },
+          ],
+        },
+      ],
+    };
+    const populatedMarkup = buildStoryMapCanvasMarkup(storyMapWithActivity);
+
+    expect(populatedMarkup).toContain('Release 1');
+    expect(populatedMarkup).toContain('Backlog');
   });
 
   it('moves task and story atomically via rpc', async () => {

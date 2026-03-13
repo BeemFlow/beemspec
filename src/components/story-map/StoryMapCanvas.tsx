@@ -558,55 +558,56 @@ export function StoryMapCanvas({
           </div>
         </SortableContext>
 
-        {/* Release Rows */}
-        <SortableContext
-          items={sortedStories.map((s) => encodeDragId({ type: 'story', id: s.id }))}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="mt-6 space-y-2">
-            {[...releases]
-              .sort((a, b) => a.sort_order - b.sort_order)
-              .map((release, index, arr) => (
-                <div key={release.id}>
-                  <ReleaseRow
-                    label={release.name}
-                    releaseId={release.id}
-                    storyMapId={storyMap.id}
-                    storyMapName={storyMapName}
-                    activities={sortedActivities}
-                    getTasksForActivity={getTasksForActivity}
-                    getStoriesForCell={getStoriesForCell}
-                    onAddStory={onAddStory}
-                    onEditStory={onEditStory}
-                    onRename={() => onRenameRelease(release.id, release.name)}
-                    onMoveUp={() => onMoveRelease(release.id, 'up')}
-                    onMoveDown={() => onMoveRelease(release.id, 'down')}
-                    onDelete={() => onDeleteRelease(release.id)}
-                    isFirst={index === 0}
-                    isLast={index === arr.length - 1}
-                    isDropTarget={isDropTarget}
-                  />
-                  <AddReleaseZone onAddRelease={onAddRelease} />
-                </div>
-              ))}
+        {activities.length > 0 && (
+          <SortableContext
+            items={sortedStories.map((s) => encodeDragId({ type: 'story', id: s.id }))}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="mt-6 space-y-2">
+              {[...releases]
+                .sort((a, b) => a.sort_order - b.sort_order)
+                .map((release, index, arr) => (
+                  <div key={release.id}>
+                    <ReleaseRow
+                      label={release.name}
+                      releaseId={release.id}
+                      storyMapId={storyMap.id}
+                      storyMapName={storyMapName}
+                      activities={sortedActivities}
+                      getTasksForActivity={getTasksForActivity}
+                      getStoriesForCell={getStoriesForCell}
+                      onAddStory={onAddStory}
+                      onEditStory={onEditStory}
+                      onRename={() => onRenameRelease(release.id, release.name)}
+                      onMoveUp={() => onMoveRelease(release.id, 'up')}
+                      onMoveDown={() => onMoveRelease(release.id, 'down')}
+                      onDelete={() => onDeleteRelease(release.id)}
+                      isFirst={index === 0}
+                      isLast={index === arr.length - 1}
+                      isDropTarget={isDropTarget}
+                    />
+                    <AddReleaseZone onAddRelease={onAddRelease} />
+                  </div>
+                ))}
 
-            {releases.length === 0 && <AddReleaseZone onAddRelease={onAddRelease} alwaysVisible />}
+              {releases.length === 0 && <AddReleaseZone onAddRelease={onAddRelease} alwaysVisible />}
 
-            <ReleaseRow
-              label="Backlog"
-              labelMuted
-              releaseId={null}
-              storyMapId={storyMap.id}
-              storyMapName={storyMapName}
-              activities={sortedActivities}
-              getTasksForActivity={getTasksForActivity}
-              getStoriesForCell={getStoriesForCell}
-              onAddStory={onAddStory}
-              onEditStory={onEditStory}
-              isDropTarget={isDropTarget}
-            />
-          </div>
-        </SortableContext>
+              <ReleaseRow
+                label="Backlog"
+                labelMuted
+                releaseId={null}
+                storyMapId={storyMap.id}
+                storyMapName={storyMapName}
+                activities={sortedActivities}
+                getTasksForActivity={getTasksForActivity}
+                getStoriesForCell={getStoriesForCell}
+                onAddStory={onAddStory}
+                onEditStory={onEditStory}
+                isDropTarget={isDropTarget}
+              />
+            </div>
+          </SortableContext>
+        )}
       </div>
 
       <DragOverlay>
