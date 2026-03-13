@@ -1,11 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env';
-import {
-  OAUTH_LOGIN_RESUME_COOKIE,
-  OAUTH_LOGIN_RESUME_MAX_AGE_SECONDS,
-  serializeOAuthLoginResumePath,
-} from '@/lib/oauth-login-resume';
+import { setOAuthLoginResumeCookie } from '@/lib/oauth-login-resume';
 import { resolveRequestUrl, resolveSafeRedirectPath } from '@/lib/request-url';
 
 const GUEST_ONLY_AUTH_ROUTES = new Set(['/auth/login', '/auth/signup']);
@@ -62,17 +58,11 @@ export async function proxy(request: NextRequest) {
 
     if (pathname === '/oauth/consent') {
       const response = NextResponse.redirect(url);
-      const resumePath = serializeOAuthLoginResumePath(`${pathname}${request.nextUrl.search}`);
-
-      if (resumePath) {
-        response.cookies.set(OAUTH_LOGIN_RESUME_COOKIE, resumePath, {
-          httpOnly: true,
-          maxAge: OAUTH_LOGIN_RESUME_MAX_AGE_SECONDS,
-          path: '/',
-          sameSite: 'lax',
-          secure: request.nextUrl.protocol === 'https:',
-        });
-      }
+      setOAuthLoginResumeCookie(
+        response.cookies,
+        `${pathname}${request.nextUrl.search}`,
+        request.nextUrl.protocol === 'https:',
+      );
 
       return response;
     }
