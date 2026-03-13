@@ -78,7 +78,7 @@ function ManualSetupSection({ mcpUrl }: { mcpUrl: string }) {
       <div>
         <h3 className="text-sm font-semibold">Manual setup</h3>
         <p className="text-muted-foreground mt-1 text-sm">
-          Edit `opencode.json` yourself if you want an explicit project-scoped MCP config.
+          Edit `opencode.json` yourself if you want an explicit project-scoped or global MCP config.
         </p>
       </div>
 
