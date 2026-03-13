@@ -1,156 +1,54 @@
-'use client';
-
-import { Map as MapIcon, Plus } from 'lucide-react';
+import { Map as MapIcon } from 'lucide-react';
+import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { useTeam } from '@/contexts/team-context';
-import { errorMessage } from '@/lib/errors';
-import { fetchJson } from '@/lib/http';
+import { CreateStoryMapButton } from '@/components/story-map/CreateStoryMapButton';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { createClient } from '@/lib/supabase/server';
+import { listTeamsForUser } from '@/lib/teams';
+import { listStoryMaps } from '@/storymap/service';
 import type { StoryMap } from '@/types';
 
-export default function Dashboard() {
-  const { currentTeam } = useTeam();
-  const [storyMaps, setStoryMaps] = useState<StoryMap[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
+const TEAM_COOKIE_KEY = 'beemspec_current_team_id';
 
-  const loadStoryMaps = useCallback(async () => {
-    if (!currentTeam) {
-      setStoryMaps([]);
-      setError(null);
-      setLoading(false);
-      return;
-    }
+function resolveCurrentTeamId(teamIds: string[], cookieTeamId: string | null): string | null {
+  if (cookieTeamId && teamIds.includes(cookieTeamId)) return cookieTeamId;
+  return teamIds[0] ?? null;
+}
 
-    try {
-      setLoading(true);
-      setError(null);
-      const maps = await fetchJson<StoryMap[]>(
-        `/api/story-maps?team_id=${currentTeam.id}`,
-        undefined,
-        'Failed to load story maps',
-      );
-      setStoryMaps(maps);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [currentTeam]);
+export default async function Dashboard() {
+  const supabase = await createClient();
+  const cookieStore = await cookies();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  useEffect(() => {
-    loadStoryMaps();
-  }, [loadStoryMaps]);
+  const teamsResult = user ? await listTeamsForUser(supabase, user.id) : { data: [], error: null };
+  const teams = teamsResult.data ?? [];
+  const currentTeamId = resolveCurrentTeamId(
+    teams.map((team) => team.team_id),
+    cookieStore.get(TEAM_COOKIE_KEY)?.value ?? null,
+  );
+  const storyMaps: StoryMap[] = currentTeamId ? ((await listStoryMaps(supabase, currentTeamId)).data ?? []) : [];
 
-  async function createStoryMap(e: React.FormEvent) {
-    e.preventDefault();
-    if (!currentTeam || isCreating) return;
-
-    try {
-      setIsCreating(true);
-      const map = await fetchJson<StoryMap>(
-        '/api/story-maps',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ team_id: currentTeam.id, name, description }),
-        },
-        'Failed to create story map',
-      );
-
-      setStoryMaps([map, ...storyMaps]);
-      setName('');
-      setDescription('');
-      setOpen(false);
-      setError(null);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setIsCreating(false);
-    }
-  }
-
-  const showEmpty = !loading && currentTeam && storyMaps.length === 0;
-  const showGrid = !loading && currentTeam && storyMaps.length > 0;
-  const showNoTeamState = !loading && !currentTeam;
+  const showEmpty = Boolean(currentTeamId) && storyMaps.length === 0;
+  const showGrid = Boolean(currentTeamId) && storyMaps.length > 0;
+  const showNoTeamState = !currentTeamId;
 
   return (
     <div className="p-8">
       <div className="mx-auto max-w-[912px]">
         <div className="mb-8 flex items-center justify-between gap-6">
           <h1 className="text-3xl font-bold">Story Maps</h1>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button disabled={!currentTeam}>
-                <Plus className="mr-2 h-4 w-4" />
-                New Story Map
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create Story Map</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={createStoryMap} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="My Product"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="A brief description..."
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={isCreating || !name.trim()}>
-                  {isCreating ? 'Creating...' : 'Create'}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <CreateStoryMapButton teamId={currentTeamId} />
         </div>
 
-        {error ? (
-          <Card className="border-destructive bg-destructive/5 p-6">
-            <p className="text-destructive">{error}</p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4"
-              onClick={() => {
-                loadStoryMaps();
-              }}
-            >
-              Retry
-            </Button>
-          </Card>
-        ) : showNoTeamState ? (
+        {showNoTeamState ? (
           <Card className="border-dashed p-8 text-center">
             <h3 className="font-medium">Create or select a team to get started</h3>
             <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
               Use the team menu in the top right to create your first workspace before making story maps.
             </p>
           </Card>
-        ) : loading ? (
-          <p className="text-muted-foreground">Loading...</p>
         ) : showEmpty ? (
           <Card className="border-dashed p-8 text-center">
             <MapIcon className="mx-auto h-12 w-12 text-muted-foreground/50" />
@@ -159,10 +57,7 @@ export default function Dashboard() {
               Story maps help you plan your product from the user&apos;s perspective. Start by mapping out the user
               journey.
             </p>
-            <Button className="mt-6" onClick={() => setOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create your first story map
-            </Button>
+            <CreateStoryMapButton teamId={currentTeamId} empty />
           </Card>
         ) : showGrid ? (
           <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,280px))] justify-center gap-6">

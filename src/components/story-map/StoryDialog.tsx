@@ -4,13 +4,13 @@ import { createContent, type StoryContent } from '@beemspec/storymap';
 import { useEffect, useState } from 'react';
 import { AgentKickoffButton, buildStoryKickoffPrompt } from '@/components/story-map/AgentKickoffButton';
 import { STATUS_OPTIONS } from '@/components/story-map/story-status';
-import { Button } from '@/components/ui/button';
-import { DeleteButton } from '@/components/ui/delete-button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/Button';
+import { DeleteButton } from '@/components/ui/DeleteButton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
 import type { Release, Story, StoryStatus } from '@/types';
 
 interface StoryFormData {

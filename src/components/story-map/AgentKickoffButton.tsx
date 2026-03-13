@@ -2,8 +2,8 @@
 
 import { Bot, Check, Copy } from 'lucide-react';
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/Button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/Tooltip';
 import type { Story } from '@/types';
 
 export function buildReleaseKickoffPrompt(input: {

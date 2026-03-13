@@ -1,5 +1,5 @@
 import { resolveSafeRedirectPath } from '@/lib/request-url';
-import { AuthForm } from './auth-form';
+import { AuthForm } from './AuthForm';
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 

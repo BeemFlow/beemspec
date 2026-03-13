@@ -26,11 +26,11 @@ import { AgentKickoffButton, buildReleaseKickoffPrompt } from '@/components/stor
 import { ADD_BUTTON_WIDTH, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, GROUP_GAP } from '@/components/story-map/constants';
 import { MapCard } from '@/components/story-map/MapCard';
 import { STATUS_LABELS, STATUS_VARIANTS } from '@/components/story-map/story-status';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { DeleteButton } from '@/components/ui/delete-button';
-import { Separator } from '@/components/ui/separator';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { DeleteButton } from '@/components/ui/DeleteButton';
+import { Separator } from '@/components/ui/Separator';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/Tooltip';
 import { assertNever, errorMessage } from '@/lib/errors';
 import { fetchJson } from '@/lib/http';
 import type { Activity, Story, StoryMapFull, Task, TaskWithStories } from '@/types';

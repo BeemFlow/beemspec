@@ -2,15 +2,15 @@
 
 import { Loader2, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { DangerZone } from '@/components/ui/danger-zone';
-import { DeleteButton } from '@/components/ui/delete-button';
-import { Input } from '@/components/ui/input';
-import { IntegrationSection } from '@/components/ui/integration-section';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SettingsDialog } from '@/components/ui/settings-dialog';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/Button';
+import { DangerZone } from '@/components/ui/DangerZone';
+import { DeleteButton } from '@/components/ui/DeleteButton';
+import { Input } from '@/components/ui/Input';
+import { IntegrationSection } from '@/components/ui/IntegrationSection';
+import { Label } from '@/components/ui/Label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
+import { SettingsDialog } from '@/components/ui/SettingsDialog';
+import { Textarea } from '@/components/ui/Textarea';
 import { errorMessage } from '@/lib/errors';
 import { fetchJson } from '@/lib/http';
 

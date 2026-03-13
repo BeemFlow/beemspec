@@ -1,7 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { AppShell } from '@/components/app-shell';
-import { TeamProvider } from '@/contexts/team-context';
+import { AppShell } from '@/components/AppShell';
 import { createClient } from '@/lib/supabase/server';
 import type { TeamWithRole } from '@/types';
 
@@ -36,8 +35,8 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
   const initialCurrentTeamId = teams.some((team) => team.id === cookieTeamId) ? cookieTeamId : (teams[0]?.id ?? null);
 
   return (
-    <TeamProvider initialTeams={teams} initialCurrentTeamId={initialCurrentTeamId}>
-      <AppShell userEmail={user.email ?? null}>{children}</AppShell>
-    </TeamProvider>
+    <AppShell userEmail={user.email ?? null} teams={teams} initialCurrentTeamId={initialCurrentTeamId}>
+      {children}
+    </AppShell>
   );
 }
