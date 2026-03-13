@@ -623,7 +623,7 @@ export function StoryMapCanvas({
         )}
         {draggedStory && (
           <MapCard variant="story" className="shadow-lg cursor-grabbing">
-            <div className="text-xs line-clamp-3">{draggedStory.title}</div>
+            <div className="text-xs leading-4 line-clamp-2">{draggedStory.title}</div>
             {draggedStory.status !== 'backlog' && (
               <Badge variant={STATUS_VARIANTS[draggedStory.status]} className="mt-auto text-[10px] self-start">
                 {STATUS_LABELS[draggedStory.status]}
@@ -980,7 +980,7 @@ function SortableStory({
           if (!isDragging) onClick();
         }}
       >
-        <div className="text-xs line-clamp-3">{story.title}</div>
+        <div className="text-xs leading-4 line-clamp-2">{story.title}</div>
         {story.status !== 'backlog' && (
           <Badge variant={STATUS_VARIANTS[story.status]} className="mt-auto text-[10px] self-start">
             {STATUS_LABELS[story.status]}
