@@ -1,4 +1,7 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
+import { LinearSettingsForm } from '@/components/TeamSettingsDialog';
 import {
   DEFAULT_AUTO_IMPORT_LABELED_ISSUES,
   DEFAULT_LINEAR_IMPORT_LABEL,
@@ -105,5 +108,30 @@ describe('linear settings target resolution', () => {
       autoImportLabeledIssues: DEFAULT_AUTO_IMPORT_LABELED_ISSUES,
       importLabelName: DEFAULT_LINEAR_IMPORT_LABEL,
     });
+  });
+
+  it('renders a selectable Linear team control when multiple teams are available', () => {
+    const markup = renderToStaticMarkup(
+      createElement(LinearSettingsForm, {
+        isOwner: true,
+        workspaceName: 'BeemFlow',
+        teamId: '',
+        optionsLoading: false,
+        teamOptions: [
+          { id: 'team_1', name: 'Engineering', key: 'ENG' },
+          { id: 'team_2', name: 'Product', key: 'PRD' },
+        ],
+        stateOptions: [],
+        statusMapping: {},
+        saving: false,
+        onSave: async () => {},
+        onTeamChange: () => {},
+        onStatusMappingChange: () => {},
+      }),
+    );
+
+    expect(markup).toContain('id="linear-team-name"');
+    expect(markup).toContain('data-slot="select-trigger"');
+    expect(markup).not.toContain('<input id="linear-team-name"');
   });
 });

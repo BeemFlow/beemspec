@@ -162,7 +162,7 @@ function LinearConnectionActions(input: {
   );
 }
 
-function LinearSettingsForm(input: {
+export function LinearSettingsForm(input: {
   isOwner: boolean;
   workspaceName: string;
   teamId: string;
