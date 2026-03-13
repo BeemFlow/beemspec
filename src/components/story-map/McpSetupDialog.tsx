@@ -29,6 +29,104 @@ function SetupSection({ title, description, code }: { title: string; description
   );
 }
 
+function InteractiveSetupSection({ mcpUrl }: { mcpUrl: string }) {
+  return (
+    <div className="space-y-3 rounded-md border p-4">
+      <div>
+        <h3 className="text-sm font-semibold">Interactive setup</h3>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Use OpenCode&apos;s guided MCP setup if you&apos;d rather answer prompts than edit `opencode.json` by hand.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium">1. Run interactive setup</p>
+        <CodeBlock code={`opencode mcp add`} />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium">2. Answer the prompts</p>
+        <CodeBlock
+          code={`MCP server name:
+beemspec
+
+Select MCP server type:
+Remote
+
+MCP server URL:
+${mcpUrl}
+
+Does this server require OAuth authentication?:
+Yes
+
+Do you have a pre-registered client ID?:
+No`}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium">3. Authenticate</p>
+        <CodeBlock code={`opencode mcp auth beemspec`} />
+      </div>
+    </div>
+  );
+}
+
+function ManualSetupSection({ mcpUrl }: { mcpUrl: string }) {
+  return (
+    <div className="space-y-3 rounded-md border p-4">
+      <div>
+        <h3 className="text-sm font-semibold">Manual setup</h3>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Edit `opencode.json` yourself if you want an explicit project-scoped MCP config.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium">1. Add project config</p>
+        <CodeBlock
+          code={`{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "beemspec": {
+      "type": "remote",
+      "url": "${mcpUrl}",
+      "oauth": {}
+    }
+  }
+}`}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium">2. Trigger auth</p>
+        <CodeBlock code={`opencode mcp auth beemspec`} />
+      </div>
+    </div>
+  );
+}
+
+function ClaudeSetupSection({ title, description, command }: { title: string; description: string; command: string }) {
+  return (
+    <div className="space-y-3 rounded-md border p-4">
+      <div>
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <p className="text-muted-foreground mt-1 text-sm">{description}</p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium">1. Add MCP server</p>
+        <CodeBlock code={command} />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium">2. Authenticate</p>
+        <CodeBlock code={`/mcp`} />
+      </div>
+    </div>
+  );
+}
+
 export function McpSetupDialog({ open, onOpenChange, appOrigin }: Props) {
   const mcpUrl = appOrigin ? `${appOrigin}/api/mcp` : 'https://beemspec.com/api/mcp';
 
@@ -48,37 +146,20 @@ export function McpSetupDialog({ open, onOpenChange, appOrigin }: Props) {
           </TabsList>
 
           <TabsContent value="opencode" className="space-y-4">
-            <SetupSection
-              title="Project config"
-              description="Add this to `opencode.json` in your project root, then let OpenCode complete OAuth when it first connects."
-              code={`{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "beemspec": {
-      "type": "remote",
-      "url": "${mcpUrl}",
-      "oauth": {}
-    }
-  }
-}`}
-            />
-            <SetupSection
-              title="Trigger auth"
-              description="Run this after adding the config if you want to force the OAuth flow immediately."
-              code={`opencode mcp auth beemspec`}
-            />
+            <InteractiveSetupSection mcpUrl={mcpUrl} />
+            <ManualSetupSection mcpUrl={mcpUrl} />
           </TabsContent>
 
           <TabsContent value="claude-code" className="space-y-4">
-            <SetupSection
-              title="Add project-scoped HTTP MCP"
-              description="Run this from your repo. Then use `/mcp` inside Claude Code to authenticate if prompted."
-              code={`claude mcp add --transport http --scope project beemspec ${mcpUrl}`}
+            <ClaudeSetupSection
+              title="Project setup"
+              description="Add BeemSpec to a repo&apos;s shared `.mcp.json` so the whole project can use the same MCP server config."
+              command={`claude mcp add --transport http --scope project beemspec ${mcpUrl}`}
             />
-            <SetupSection
-              title="Trigger auth"
-              description="Inside Claude Code, open the MCP manager and complete the login flow for BeemSpec."
-              code={`/mcp`}
+            <ClaudeSetupSection
+              title="Global setup"
+              description="Add BeemSpec to your user-level Claude Code config so it&apos;s available across all projects on your machine."
+              command={`claude mcp add --transport http --scope user beemspec ${mcpUrl}`}
             />
           </TabsContent>
 

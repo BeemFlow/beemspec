@@ -21,7 +21,44 @@ The BeemSpec MCP endpoint exposes full story map management operations:
 
 ## Usage
 
-Add to `opencode.json`:
+### Interactive setup
+
+If you want OpenCode to walk you through the setup instead of editing `opencode.json` yourself:
+
+1. Run:
+
+```bash
+opencode mcp add
+```
+
+2. Answer the prompts with:
+
+```text
+MCP server name:
+beemspec
+
+Select MCP server type:
+Remote
+
+MCP server URL:
+http://127.0.0.1:3000/api/mcp
+
+Does this server require OAuth authentication?:
+Yes
+
+Do you have a pre-registered client ID?:
+No
+```
+
+3. Authenticate:
+
+```bash
+opencode mcp auth beemspec
+```
+
+### Manual setup
+
+1. Add to `opencode.json`:
 
 ```json
 {
@@ -37,7 +74,13 @@ Add to `opencode.json`:
 }
 ```
 
-If your MCP client does not support automatic OAuth, use manual bearer mode:
+2. Authenticate:
+
+```bash
+opencode mcp auth beemspec
+```
+
+If your MCP client does not support automatic OAuth, use manual bearer mode instead:
 
 ```json
 {
