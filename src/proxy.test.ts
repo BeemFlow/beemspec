@@ -43,6 +43,16 @@ describe('proxy auth redirects', () => {
     expect(response.headers.get('location')).toBe('https://app.example.com/auth/login?next=%2Fstory-map%2F123');
   });
 
+  it('stores oauth consent resume state in a dedicated cookie', async () => {
+    const response = await proxy(makeRequest('/oauth/consent?authorization_id=auth-123'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('https://app.example.com/auth/login');
+    expect(response.cookies.get('beemspec_oauth_login_resume')?.value).toBe(
+      '%2Foauth%2Fconsent%3Fauthorization_id%3Dauth-123',
+    );
+  });
+
   it('redirects authenticated users away from login using the forwarded public origin', async () => {
     getUserMock.mockResolvedValue({ data: { user: { id: 'user-1' } } });
 

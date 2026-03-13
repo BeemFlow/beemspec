@@ -29,7 +29,7 @@ export default async function OAuthConsentPage({ searchParams }: ConsentPageProp
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(`/auth/login?next=${encodeURIComponent(`/oauth/consent?authorization_id=${authorizationId}`)}`);
+    redirect('/auth/login');
   }
 
   const oauthApi = (

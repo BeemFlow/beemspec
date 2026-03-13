@@ -1,4 +1,9 @@
 import { NextResponse } from 'next/server';
+import {
+  OAUTH_LOGIN_RESUME_COOKIE,
+  OAUTH_LOGIN_RESUME_MAX_AGE_SECONDS,
+  serializeOAuthLoginResumePath,
+} from '@/lib/oauth-login-resume';
 import { resolveRequestUrl } from '@/lib/request-url';
 import { createClient } from '@/lib/supabase/server';
 
@@ -25,8 +30,22 @@ export async function POST(request: Request) {
 
   if (!user) {
     const loginUrl = resolveRequestUrl(request, '/auth/login');
-    loginUrl.searchParams.set('next', `/oauth/consent?authorization_id=${encodeURIComponent(authorizationId)}`);
-    return NextResponse.redirect(loginUrl);
+    const response = NextResponse.redirect(loginUrl);
+    const resumePath = serializeOAuthLoginResumePath(
+      `/oauth/consent?authorization_id=${encodeURIComponent(authorizationId)}`,
+    );
+
+    if (resumePath) {
+      response.cookies.set(OAUTH_LOGIN_RESUME_COOKIE, resumePath, {
+        httpOnly: true,
+        maxAge: OAUTH_LOGIN_RESUME_MAX_AGE_SECONDS,
+        path: '/',
+        sameSite: 'lax',
+        secure: loginUrl.protocol === 'https:',
+      });
+    }
+
+    return response;
   }
 
   const oauthApi = (

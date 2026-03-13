@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/Button';
@@ -19,9 +18,16 @@ export function AuthForm({ next }: AuthFormProps) {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
-  const router = useRouter();
   const supabase = createClient();
   const isLogin = mode === 'login';
+
+  function buildPostLoginUrl() {
+    const url = new URL('/auth/complete', window.location.origin);
+    if (next !== '/') {
+      url.searchParams.set('next', next);
+    }
+    return url.toString();
+  }
 
   function getEmailRedirectTo() {
     const callbackUrl = new URL('/auth/callback', window.location.origin);
@@ -48,8 +54,7 @@ export function AuthForm({ next }: AuthFormProps) {
       setMessage({ type: 'error', text: error.message });
       setLoading(false);
     } else if (isLogin) {
-      router.push(next);
-      router.refresh();
+      window.location.assign(buildPostLoginUrl());
     } else {
       setMessage({ type: 'success', text: 'Check your email to confirm your account!' });
       setLoading(false);
