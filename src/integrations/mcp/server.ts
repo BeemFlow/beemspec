@@ -201,6 +201,15 @@ function buildStoryMapInsights(input: {
   const backlogStories = allStories.filter((story) => story.release_id === null);
   const storiesWithFigma = allStories.filter((story) => Boolean(story.content?.figma_link));
   const storiesMissingEdgeCases = allStories.filter((story) => !story.content?.edge_cases);
+  const implementationNamedActivities = input.activities.filter((activity) =>
+    /frontend|backend|api|database|infra|platform|ui/i.test(activity.name),
+  );
+  const implementationNamedTasks = allTasks.filter((task) =>
+    /frontend|backend|api|database|schema|endpoint|ui/i.test(task.name),
+  );
+  const implementationHeavyStories = allStories.filter((story) =>
+    /build|create|add|implement|refactor|wire|setup/i.test(story.title),
+  );
 
   const statusCounts = allStories.reduce<Record<string, number>>((acc, story) => {
     acc[story.status] = (acc[story.status] ?? 0) + 1;
@@ -241,6 +250,11 @@ function buildStoryMapInsights(input: {
       'All stories are still in backlog even though releases exist. The release plan may be underspecified.',
     );
   }
+  if (implementationNamedActivities.length > 0 || implementationNamedTasks.length > 0) {
+    storyMappingWarnings.push(
+      'Some activity or task names look implementation-oriented rather than user-workflow-oriented.',
+    );
+  }
 
   const recommendedNextActions: string[] = [];
   if (input.activities.length === 0) {
@@ -269,6 +283,17 @@ function buildStoryMapInsights(input: {
     );
   }
 
+  const topRiskFlags: string[] = [];
+  if (implementationNamedActivities.length > 0 || implementationNamedTasks.length > 0) {
+    topRiskFlags.push('Map structure may reflect implementation breakdown instead of user workflow.');
+  }
+  if (implementationHeavyStories.length > 0) {
+    topRiskFlags.push('Some story titles may describe implementation tasks rather than user-visible outcomes.');
+  }
+  if (storiesMissingEdgeCases.length > 0) {
+    topRiskFlags.push('Some stories omit edge cases, which may hide implementation risk.');
+  }
+
   return {
     map_summary: {
       storyMapId: input.map.id,
@@ -289,8 +314,9 @@ function buildStoryMapInsights(input: {
       name: persona.name,
       goals: persona.goals ?? null,
     })),
+    top_risk_flags: topRiskFlags.slice(0, 3),
     story_mapping_warnings: storyMappingWarnings,
-    recommended_next_actions: recommendedNextActions,
+    recommended_next_actions: recommendedNextActions.slice(0, 3),
   };
 }
 
@@ -470,15 +496,22 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     withToolErrorBoundary('storymap_workflow_guide', async () => {
       return successResult({
         objective:
-          'Learn how to shape a strong story map and how to implement stories with enough context to code correctly, while minimizing redundant MCP calls.',
-        recommended_sequence: [
+          'Use BeemSpec as the planning source of truth, act like an expert product-minded implementation partner, and make careful decisions with minimal redundant MCP calls or unnecessary user interruptions.',
+        operating_mode: [
+          'Act as a product-minded implementation partner, not just a code generator.',
+          'Read this guide first, then fetch only the map or story context needed for the current decision.',
+          'Preserve the intent of the story map, release slice, and selected story while making local implementation decisions.',
+          'Do not invent product decisions when the map, story, release, personas, or linked design should answer them.',
+          'When context is missing, prefer a focused clarification or explicit assumption over a risky product decision.',
+        ],
+        tool_sequence: [
           '1) Call storymap_list(team_id?) to discover candidate maps (team_id optional when user has one team).',
           '2) Call storymap_get(story_map_id) once to load complete map graph for planning, release selection, or structural edits.',
           '3) If implementing or deeply refining one story, call story_context_get(story_id) for story-level coding and design context.',
           '4) Perform targeted create/update/move/reorder/delete operations as needed.',
           '5) Re-read with storymap_get(story_map_id) only after a structural mutation batch or when release planning context has changed.',
         ],
-        decision_rules: [
+        tool_usage_rules: [
           'Call team_list when team context is unknown or the user may have access to multiple teams.',
           'Call storymap_get before structural edits or release planning so you can preserve activity, task, story, and release ordering.',
           'Use story_update for content or status changes; use story_move/task_move for placement changes; use *_reorder only when you already know the full ordered ID list.',
@@ -486,34 +519,78 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
           'Avoid redundant reads: if you already have the needed story or map context in the current session, continue working instead of re-fetching it.',
           'Treat inferred user stories, acceptance criteria, personas, and release plans as drafts unless the user explicitly asks you to synthesize them.',
         ],
+        clarification_policy: [
+          'Ask the user questions only when ambiguity would materially change implementation, acceptance criteria, release choice, or user-visible behavior.',
+          'Do all non-blocked work first before asking clarifying questions.',
+          'Bundle clarifying questions into one focused round instead of asking multiple tiny follow-ups.',
+          'Ask at most one bundled clarification round unless new blockers appear later.',
+          'When asking a question, recommend a reasonable default and explain what would change based on the answer.',
+          'Do not ask for information that is already available in the story map, story context, personas, release lane, or linked Figma design.',
+        ],
+        safe_vs_unsafe_inference: {
+          safe_to_infer: [
+            'Reasonable implementation details that do not change the user-visible behavior or product scope.',
+            'Small coding decisions that follow established repository conventions, existing architecture, or linked design patterns.',
+            'Thin sequencing choices inside an already-defined story when acceptance criteria remain satisfied.',
+          ],
+          unsafe_to_infer: [
+            'New product scope, success criteria, or release commitments that are not supported by the map.',
+            'User-visible behavior choices when the story, acceptance criteria, or design could lead to meaningfully different outcomes.',
+            'Missing UX decisions when a Figma link exists or when a UI choice could affect the workflow, accessibility, or acceptance criteria.',
+            'Architectural or data-model changes that create irreversible constraints without clear story support.',
+          ],
+        },
         story_mapping_principles: [
           'Keep the backbone as user workflow steps in narrative order, not engineering components or team ownership lanes.',
           'Place tasks under activities as user tasks, then slice stories into thin end-to-end increments that deliver observable value.',
           'Use releases as usable learning increments or backlog separation, not internal implementation phases.',
           'Keep personas lightweight and only use them when they materially change workflow, story selection, or acceptance criteria.',
+          'If activity or task names read like frontend/backend/database/components, treat that as a warning that the map may be organized around implementation structure instead of user workflow.',
+          'If a story title sounds like an implementation task rather than a user-visible outcome, preserve the data but flag the issue to the user before broadening execution.',
+          'If a story appears too broad, prefer suggesting a thinner end-to-end slice rather than implementing a wide batch of loosely related work.',
+          'If releases look like internal phases instead of usable increments, preserve the current structure unless asked to reorganize, but call out the planning risk.',
         ],
-        release_rules: [
-          'release_id = null means backlog. Do not invent releases prematurely when backlog is the more honest state.',
-          'When building an entire release, use storymap_get to inspect all stories in that release before choosing implementation order.',
-          'Favor a walking skeleton or critical-path release slice before adding breadth, polish, or component completeness.',
-        ],
-        story_quality_checklist: [
+        story_quality_principles: [
           'Title expresses user-visible value or outcome, not just an implementation task.',
           'User story explains who wants what and why.',
           'Acceptance criteria are specific, observable, and testable.',
           'Edge cases and technical guidelines are included when they materially reduce ambiguity or implementation risk.',
-          'If a Figma link is present, treat it as required design context for UI work.',
+          'If a story lacks enough context to tell what user-visible outcome should change, treat it as underspecified.',
+          'If the story is implementation-ready, proceed decisively rather than asking the user to reconfirm obvious next steps.',
         ],
-        figma_rules: [
+        implementation_principles: [
+          'release_id = null means backlog. Do not invent releases prematurely when backlog is the more honest state.',
+          'When building an entire release, use storymap_get to inspect all stories in that release before choosing implementation order.',
+          'Favor a walking skeleton or critical-path release slice before adding breadth, polish, or component completeness.',
+          'Prefer implementing the minimum set of stories that makes the release usable, learnable, or testable in the hands of a user.',
+          'Check nearby stories in the same release before coding so you preserve the release intent instead of optimizing one story in isolation.',
+          'If the release contains both critical-path and polish stories, implement the critical-path stories first unless the user explicitly chooses otherwise.',
+          'If a Figma link is present, treat it as required design context for UI work.',
+          'If the acceptance criteria are vague, non-observable, or only describe implementation, pause and clarify before committing to broad execution.',
+          'If the story includes meaningful risk areas such as auth, payments, destructive actions, migrations, or permissions, missing edge cases should raise caution.',
           'When a story includes a figma_link, prefer using the Figma MCP server if it is connected to the current agent session.',
           'Use figma_get_design_context first when possible, then figma_get_screenshot if a visual check is still needed.',
           'Do not invent UI details that the linked design can answer directly.',
+          'Use story_context_get for the selected story before implementation when the story is the main unit of work.',
+          'Implement carefully and thoughtfully: satisfy the story, preserve release intent, and avoid accidental scope expansion.',
+          'Keep implementation aligned to the acceptance criteria and avoid solving adjacent problems unless they are required to satisfy the story.',
+          'Prefer changes that are easy to verify, easy to explain, and easy to adjust if the story evolves.',
+          'When technical guidelines exist, treat them as constraints unless they clearly conflict with repository reality and need user clarification.',
+          'When UI work is involved and design context is incomplete, be conservative and explicit about assumptions.',
+        ],
+        update_policy: [
+          'If you refine scope, acceptance criteria, or story wording during discussion, update the relevant BeemSpec entities so the map stays trustworthy.',
+          'Use move and reorder operations instead of delete-and-recreate when preserving history and ordering matters.',
+          'Keep newly synthesized planning content clearly framed as draft unless the user asked you to formalize it.',
         ],
         anti_patterns: [
+          'Do not behave like a passive code executor that ignores release intent, personas, or workflow context.',
+          'Do not ask the user to reconfirm obvious next steps when the map already provides enough direction.',
           'Do not reorganize a story map around frontend/backend/database components.',
           'Do not create giant unsliced stories when thinner end-to-end slices are possible.',
           'Do not delete and recreate entities when move/update preserves history and ordering more safely.',
           'Do not treat personas as decorative metadata if they do not change decisions.',
+          'Do not invent product decisions or UI details when BeemSpec context or linked design should answer them.',
         ],
         verification_checklist: [
           'Backbone still reads as a coherent user journey from left to right.',

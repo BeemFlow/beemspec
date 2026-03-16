@@ -110,19 +110,30 @@ describe('mcp server', () => {
         structuredContent: {
           ok: boolean;
           data: {
-            recommended_sequence: string[];
-            figma_rules: string[];
-            story_quality_checklist: string[];
+            operating_mode: string[];
+            clarification_policy: string[];
+            tool_sequence: string[];
+            implementation_principles: string[];
+            safe_vs_unsafe_inference: {
+              safe_to_infer: string[];
+              unsafe_to_infer: string[];
+            };
+            story_quality_principles: string[];
           };
         };
       };
     };
 
     expect(payload.result.structuredContent.ok).toBe(true);
-    expect(payload.result.structuredContent.data.recommended_sequence[0]).toContain('storymap_list');
-    expect(payload.result.structuredContent.data.recommended_sequence[1]).toContain('storymap_get');
-    expect(payload.result.structuredContent.data.figma_rules[0]).toContain('Figma MCP server');
-    expect(payload.result.structuredContent.data.story_quality_checklist[4]).toContain('Figma link');
+    expect(payload.result.structuredContent.data.operating_mode[0]).toContain('product-minded implementation partner');
+    expect(payload.result.structuredContent.data.clarification_policy[0]).toContain('materially change');
+    expect(payload.result.structuredContent.data.tool_sequence[0]).toContain('storymap_list');
+    expect(payload.result.structuredContent.data.tool_sequence[1]).toContain('storymap_get');
+    expect(payload.result.structuredContent.data.safe_vs_unsafe_inference.unsafe_to_infer[0]).toContain(
+      'New product scope',
+    );
+    expect(payload.result.structuredContent.data.implementation_principles.join(' ')).toContain('Figma MCP server');
+    expect(payload.result.structuredContent.data.story_quality_principles[0]).toContain('user-visible value');
   });
 
   it('returns story map insights with warnings and recommendations', async () => {
@@ -696,6 +707,9 @@ describe('mcp server', () => {
             figmaLink: string | null;
             personas: Array<{ name: string }>;
             agentGuidance: {
+              riskFlags: string[];
+              missingContext: string[];
+              verificationFocus: string[];
               figma: {
                 hasFigmaLink: boolean;
                 recommendedTools: string[];
@@ -717,6 +731,8 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.data.edgeCases).toBe('Handle empty states');
     expect(payload.result.structuredContent.data.figmaLink).toContain('figma.com');
     expect(payload.result.structuredContent.data.personas).toHaveLength(1);
+    expect(payload.result.structuredContent.data.agentGuidance.riskFlags[0]).toContain('Linked design context');
+    expect(payload.result.structuredContent.data.agentGuidance.verificationFocus[0]).toContain('acceptance criteria');
     expect(payload.result.structuredContent.data.agentGuidance.figma.hasFigmaLink).toBe(true);
     expect(payload.result.structuredContent.data.agentGuidance.figma.recommendedTools).toContain(
       'figma_get_design_context',

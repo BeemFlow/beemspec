@@ -32,8 +32,9 @@ interface StoryContext {
     goals: string | null;
   }>;
   agentGuidance: {
-    recommendedReadSequence: string[];
-    storyMappingTips: string[];
+    riskFlags: string[];
+    missingContext: string[];
+    verificationFocus: string[];
     figma: {
       hasFigmaLink: boolean;
       figmaLink: string | null;
@@ -112,24 +113,54 @@ interface PersonaTable {
   };
 }
 
-function buildAgentGuidance(figmaLink: string | null) {
-  const hasFigmaLink = Boolean(figmaLink);
+function buildAgentGuidance(input: {
+  figmaLink: string | null;
+  edgeCases: string | null;
+  technicalGuidelines: string | null;
+  acceptanceCriteria: string;
+}) {
+  const hasFigmaLink = Boolean(input.figmaLink);
+  const riskFlags: string[] = [];
+  const missingContext: string[] = [];
+  const verificationFocus = ['Verify the implementation against the story acceptance criteria.'];
+
+  if (hasFigmaLink) {
+    verificationFocus.push('Check the implemented UI against the linked design context.');
+  } else {
+    missingContext.push(
+      'No Figma link is attached for this story. Be conservative about UI assumptions if design details matter.',
+    );
+  }
+
+  if (!input.edgeCases) {
+    missingContext.push(
+      'No edge cases are captured for this story. Add them if failure modes could change implementation.',
+    );
+  }
+
+  if (!input.technicalGuidelines) {
+    missingContext.push(
+      'No technical guidelines are captured for this story. Follow existing repository conventions unless the user specifies constraints.',
+    );
+  }
+
+  if (/auth|payment|permission|delete|destructive|migration/i.test(input.acceptanceCriteria)) {
+    riskFlags.push(
+      'Acceptance criteria suggest a higher-risk area; verify failure handling and side effects carefully.',
+    );
+  }
+
+  if (hasFigmaLink) {
+    riskFlags.push('Linked design context exists; avoid inventing UI details that the design should answer.');
+  }
 
   return {
-    recommendedReadSequence: [
-      '1) If you still need release-wide planning context, call storymap_get first; otherwise use this response directly.',
-      '2) Use this story context to implement or refine the selected story without losing map context.',
-      '3) Use story_update for content/status changes and move/reorder tools for placement changes.',
-      '4) Re-read with storymap_get only after structural edits or release planning changes.',
-    ],
-    storyMappingTips: [
-      'Keep the story aligned to the user workflow and release intent, not implementation layers.',
-      'Use personas only when they materially change the workflow, acceptance criteria, or release choice.',
-      'Prefer thin end-to-end slices that deliver user-visible progress and are testable from acceptance criteria.',
-    ],
+    riskFlags,
+    missingContext,
+    verificationFocus,
     figma: {
       hasFigmaLink,
-      figmaLink,
+      figmaLink: input.figmaLink,
       recommendedNextStep: hasFigmaLink
         ? 'A Figma link is attached. If the Figma MCP server is connected in this agent session, fetch design context from the link before implementing UI changes.'
         : null,
@@ -215,6 +246,11 @@ export async function getStoryContext(supabase: SupabaseLike, storyId: string): 
     technicalGuidelines: content.technical_guidelines ?? null,
     figmaLink,
     personas: personas ?? [],
-    agentGuidance: buildAgentGuidance(figmaLink),
+    agentGuidance: buildAgentGuidance({
+      figmaLink,
+      edgeCases: content.edge_cases ?? null,
+      technicalGuidelines: content.technical_guidelines ?? null,
+      acceptanceCriteria: content.acceptance_criteria ?? '',
+    }),
   };
 }

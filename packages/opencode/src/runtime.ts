@@ -143,7 +143,7 @@ export const BeemSpecPlugin: Plugin = async () => {
   return {
     'experimental.session.compacting': async (_input, output) => {
       output.context.push(
-        'BeemSpec workflow: use storymap_get for whole-map or release planning, then use story_context_get only for the specific story you are implementing or deeply refining.',
+        'BeemSpec workflow: call storymap_workflow_guide first and treat it as the operating standard for planning, clarification, and implementation behavior; then use storymap_get for whole-map or release planning and story_context_get only for the specific story you are implementing or deeply refining.',
       );
 
       const toolResult = await callMcpStoryMapGet();
