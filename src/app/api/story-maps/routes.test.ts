@@ -187,11 +187,11 @@ describe('story map domain routes', () => {
   });
 
   it('creates and updates entities', async () => {
-    const { client: insertClient } = createInsertClient({ id: VALID_ID, title: 'Login', name: 'N' });
+    const { client: insertClient, insert } = createInsertClient({ id: VALID_ID, title: 'Login', name: 'N' });
     vi.mocked(createClient).mockResolvedValue(insertClient as never);
     await postActivities(jsonRequest({ story_map_id: VALID_ID, name: 'Signup' }));
     await postTasks(jsonRequest({ activity_id: VALID_ID, name: 'Task' }));
-    await postReleases(jsonRequest({ story_map_id: VALID_ID, name: 'R1' }));
+    await postReleases(jsonRequest({ story_map_id: VALID_ID, name: 'R1', context_markdown: '## Scope' }));
     await postStories(
       jsonRequest({
         task_id: VALID_ID,
@@ -200,14 +200,19 @@ describe('story map domain routes', () => {
       }),
     );
 
-    const { client: updateClient } = createUpdateClient({ id: VALID_ID, title: 'Edited', name: 'Edited' });
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ context_markdown: '## Scope' }));
+
+    const { client: updateClient, update } = createUpdateClient({ id: VALID_ID, title: 'Edited', name: 'Edited' });
     vi.mocked(createClient).mockResolvedValue(updateClient as never);
     await putActivityById(jsonRequest({ name: 'Edited' }), { params: Promise.resolve({ id: VALID_ID }) });
     await putTaskById(jsonRequest({ name: 'Edited' }), { params: Promise.resolve({ id: VALID_ID }) });
-    await putReleaseById(jsonRequest({ name: 'Edited' }), { params: Promise.resolve({ id: VALID_ID }) });
+    await putReleaseById(jsonRequest({ name: 'Edited', context_markdown: '## Updated scope' }), {
+      params: Promise.resolve({ id: VALID_ID }),
+    });
     const response = await putStoryById(jsonRequest({ title: 'Edited' }), {
       params: Promise.resolve({ id: VALID_ID }),
     });
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ context_markdown: '## Updated scope' }));
     expect(response.status).toBe(200);
   });
 

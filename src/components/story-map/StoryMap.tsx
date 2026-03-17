@@ -1,10 +1,11 @@
 'use client';
 
-import { ArrowLeft, Bot, Settings } from 'lucide-react';
+import { ArrowLeft, Bot, FileText, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityDialog } from '@/components/story-map/ActivityDialog';
+import { ContextMarkdownDialog } from '@/components/story-map/ContextMarkdownDialog';
 import { McpSetupDialog } from '@/components/story-map/McpSetupDialog';
 import { planStoryEditSave, type StoryEditSave } from '@/components/story-map/payloads';
 import { StoryDialog } from '@/components/story-map/StoryDialog';
@@ -41,6 +42,12 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
   const [dialog, setDialog] = useState<DialogState>(CLOSED);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mcpSetupOpen, setMcpSetupOpen] = useState(false);
+  const [mapContextOpen, setMapContextOpen] = useState(false);
+  const [releaseContextOpen, setReleaseContextOpen] = useState<{
+    releaseId: string;
+    releaseName: string;
+    contextMarkdown: string | null;
+  } | null>(null);
 
   useEffect(() => {
     setStoryMap(initialStoryMap);
@@ -340,6 +347,34 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
     }
   }
 
+  async function handleSaveMapContext(value: string | null) {
+    if (!storyMap) return;
+    await fetchJson(
+      `/api/story-maps/${storyMap.id}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context_markdown: value }),
+      },
+      'Failed to save story map context',
+    );
+    refreshStoryMap();
+  }
+
+  async function handleSaveReleaseContext(value: string | null) {
+    if (!releaseContextOpen) return;
+    await fetchJson(
+      `/api/releases/${releaseContextOpen.releaseId}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context_markdown: value }),
+      },
+      'Failed to save release context',
+    );
+    refreshStoryMap();
+  }
+
   function getPromptProps(): { title: string; placeholder: string; defaultValue: string } {
     switch (dialog.type) {
       case 'release:create':
@@ -370,6 +405,19 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
         </Link>
         <h1 className="truncate text-base font-semibold sm:text-xl">{storyMap.name}</h1>
         <div className="ml-auto flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMapContextOpen(true)}
+                aria-label="Story map context"
+              >
+                <FileText className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">Story map context</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon" onClick={() => setMcpSetupOpen(true)} aria-label="Connect MCP Client">
@@ -408,6 +456,16 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
             onRenameRelease={handleRenameRelease}
             onMoveRelease={handleMoveRelease}
             onDeleteRelease={handleDeleteRelease}
+            onEditReleaseContext={(releaseId) => {
+              const release = storyMap.releases.find((r) => r.id === releaseId);
+              if (release) {
+                setReleaseContextOpen({
+                  releaseId: release.id,
+                  releaseName: release.name,
+                  contextMarkdown: release.context_markdown ?? null,
+                });
+              }
+            }}
             onError={setUiError}
             onStoryMapChange={setStoryMap}
           />
@@ -477,6 +535,26 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
         task={dialog.type === 'task:edit' ? dialog.task : null}
         onSave={handleSaveTask}
         onDelete={dialog.type === 'task:edit' ? handleDeleteTask : undefined}
+      />
+
+      <ContextMarkdownDialog
+        open={mapContextOpen}
+        onOpenChange={setMapContextOpen}
+        title={`${storyMap.name} — Context`}
+        value={storyMap.context_markdown ?? null}
+        onSave={handleSaveMapContext}
+        variant="story-map"
+      />
+
+      <ContextMarkdownDialog
+        open={releaseContextOpen !== null}
+        onOpenChange={(open) => {
+          if (!open) setReleaseContextOpen(null);
+        }}
+        title={`${releaseContextOpen?.releaseName ?? 'Release'} — Context`}
+        value={releaseContextOpen?.contextMarkdown ?? null}
+        onSave={handleSaveReleaseContext}
+        variant="release"
       />
     </div>
   );

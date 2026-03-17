@@ -11,6 +11,7 @@ export interface StoryMap {
   id: string;
   name: string;
   description?: string | null;
+  context_markdown?: string | null;
 }
 
 /** A named, ordered column group across the top of the map. */
@@ -37,6 +38,7 @@ export interface Release {
   story_map_id: string;
   name: string;
   description?: string | null;
+  context_markdown?: string | null;
   sort_order: number;
 }
 

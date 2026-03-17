@@ -42,10 +42,11 @@ export const storyMapBase = z
     team_id: uuid,
     name,
     description: nullableString,
+    context_markdown: nullableString,
   })
   .strict();
 
-export const createStoryMapSchema = storyMapBase.partial({ description: true });
+export const createStoryMapSchema = storyMapBase.partial({ description: true, context_markdown: true });
 
 export const updateStoryMapSchema = storyMapBase
   .omit({ team_id: true })
@@ -62,10 +63,11 @@ export const releaseBase = z
     story_map_id: uuid,
     name,
     description: nullableString,
+    context_markdown: nullableString,
   })
   .strict();
 
-export const createReleaseSchema = releaseBase.partial({ description: true });
+export const createReleaseSchema = releaseBase.partial({ description: true, context_markdown: true });
 
 export const updateReleaseSchema = releaseBase
   .omit({ story_map_id: true })

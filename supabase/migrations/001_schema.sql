@@ -51,6 +51,7 @@ CREATE TABLE story_maps (
   team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
+  context_markdown TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -122,6 +123,7 @@ CREATE TABLE releases (
   story_map_id UUID NOT NULL REFERENCES story_maps(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
+  context_markdown TEXT,
   sort_order INTEGER DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

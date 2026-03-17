@@ -1,4 +1,6 @@
 import {
+  createReleaseSchema,
+  createStoryMapSchema,
   createStorySchema,
   updateActivitySchema,
   updatePersonaSchema,
@@ -20,6 +22,24 @@ describe('story-map schemas', () => {
     });
 
     expect(parsed.status).toBe('backlog');
+  });
+
+  it('accepts nullable context markdown on story maps and releases', () => {
+    expect(
+      createStoryMapSchema.safeParse({
+        team_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+        name: 'Core Product',
+        context_markdown: '## Goals',
+      }).success,
+    ).toBe(true);
+
+    expect(
+      createReleaseSchema.safeParse({
+        story_map_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+        name: 'Release 1',
+        context_markdown: null,
+      }).success,
+    ).toBe(true);
   });
 
   it('rejects empty update payloads', () => {

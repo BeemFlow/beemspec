@@ -19,7 +19,7 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { ArrowDown, ArrowUp, Pencil, Plus } from 'lucide-react';
+import { ArrowDown, ArrowUp, FileText, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { AddButton } from '@/components/story-map/AddButton';
 import { AgentKickoffButton, buildReleaseKickoffPrompt } from '@/components/story-map/AgentKickoffButton';
@@ -111,6 +111,7 @@ interface Props {
   onRenameRelease: (releaseId: string, currentName: string) => void;
   onMoveRelease: (releaseId: string, direction: 'up' | 'down') => void;
   onDeleteRelease: (releaseId: string) => void;
+  onEditReleaseContext?: (releaseId: string) => void;
   onError?: (message: string) => void;
   onStoryMapChange: React.Dispatch<React.SetStateAction<StoryMapFull | null>>;
 }
@@ -276,6 +277,7 @@ export function StoryMapCanvas({
   onRenameRelease,
   onMoveRelease,
   onDeleteRelease,
+  onEditReleaseContext,
   onError,
   onStoryMapChange,
 }: Props) {
@@ -582,6 +584,7 @@ export function StoryMapCanvas({
                       onMoveUp={() => onMoveRelease(release.id, 'up')}
                       onMoveDown={() => onMoveRelease(release.id, 'down')}
                       onDelete={() => onDeleteRelease(release.id)}
+                      onEditContext={onEditReleaseContext ? () => onEditReleaseContext(release.id) : undefined}
                       isFirst={index === 0}
                       isLast={index === arr.length - 1}
                       isDropTarget={isDropTarget}
@@ -761,6 +764,7 @@ interface ReleaseRowProps {
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   onDelete?: () => void;
+  onEditContext?: () => void;
   isFirst?: boolean;
   isLast?: boolean;
   isDropTarget: (itemId: string) => boolean;
@@ -795,6 +799,7 @@ function ReleaseRow({
   onMoveUp,
   onMoveDown,
   onDelete,
+  onEditContext,
   isFirst,
   isLast,
   isDropTarget,
@@ -852,6 +857,16 @@ function ReleaseRow({
               </TooltipTrigger>
               <TooltipContent>Move down</TooltipContent>
             </Tooltip>
+            {onEditContext && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 cursor-pointer" onClick={onEditContext}>
+                    <FileText className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Release context</TooltipContent>
+              </Tooltip>
+            )}
             {releaseId && (
               <AgentKickoffButton
                 prompt={buildReleaseKickoffPrompt({

@@ -57,6 +57,77 @@ export async function getStoryMapGraph(
   };
 }
 
+export async function getStoryMapMcpContext(
+  supabase: Supabase,
+  storyMapId: string,
+  options?: { includePersonas?: boolean },
+) {
+  const includePersonas = options?.includePersonas ?? false;
+  const [mapResult, activitiesResult, releasesResult, personasResult] = await Promise.all([
+    supabase.from('story_maps').select('id, name, description, context_markdown').eq('id', storyMapId).single(),
+    supabase
+      .from('activities')
+      .select(
+        'id, story_map_id, name, description, sort_order, tasks(id, activity_id, name, description, sort_order, stories(id, title, status, release_id, sort_order, content))',
+      )
+      .eq('story_map_id', storyMapId)
+      .order('sort_order')
+      .order('sort_order', { referencedTable: 'tasks' })
+      .order('sort_order', { referencedTable: 'tasks.stories' }),
+    supabase
+      .from('releases')
+      .select('id, story_map_id, name, description, context_markdown, sort_order')
+      .eq('story_map_id', storyMapId)
+      .order('sort_order'),
+    includePersonas
+      ? supabase.from('personas').select('*').eq('story_map_id', storyMapId).order('created_at')
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  return {
+    mapResult,
+    activitiesResult,
+    releasesResult,
+    personasResult,
+  };
+}
+
+export async function getReleaseMcpContext(supabase: Supabase, releaseId: string) {
+  const releaseResult = await supabase
+    .from('releases')
+    .select('id, story_map_id, name, description, context_markdown, sort_order')
+    .eq('id', releaseId)
+    .single();
+
+  if (releaseResult.error || !releaseResult.data) {
+    return {
+      releaseResult,
+      mapResult: { data: null, error: releaseResult.error },
+      activitiesResult: { data: null, error: releaseResult.error },
+    };
+  }
+
+  const storyMapId = releaseResult.data.story_map_id;
+  const [mapResult, activitiesResult] = await Promise.all([
+    supabase.from('story_maps').select('id, name, description, context_markdown').eq('id', storyMapId).single(),
+    supabase
+      .from('activities')
+      .select(
+        'id, story_map_id, name, description, sort_order, tasks(id, activity_id, name, description, sort_order, stories(id, title, status, release_id, sort_order, content))',
+      )
+      .eq('story_map_id', storyMapId)
+      .order('sort_order')
+      .order('sort_order', { referencedTable: 'tasks' })
+      .order('sort_order', { referencedTable: 'tasks.stories' }),
+  ]);
+
+  return {
+    releaseResult,
+    mapResult,
+    activitiesResult,
+  };
+}
+
 export async function createStoryMap(supabase: Supabase, input: CreateStoryMap) {
   return supabase
     .from('story_maps')
@@ -64,6 +135,7 @@ export async function createStoryMap(supabase: Supabase, input: CreateStoryMap) 
       team_id: input.team_id,
       name: input.name,
       description: input.description ?? null,
+      context_markdown: input.context_markdown ?? null,
     })
     .select()
     .single();
@@ -146,6 +218,7 @@ export async function createRelease(supabase: Supabase, input: CreateRelease) {
       story_map_id: input.story_map_id,
       name: input.name,
       description: input.description ?? null,
+      context_markdown: input.context_markdown ?? null,
     })
     .select()
     .single();

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { GET as getStoryMaps } from './route';
+import { GET as getStoryMaps, POST as postStoryMap } from './route';
 
 vi.mock('@/lib/auth', () => ({
   requireAuth: vi.fn(),
@@ -75,5 +75,39 @@ describe('story maps route', () => {
     await expect(response.json()).resolves.toEqual(
       expect.objectContaining({ error: 'Multiple teams found. Pass team_id explicitly.' }),
     );
+  });
+
+  it('creates a story map with context markdown', async () => {
+    const single = vi.fn().mockResolvedValue({
+      data: { id: 'map-1', name: 'Core', context_markdown: '## Goals' },
+      error: null,
+    });
+    const select = vi.fn().mockReturnValue({ single });
+    const insert = vi.fn().mockReturnValue({ select });
+    const from = vi.fn((table: string) => {
+      if (table === 'story_maps') return { insert };
+      throw new Error(`Unexpected table: ${table}`);
+    });
+    vi.mocked(createClient).mockResolvedValue({ from } as never);
+
+    const response = await postStoryMap(
+      new Request('http://localhost/api/story-maps', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          team_id: TEAM_ID,
+          name: 'Core',
+          context_markdown: '## Goals',
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(insert).toHaveBeenCalledWith({
+      team_id: TEAM_ID,
+      name: 'Core',
+      description: null,
+      context_markdown: '## Goals',
+    });
   });
 });

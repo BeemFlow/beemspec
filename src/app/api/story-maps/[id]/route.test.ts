@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { GET as getStoryMapById } from './route';
+import { GET as getStoryMapById, PUT as putStoryMapById } from './route';
 
 vi.mock('@/lib/auth', () => ({
   requireAuth: vi.fn(),
@@ -15,7 +15,7 @@ const VALID_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
 function createStoryMapGetClient() {
   const storyMapSingle = vi.fn().mockResolvedValue({
-    data: { id: VALID_ID, name: 'Map A' },
+    data: { id: VALID_ID, name: 'Map A', description: null, context_markdown: '## Goals' },
     error: null,
   });
   const storyMapEq = vi.fn().mockReturnValue({ single: storyMapSingle });
@@ -31,7 +31,7 @@ function createStoryMapGetClient() {
   const activitiesSelect = vi.fn().mockReturnValue({ eq: activitiesEq });
 
   const releasesOrder = vi.fn().mockResolvedValue({
-    data: [{ id: 'r1', name: 'Release 1' }],
+    data: [{ id: 'r1', name: 'Release 1', context_markdown: '## Scope' }],
     error: null,
   });
   const releasesEq = vi.fn().mockReturnValue({ order: releasesOrder });
@@ -73,8 +73,10 @@ describe('story maps [id] route', () => {
     await expect(response.json()).resolves.toEqual({
       id: VALID_ID,
       name: 'Map A',
+      description: null,
+      context_markdown: '## Goals',
       activities: [{ id: 'a1', tasks: [] }],
-      releases: [{ id: 'r1', name: 'Release 1' }],
+      releases: [{ id: 'r1', name: 'Release 1', context_markdown: '## Scope' }],
       personas: [{ id: 'p1', name: 'Admin' }],
     });
     expect(from).toHaveBeenCalledWith('story_maps');
@@ -91,5 +93,32 @@ describe('story maps [id] route', () => {
 
     expect(response.status).toBe(400);
     expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it('updates story map context markdown', async () => {
+    const single = vi.fn().mockResolvedValue({
+      data: { id: VALID_ID, name: 'Map A', context_markdown: '## Updated' },
+      error: null,
+    });
+    const select = vi.fn().mockReturnValue({ single });
+    const eq = vi.fn().mockReturnValue({ select });
+    const update = vi.fn().mockReturnValue({ eq });
+    const from = vi.fn((table: string) => {
+      if (table === 'story_maps') return { update };
+      throw new Error(`Unexpected table: ${table}`);
+    });
+    vi.mocked(createClient).mockResolvedValue({ from } as never);
+
+    const response = await putStoryMapById(
+      new Request('http://localhost/api/story-maps/id', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ context_markdown: '## Updated' }),
+      }),
+      { params: Promise.resolve({ id: VALID_ID }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(update).toHaveBeenCalledWith({ context_markdown: '## Updated' });
   });
 });

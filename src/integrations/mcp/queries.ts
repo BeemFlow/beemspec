@@ -8,6 +8,7 @@ interface StoryContext {
   storyMapId: string;
   storyMapName: string;
   storyMapDescription: string | null;
+  storyMapContextMarkdown: string | null;
   activityId: string;
   activityName: string;
   activityDescription: string | null;
@@ -19,6 +20,7 @@ interface StoryContext {
   releaseId: string | null;
   releaseName: string | null;
   releaseDescription: string | null;
+  releaseContextMarkdown: string | null;
   releaseSortOrder: number | null;
   userStory: string;
   acceptanceCriteria: string;
@@ -80,6 +82,7 @@ interface ReleaseRow {
   id: string;
   name: string;
   description: string | null;
+  context_markdown: string | null;
   sort_order: number;
 }
 
@@ -87,6 +90,7 @@ interface StoryMapRow {
   id: string;
   name: string;
   description: string | null;
+  context_markdown: string | null;
 }
 
 interface PersonaRow {
@@ -118,6 +122,9 @@ function buildAgentGuidance(input: {
   edgeCases: string | null;
   technicalGuidelines: string | null;
   acceptanceCriteria: string;
+  storyMapContextMarkdown: string | null;
+  hasRelease: boolean;
+  releaseContextMarkdown: string | null;
 }) {
   const hasFigmaLink = Boolean(input.figmaLink);
   const riskFlags: string[] = [];
@@ -141,6 +148,18 @@ function buildAgentGuidance(input: {
   if (!input.technicalGuidelines) {
     missingContext.push(
       'No technical guidelines are captured for this story. Follow existing repository conventions unless the user specifies constraints.',
+    );
+  }
+
+  if (!input.storyMapContextMarkdown) {
+    missingContext.push(
+      'No story map context is captured yet. Product goals and guardrails may need clarification before broad scope judgments.',
+    );
+  }
+
+  if (input.hasRelease && !input.releaseContextMarkdown) {
+    missingContext.push(
+      'This story is assigned to a release, but that release has no context yet. Be cautious about scope and prioritization assumptions.',
     );
   }
 
@@ -194,7 +213,7 @@ export async function getStoryContext(supabase: SupabaseLike, storyId: string): 
 
   const storyMapsTable = supabase.from('story_maps') as SingleRowTable<StoryMapRow>;
   const { data: storyMap, error: storyMapError } = await storyMapsTable
-    .select('id, name, description')
+    .select('id, name, description, context_markdown')
     .eq('id', activity.story_map_id)
     .single();
   if (storyMapError || !storyMap) return null;
@@ -210,7 +229,7 @@ export async function getStoryContext(supabase: SupabaseLike, storyId: string): 
   if (story.release_id) {
     const releasesTable = supabase.from('releases') as SingleRowTable<ReleaseRow>;
     const { data: releaseRow, error: releaseError } = await releasesTable
-      .select('id, name, description, sort_order')
+      .select('id, name, description, context_markdown, sort_order')
       .eq('id', story.release_id)
       .single();
     if (releaseError || !releaseRow) return null;
@@ -228,6 +247,7 @@ export async function getStoryContext(supabase: SupabaseLike, storyId: string): 
     storyMapId: storyMap.id,
     storyMapName: storyMap.name,
     storyMapDescription: storyMap.description ?? null,
+    storyMapContextMarkdown: storyMap.context_markdown ?? null,
     activityId: activity.id,
     activityName: activity.name,
     activityDescription: activity.description ?? null,
@@ -239,6 +259,7 @@ export async function getStoryContext(supabase: SupabaseLike, storyId: string): 
     releaseId: release?.id ?? null,
     releaseName: release?.name ?? null,
     releaseDescription: release?.description ?? null,
+    releaseContextMarkdown: release?.context_markdown ?? null,
     releaseSortOrder: release?.sort_order ?? null,
     userStory: content.user_story ?? '',
     acceptanceCriteria: content.acceptance_criteria ?? '',
@@ -251,6 +272,9 @@ export async function getStoryContext(supabase: SupabaseLike, storyId: string): 
       edgeCases: content.edge_cases ?? null,
       technicalGuidelines: content.technical_guidelines ?? null,
       acceptanceCriteria: content.acceptance_criteria ?? '',
+      storyMapContextMarkdown: storyMap.context_markdown ?? null,
+      hasRelease: Boolean(release),
+      releaseContextMarkdown: release?.context_markdown ?? null,
     }),
   };
 }

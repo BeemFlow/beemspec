@@ -37,8 +37,9 @@ import {
   deleteRelease,
   deleteStory,
   deleteTask,
+  getReleaseMcpContext,
   getStory,
-  getStoryMapGraph,
+  getStoryMapMcpContext,
   listPersonas,
   listStoryMaps,
   moveStory,
@@ -167,21 +168,37 @@ type StoryLike = {
   } | null;
 };
 
+type StoryPlanningRef = {
+  id: string;
+  title: string;
+  status: string;
+  release_id: string | null;
+  has_figma_link: boolean;
+  has_edge_cases: boolean;
+};
+
 type TaskLike = {
   id: string;
   name: string;
-  stories?: StoryLike[];
+  stories?: StoryPlanningRef[];
+  description?: string | null;
+  sort_order?: number;
 };
 
 type ActivityLike = {
   id: string;
   name: string;
+  description?: string | null;
+  sort_order?: number;
   tasks?: TaskLike[];
 };
 
 type ReleaseLike = {
   id: string;
   name: string;
+  description?: string | null;
+  context_markdown?: string | null;
+  sort_order?: number;
 };
 
 type PersonaLike = {
@@ -190,8 +207,46 @@ type PersonaLike = {
   goals?: string | null;
 };
 
+function toStoryPlanningRef(story: StoryLike): StoryPlanningRef {
+  return {
+    id: story.id,
+    title: story.title,
+    status: story.status,
+    release_id: story.release_id,
+    has_figma_link: Boolean(story.content?.figma_link),
+    has_edge_cases: Boolean(story.content?.edge_cases),
+  };
+}
+
+function buildPlanningLanes(releases: ReleaseLike[]) {
+  return [
+    { releaseId: null, releaseName: 'Backlog' },
+    ...releases.map((release) => ({
+      releaseId: release.id,
+      releaseName: release.name,
+    })),
+  ];
+}
+
+function filterActivitiesForRelease(
+  activities: Array<ActivityLike & { tasks?: Array<TaskLike & { stories?: StoryPlanningRef[] }> }>,
+  releaseId: string,
+) {
+  return activities
+    .map((activity) => ({
+      ...activity,
+      tasks: (activity.tasks ?? [])
+        .map((task) => ({
+          ...task,
+          stories: (task.stories ?? []).filter((story) => story.release_id === releaseId),
+        }))
+        .filter((task) => (task.stories?.length ?? 0) > 0),
+    }))
+    .filter((activity) => (activity.tasks?.length ?? 0) > 0);
+}
+
 function buildStoryMapInsights(input: {
-  map: { id: string; name: string; description?: string | null };
+  map: { id: string; name: string; description?: string | null; context_markdown?: string | null };
   activities: ActivityLike[];
   releases: ReleaseLike[];
   personas: PersonaLike[];
@@ -199,8 +254,8 @@ function buildStoryMapInsights(input: {
   const allTasks = input.activities.flatMap((activity) => activity.tasks ?? []);
   const allStories = allTasks.flatMap((task) => task.stories ?? []);
   const backlogStories = allStories.filter((story) => story.release_id === null);
-  const storiesWithFigma = allStories.filter((story) => Boolean(story.content?.figma_link));
-  const storiesMissingEdgeCases = allStories.filter((story) => !story.content?.edge_cases);
+  const storiesWithFigma = allStories.filter((story) => story.has_figma_link);
+  const storiesMissingEdgeCases = allStories.filter((story) => !story.has_edge_cases);
   const implementationNamedActivities = input.activities.filter((activity) =>
     /frontend|backend|api|database|infra|platform|ui/i.test(activity.name),
   );
@@ -222,7 +277,7 @@ function buildStoryMapInsights(input: {
       releaseName: 'Backlog',
       storyCount: backlogStories.length,
       unfinishedCount: backlogStories.filter((story) => story.status !== 'done').length,
-      storiesWithFigmaCount: backlogStories.filter((story) => Boolean(story.content?.figma_link)).length,
+      storiesWithFigmaCount: backlogStories.filter((story) => story.has_figma_link).length,
     },
     ...input.releases.map((release) => {
       const stories = allStories.filter((story) => story.release_id === release.id);
@@ -231,7 +286,8 @@ function buildStoryMapInsights(input: {
         releaseName: release.name,
         storyCount: stories.length,
         unfinishedCount: stories.filter((story) => story.status !== 'done').length,
-        storiesWithFigmaCount: stories.filter((story) => Boolean(story.content?.figma_link)).length,
+        storiesWithFigmaCount: stories.filter((story) => story.has_figma_link).length,
+        hasContext: Boolean(release.context_markdown),
       };
     }),
   ];
@@ -250,6 +306,11 @@ function buildStoryMapInsights(input: {
       'All stories are still in backlog even though releases exist. The release plan may be underspecified.',
     );
   }
+  if (!input.map.context_markdown) {
+    storyMappingWarnings.push(
+      'This map has no context markdown yet, so product-level goals and guardrails are not captured in BeemSpec.',
+    );
+  }
   if (implementationNamedActivities.length > 0 || implementationNamedTasks.length > 0) {
     storyMappingWarnings.push(
       'Some activity or task names look implementation-oriented rather than user-workflow-oriented.',
@@ -265,7 +326,7 @@ function buildStoryMapInsights(input: {
   }
   if (input.releases.length > 0) {
     recommendedNextActions.push(
-      'Choose a target release, then inspect unfinished stories in that lane before implementation.',
+      'Choose a target release, then call release_get or inspect unfinished stories in that lane before implementation.',
     );
   } else {
     recommendedNextActions.push(
@@ -292,6 +353,11 @@ function buildStoryMapInsights(input: {
   }
   if (storiesMissingEdgeCases.length > 0) {
     topRiskFlags.push('Some stories omit edge cases, which may hide implementation risk.');
+  }
+  if (input.releases.some((release) => !release.context_markdown)) {
+    topRiskFlags.push(
+      'One or more releases lack context markdown, which may weaken release-level scope and priority decisions.',
+    );
   }
 
   return {
@@ -506,17 +572,21 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         ],
         tool_sequence: [
           '1) Call storymap_list(team_id?) to discover candidate maps (team_id optional when user has one team).',
-          '2) Call storymap_get(story_map_id) once to load complete map graph for planning, release selection, or structural edits.',
-          '3) If implementing or deeply refining one story, call story_context_get(story_id) for story-level coding and design context.',
-          '4) Perform targeted create/update/move/reorder/delete operations as needed.',
-          '5) Re-read with storymap_get(story_map_id) only after a structural mutation batch or when release planning context has changed.',
+          '2) Call storymap_get(story_map_id) to load story map context, backbone structure, release list, and lightweight story references.',
+          '3) Call release_get(release_id) when you need release-level context, release-scope review, or the stories inside one release.',
+          '4) If implementing or deeply refining one story, call story_context_get(story_id) for story-level coding and design context.',
+          '5) Perform targeted create/update/move/reorder/delete operations as needed.',
+          '6) Re-read with storymap_get(story_map_id) only after a structural mutation batch or when release planning context has changed.',
         ],
         tool_usage_rules: [
           'Call team_list when team context is unknown or the user may have access to multiple teams.',
           'Call storymap_get before structural edits or release planning so you can preserve activity, task, story, and release ordering.',
+          'Use release_get when a release has its own context, goals, or review questions and you do not need full story context for every story.',
           'Use story_update for content or status changes; use story_move/task_move for placement changes; use *_reorder only when you already know the full ordered ID list.',
-          'Use story_context_get only when one story needs full implementation context, including workflow placement, personas, and any Figma link.',
+          'Use story_context_get only when one story needs full implementation context, including workflow placement, personas, map context, release context, and any Figma link.',
           'Avoid redundant reads: if you already have the needed story or map context in the current session, continue working instead of re-fetching it.',
+          'Treat story map context markdown as the place for durable product context such as higher-level goals, business context, success criteria, key metrics, and prioritization guardrails.',
+          'Treat release context markdown as the place for release-specific goals, success criteria, scope guidance, business focus, and technical constraints that apply across stories in that release.',
           'Treat inferred user stories, acceptance criteria, personas, and release plans as drafts unless the user explicitly asks you to synthesize them.',
         ],
         clarification_policy: [
@@ -526,6 +596,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
           'Ask at most one bundled clarification round unless new blockers appear later.',
           'When asking a question, recommend a reasonable default and explain what would change based on the answer.',
           'Do not ask for information that is already available in the story map, story context, personas, release lane, or linked Figma design.',
+          'When durable product or release guidance is missing, suggest capturing it in story map or release context markdown instead of repeating it ad hoc in chat.',
         ],
         safe_vs_unsafe_inference: {
           safe_to_infer: [
@@ -554,13 +625,14 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
           'Title expresses user-visible value or outcome, not just an implementation task.',
           'User story explains who wants what and why.',
           'Acceptance criteria are specific, observable, and testable.',
+          'Story, release, and map-level context should make it clear how the work supports broader goals, success criteria, or business priorities when that context matters.',
           'Edge cases and technical guidelines are included when they materially reduce ambiguity or implementation risk.',
           'If a story lacks enough context to tell what user-visible outcome should change, treat it as underspecified.',
           'If the story is implementation-ready, proceed decisively rather than asking the user to reconfirm obvious next steps.',
         ],
         implementation_principles: [
           'release_id = null means backlog. Do not invent releases prematurely when backlog is the more honest state.',
-          'When building an entire release, use storymap_get to inspect all stories in that release before choosing implementation order.',
+          'When building an entire release, use release_get to inspect release context and the stories in that release before choosing implementation order.',
           'Favor a walking skeleton or critical-path release slice before adding breadth, polish, or component completeness.',
           'Prefer implementing the minimum set of stories that makes the release usable, learnable, or testable in the hands of a user.',
           'Check nearby stories in the same release before coding so you preserve the release intent instead of optimizing one story in isolation.',
@@ -580,6 +652,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         ],
         update_policy: [
           'If you refine scope, acceptance criteria, or story wording during discussion, update the relevant BeemSpec entities so the map stays trustworthy.',
+          'If the conversation reveals durable product goals, release goals, metrics, success criteria, or business context that should guide future work, suggest capturing them in story map or release context markdown.',
           'Use move and reorder operations instead of delete-and-recreate when preserving history and ordering matters.',
           'Keep newly synthesized planning content clearly framed as draft unless the user asked you to formalize it.',
         ],
@@ -656,7 +729,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         return errorResult('Provide story_map_id or story_map_name');
       }
 
-      const { mapResult, activitiesResult, releasesResult, personasResult } = await getStoryMapGraph(
+      const { mapResult, activitiesResult, releasesResult, personasResult } = await getStoryMapMcpContext(
         supabase,
         resolvedStoryMapId,
         {
@@ -678,11 +751,21 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         return errorResult('Failed to load personas', describeDbError(personasResult.error));
       }
 
+      const activities = (activitiesResult.data ?? []).map((activity) => ({
+        ...activity,
+        tasks: (activity.tasks ?? []).map((task) => ({
+          ...task,
+          stories: (task.stories ?? []).map(toStoryPlanningRef),
+        })),
+      }));
+      const releases = releasesResult.data ?? [];
+      const personas = personasResult.data ?? [];
       const data = {
         ...mapResult.data,
-        activities: activitiesResult.data ?? [],
-        releases: releasesResult.data ?? [],
-        personas: personasResult.data ?? [],
+        activities,
+        releases,
+        planning_lanes: buildPlanningLanes(releases),
+        personas,
       };
 
       return successResult({
@@ -698,6 +781,63 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
   );
 
   server.registerTool(
+    'release_get',
+    {
+      title: 'Get Release',
+      description:
+        'Load one release with release context and lightweight story references. Use this for release planning and scope review.',
+      inputSchema: {
+        release_id: z.string().uuid().describe('Release UUID'),
+      },
+      annotations: readAnnotations,
+    },
+    withToolErrorBoundary('release_get', async ({ release_id }) => {
+      const supabase = getUserScopedClient();
+      const { releaseResult, mapResult, activitiesResult } = await getReleaseMcpContext(supabase, release_id);
+
+      if (releaseResult.error) {
+        if (isNotFound(releaseResult.error)) return errorResult('Release not found');
+        return errorResult('Failed to load release', describeDbError(releaseResult.error));
+      }
+      if (mapResult.error) {
+        return errorResult('Failed to load story map for release', describeDbError(mapResult.error));
+      }
+      if (activitiesResult.error) {
+        return errorResult('Failed to load activities for release', describeDbError(activitiesResult.error));
+      }
+
+      const activities = (activitiesResult.data ?? []).map((activity) => ({
+        ...activity,
+        tasks: (activity.tasks ?? []).map((task) => ({
+          ...task,
+          stories: (task.stories ?? []).map(toStoryPlanningRef),
+        })),
+      }));
+      const releaseActivities = filterActivitiesForRelease(activities, release_id);
+      const allStories = releaseActivities.flatMap((activity) =>
+        (activity.tasks ?? []).flatMap((task) => task.stories ?? []),
+      );
+
+      return successResult({
+        release: releaseResult.data,
+        story_map: mapResult.data,
+        activities: releaseActivities,
+        summary: {
+          storyCount: allStories.length,
+          unfinishedCount: allStories.filter((story) => story.status !== 'done').length,
+          storiesWithFigmaCount: allStories.filter((story) => story.has_figma_link).length,
+          storiesMissingEdgeCasesCount: allStories.filter((story) => !story.has_edge_cases).length,
+        },
+        warnings: [
+          ...(releaseResult.data?.context_markdown
+            ? []
+            : ['This release has no context markdown yet, so release-specific goals and guardrails are not captured.']),
+        ],
+      });
+    }),
+  );
+
+  server.registerTool(
     'storymap_create',
     {
       title: 'Create Story Map',
@@ -707,6 +847,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         team_id: z.string().uuid().optional().describe('Team UUID (optional for single-team users)'),
         name: createStoryMapSchema.shape.name,
         description: createStoryMapSchema.shape.description,
+        context_markdown: createStoryMapSchema.shape.context_markdown,
       },
       annotations: mutateAnnotations,
     },
@@ -719,6 +860,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         team_id: resolvedTeam.teamId,
         name: input.name,
         description: input.description,
+        context_markdown: input.context_markdown,
       });
 
       if (error) return errorResult('Failed to create story map', describeDbError(error));

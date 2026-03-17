@@ -74,6 +74,7 @@ describe('mcp server', () => {
     expect(toolNames.has('storymap_workflow_guide')).toBe(true);
     expect(toolNames.has('storymap_list')).toBe(true);
     expect(toolNames.has('storymap_get')).toBe(true);
+    expect(toolNames.has('release_get')).toBe(true);
     expect(toolNames.has('storymap_delete')).toBe(false);
     expect(toolNames.has('activity_create')).toBe(true);
     expect(toolNames.has('task_create')).toBe(true);
@@ -113,7 +114,9 @@ describe('mcp server', () => {
             operating_mode: string[];
             clarification_policy: string[];
             tool_sequence: string[];
+            tool_usage_rules: string[];
             implementation_principles: string[];
+            update_policy: string[];
             safe_vs_unsafe_inference: {
               safe_to_infer: string[];
               unsafe_to_infer: string[];
@@ -129,74 +132,70 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.data.clarification_policy[0]).toContain('materially change');
     expect(payload.result.structuredContent.data.tool_sequence[0]).toContain('storymap_list');
     expect(payload.result.structuredContent.data.tool_sequence[1]).toContain('storymap_get');
+    expect(payload.result.structuredContent.data.tool_sequence[2]).toContain('release_get');
+    expect(payload.result.structuredContent.data.tool_usage_rules.join(' ')).toContain('story map context markdown');
+    expect(payload.result.structuredContent.data.clarification_policy.join(' ')).toContain('context markdown');
     expect(payload.result.structuredContent.data.safe_vs_unsafe_inference.unsafe_to_infer[0]).toContain(
       'New product scope',
     );
     expect(payload.result.structuredContent.data.implementation_principles.join(' ')).toContain('Figma MCP server');
     expect(payload.result.structuredContent.data.story_quality_principles[0]).toContain('user-visible value');
+    expect(payload.result.structuredContent.data.update_policy.join(' ')).toContain('metrics');
   });
 
   it('returns story map insights with warnings and recommendations', async () => {
-    const mapSingle = vi.fn().mockResolvedValue({
-      data: { id: 'map-1', name: 'Core Product', description: 'Primary map' },
-      error: null,
-    });
-    const activitiesOrder3 = vi.fn().mockResolvedValue({
-      data: [
-        {
-          id: 'activity-1',
-          name: 'Frontend',
-          tasks: [
-            {
-              id: 'task-1',
-              name: 'API integration',
-              stories: [
-                {
-                  id: 'story-1',
-                  title: 'Build API endpoint',
-                  status: 'backlog',
-                  release_id: null,
-                  content: {
-                    acceptance_criteria: '- [ ] endpoint works',
-                    figma_link: 'https://figma.com/design/abc/Test?node-id=1-2',
+    vi.spyOn(storymapService, 'getStoryMapMcpContext').mockResolvedValue({
+      mapResult: {
+        data: { id: 'map-1', name: 'Core Product', description: 'Primary map', context_markdown: null },
+        error: null,
+      },
+      activitiesResult: {
+        data: [
+          {
+            id: 'activity-1',
+            story_map_id: 'map-1',
+            name: 'Frontend',
+            description: null,
+            sort_order: 0,
+            tasks: [
+              {
+                id: 'task-1',
+                activity_id: 'activity-1',
+                name: 'API integration',
+                description: null,
+                sort_order: 0,
+                stories: [
+                  {
+                    id: 'story-1',
+                    title: 'Build API endpoint',
+                    status: 'backlog',
+                    release_id: null,
+                    sort_order: 0,
+                    content: {
+                      acceptance_criteria: '- [ ] endpoint works',
+                      figma_link: 'https://figma.com/design/abc/Test?node-id=1-2',
+                    },
                   },
-                },
-              ],
-            },
-          ],
-        },
-      ],
-      error: null,
-    });
-    const activitiesOrder2 = vi.fn().mockReturnValue({ order: activitiesOrder3 });
-    const activitiesOrder1 = vi.fn().mockReturnValue({ order: activitiesOrder2 });
-    const releasesOrder = vi.fn().mockResolvedValue({
-      data: [{ id: 'release-1', name: 'Release 1' }],
-      error: null,
-    });
-    const personasOrder = vi.fn().mockResolvedValue({
-      data: [{ id: 'persona-1', name: 'Admin', goals: 'Ship safely' }],
-      error: null,
-    });
+                ],
+              },
+            ],
+          },
+        ],
+        error: null,
+      },
+      releasesResult: {
+        data: [
+          { id: 'release-1', story_map_id: 'map-1', name: 'Release 1', description: null, context_markdown: null },
+        ],
+        error: null,
+      },
+      personasResult: {
+        data: [{ id: 'persona-1', name: 'Admin', goals: 'Ship safely' }],
+        error: null,
+      },
+    } as never);
 
-    const fakeSupabase = {
-      from: vi.fn((table: string) => {
-        if (table === 'story_maps') {
-          return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: mapSingle }) }) };
-        }
-        if (table === 'activities') {
-          return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ order: activitiesOrder1 }) }) };
-        }
-        if (table === 'releases') {
-          return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ order: releasesOrder }) }) };
-        }
-        if (table === 'personas') {
-          return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ order: personasOrder }) }) };
-        }
-        throw new Error(`Unexpected table ${table}`);
-      }),
-      rpc: vi.fn(),
-    } as never;
+    const fakeSupabase = { from: vi.fn(), rpc: vi.fn() } as never;
 
     const response = await handleMcpRequest(
       rpcRequest({
@@ -215,9 +214,103 @@ describe('mcp server', () => {
     expect(response.status).toBe(200);
     const body = await response.text();
     expect(body).toContain('agent_insights');
+    expect(body).toContain('planning_lanes');
     expect(body).toContain('storiesWithFigmaCount');
     expect(body).toContain('story_mapping_warnings');
     expect(body).toContain('Figma MCP server');
+    expect(body).not.toContain('acceptance_criteria');
+  });
+
+  it('returns release planning context with lightweight stories', async () => {
+    const releaseId = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
+    vi.spyOn(storymapService, 'getReleaseMcpContext').mockResolvedValue({
+      releaseResult: {
+        data: {
+          id: releaseId,
+          story_map_id: 'map-1',
+          name: 'Release 1',
+          description: 'Core scope',
+          context_markdown: '## Focus\nShip activation',
+          sort_order: 0,
+        },
+        error: null,
+      },
+      mapResult: {
+        data: { id: 'map-1', name: 'Core Product', description: 'Primary map', context_markdown: '## Goal' },
+        error: null,
+      },
+      activitiesResult: {
+        data: [
+          {
+            id: 'activity-1',
+            story_map_id: 'map-1',
+            name: 'Browse',
+            description: null,
+            sort_order: 0,
+            tasks: [
+              {
+                id: 'task-1',
+                activity_id: 'activity-1',
+                name: 'View rates',
+                description: null,
+                sort_order: 0,
+                stories: [
+                  {
+                    id: 'story-1',
+                    title: 'Show featured rates',
+                    status: 'todo',
+                    release_id: releaseId,
+                    sort_order: 0,
+                    content: { edge_cases: null, figma_link: null },
+                  },
+                  {
+                    id: 'story-2',
+                    title: 'Backlog story',
+                    status: 'backlog',
+                    release_id: null,
+                    sort_order: 1,
+                    content: { edge_cases: 'Handle empty state', figma_link: null },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        error: null,
+      },
+    } as never);
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 32,
+        method: 'tools/call',
+        params: {
+          name: 'release_get',
+          arguments: { release_id: releaseId },
+        },
+      }),
+      { from: vi.fn(), rpc: vi.fn() } as never,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      result: {
+        structuredContent: {
+          ok: boolean;
+          data: {
+            summary: { storyCount: number };
+            activities: Array<{ tasks: Array<{ stories: Array<{ id: string }> }> }>;
+          };
+        };
+      };
+    };
+    expect(payload.result.structuredContent.ok).toBe(true);
+    expect(payload.result.structuredContent.data.summary.storyCount).toBe(1);
+    expect(payload.result.structuredContent.data.activities[0].tasks[0].stories).toEqual([
+      expect.objectContaining({ id: 'story-1' }),
+    ]);
   });
 
   it('calls storymap_list through shared service path', async () => {
@@ -639,6 +732,7 @@ describe('mcp server', () => {
                     id: 'map-1',
                     name: 'Core Product',
                     description: 'Primary planning map',
+                    context_markdown: '## Goals\nImprove conversion',
                   },
                   error: null,
                 }),
@@ -698,6 +792,7 @@ describe('mcp server', () => {
             storyTitle: string;
             storyStatus: string;
             storyMapName: string;
+            storyMapContextMarkdown: string | null;
             activityName: string;
             taskName: string;
             userStory: string;
@@ -705,6 +800,7 @@ describe('mcp server', () => {
             edgeCases: string | null;
             technicalGuidelines: string | null;
             figmaLink: string | null;
+            releaseContextMarkdown: string | null;
             personas: Array<{ name: string }>;
             agentGuidance: {
               riskFlags: string[];
@@ -726,10 +822,12 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.data.storyTitle).toBe('Backlog story');
     expect(payload.result.structuredContent.data.storyStatus).toBe('backlog');
     expect(payload.result.structuredContent.data.storyMapName).toBe('Core Product');
+    expect(payload.result.structuredContent.data.storyMapContextMarkdown).toContain('Improve conversion');
     expect(payload.result.structuredContent.data.activityName).toBe('Plan work');
     expect(payload.result.structuredContent.data.taskName).toBe('Review backlog item');
     expect(payload.result.structuredContent.data.edgeCases).toBe('Handle empty states');
     expect(payload.result.structuredContent.data.figmaLink).toContain('figma.com');
+    expect(payload.result.structuredContent.data.releaseContextMarkdown).toBeNull();
     expect(payload.result.structuredContent.data.personas).toHaveLength(1);
     expect(payload.result.structuredContent.data.agentGuidance.riskFlags[0]).toContain('Linked design context');
     expect(payload.result.structuredContent.data.agentGuidance.verificationFocus[0]).toContain('acceptance criteria');
@@ -772,5 +870,137 @@ describe('mcp server', () => {
 
     expect(payload.result.isError).toBe(true);
     expect(payload.result.structuredContent.error).toBe('Story not found');
+  });
+
+  it('returns assigned release context in story_context_get', async () => {
+    const storyId = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
+    const releaseId = '34e8bb98-8f40-4331-8df2-8f83fd8c7af4';
+    const fakeSupabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'stories') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: storyId,
+                    task_id: 'task-1',
+                    title: 'Release story',
+                    status: 'todo',
+                    sort_order: 0,
+                    release_id: releaseId,
+                    content: {
+                      user_story: 'As a customer, I can complete checkout',
+                      acceptance_criteria: 'Checkout succeeds',
+                    },
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'tasks') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: { id: 'task-1', activity_id: 'activity-1', name: 'Checkout', description: null, sort_order: 0 },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'activities') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: 'activity-1',
+                    story_map_id: 'map-1',
+                    name: 'Buy',
+                    description: null,
+                    sort_order: 0,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'story_maps') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: 'map-1',
+                    name: 'Core Product',
+                    description: null,
+                    context_markdown: '## Product goal',
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'personas') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({ order: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+            }),
+          };
+        }
+        if (table === 'releases') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: releaseId,
+                    name: 'Release 1',
+                    description: null,
+                    context_markdown: '## Release goal',
+                    sort_order: 0,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    } as never;
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 14,
+        method: 'tools/call',
+        params: {
+          name: 'story_context_get',
+          arguments: { story_id: storyId },
+        },
+      }),
+      fakeSupabase,
+      user,
+    );
+
+    const payload = (await response.json()) as {
+      result: {
+        structuredContent: {
+          ok: boolean;
+          data: { releaseContextMarkdown: string | null; storyMapContextMarkdown: string | null };
+        };
+      };
+    };
+
+    expect(payload.result.structuredContent.ok).toBe(true);
+    expect(payload.result.structuredContent.data.storyMapContextMarkdown).toContain('Product goal');
+    expect(payload.result.structuredContent.data.releaseContextMarkdown).toContain('Release goal');
   });
 });
