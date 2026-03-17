@@ -83,10 +83,13 @@ export function StoryDialog({
     e.preventDefault();
     if (isSubmitting) return;
 
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) return;
+
     try {
       setIsSubmitting(true);
       await onSave({
-        title,
+        title: trimmedTitle,
         content: createContent({
           user_story: userStory,
           acceptance_criteria: acceptanceCriteria,
@@ -132,6 +135,7 @@ export function StoryDialog({
               placeholder="OAuth login with Google"
               disabled={isSubmitting}
               required
+              pattern=".*\S.*"
             />
           </div>
 

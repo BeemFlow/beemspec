@@ -66,15 +66,44 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
   async function handleSaveStory(storyData: Partial<Story>) {
     try {
       if (dialog.type === 'story:edit') {
-        await request(
-          `/api/stories/${dialog.story.id}`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(storyData),
-          },
-          'Failed to save story',
-        );
+        const { release_id, ...storyUpdates } = storyData;
+        if (Object.keys(storyUpdates).length > 0) {
+          await request(
+            `/api/stories/${dialog.story.id}`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(storyUpdates),
+            },
+            'Failed to save story',
+          );
+        }
+
+        if (storyMap && release_id !== undefined && release_id !== dialog.story.release_id) {
+          const targetStories = storyMap.activities
+            .flatMap((activity) => activity.tasks)
+            .find((task) => task.id === dialog.story.task_id)?.stories;
+
+          const targetOrder = (targetStories ?? [])
+            .filter((story) => story.id !== dialog.story.id && story.release_id === release_id)
+            .map((story) => story.id);
+
+          targetOrder.push(dialog.story.id);
+
+          await request(
+            `/api/stories/${dialog.story.id}/move`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                target_task_id: dialog.story.task_id,
+                target_release_id: release_id,
+                target_order: targetOrder,
+              }),
+            },
+            'Failed to move story',
+          );
+        }
       } else if (dialog.type === 'story:create') {
         await request(
           '/api/stories',
