@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityDialog } from '@/components/story-map/ActivityDialog';
 import { McpSetupDialog } from '@/components/story-map/McpSetupDialog';
+import { planStoryEditSave, type StoryEditSave } from '@/components/story-map/payloads';
 import { StoryDialog } from '@/components/story-map/StoryDialog';
 import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas';
 import { StoryMapSettingsDialog } from '@/components/story-map/StoryMapSettingsDialog';
@@ -63,10 +64,10 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
     setDialog({ type: 'story:edit', story });
   };
 
-  async function handleSaveStory(storyData: Partial<Story>) {
+  async function handleSaveStory(storyData: StoryEditSave) {
     try {
       if (dialog.type === 'story:edit') {
-        const { release_id, ...storyUpdates } = storyData;
+        const { updates: storyUpdates, move } = planStoryEditSave(storyMap, dialog.story, storyData);
         if (Object.keys(storyUpdates).length > 0) {
           await request(
             `/api/stories/${dialog.story.id}`,
@@ -79,27 +80,13 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
           );
         }
 
-        if (storyMap && release_id !== undefined && release_id !== dialog.story.release_id) {
-          const targetStories = storyMap.activities
-            .flatMap((activity) => activity.tasks)
-            .find((task) => task.id === dialog.story.task_id)?.stories;
-
-          const targetOrder = (targetStories ?? [])
-            .filter((story) => story.id !== dialog.story.id && story.release_id === release_id)
-            .map((story) => story.id);
-
-          targetOrder.push(dialog.story.id);
-
+        if (move) {
           await request(
             `/api/stories/${dialog.story.id}/move`,
             {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                target_task_id: dialog.story.task_id,
-                target_release_id: release_id,
-                target_order: targetOrder,
-              }),
+              body: JSON.stringify(move),
             },
             'Failed to move story',
           );

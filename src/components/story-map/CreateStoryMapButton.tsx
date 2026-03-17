@@ -3,6 +3,7 @@
 import { Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { buildCreateStoryMapPayload } from '@/components/story-map/payloads';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/Dialog';
@@ -38,7 +39,7 @@ export function CreateStoryMapButton({ teamId, empty = false }: CreateStoryMapBu
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ team_id: teamId, name, description }),
+          body: JSON.stringify(buildCreateStoryMapPayload(teamId, name, description)),
         },
         'Failed to create story map',
       );

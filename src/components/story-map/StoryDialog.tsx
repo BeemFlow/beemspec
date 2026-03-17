@@ -3,6 +3,7 @@
 import { createContent, type StoryContent } from '@beemspec/storymap';
 import { useEffect, useState } from 'react';
 import { AgentKickoffButton, buildStoryKickoffPrompt } from '@/components/story-map/AgentKickoffButton';
+import type { StoryEditSave } from '@/components/story-map/payloads';
 import { STATUS_OPTIONS } from '@/components/story-map/story-status';
 import { Button } from '@/components/ui/Button';
 import { DeleteButton } from '@/components/ui/DeleteButton';
@@ -28,7 +29,7 @@ interface Props {
   storyMapId: string;
   storyMapName: string;
   defaultReleaseId?: string | null;
-  onSave: (story: Partial<StoryFormData>) => Promise<void> | void;
+  onSave: (story: StoryEditSave | StoryFormData) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
 }
 
