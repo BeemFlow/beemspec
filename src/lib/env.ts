@@ -36,4 +36,14 @@ export const env = {
   linearWebhookSecret(): string | null {
     return readEnv('LINEAR_WEBHOOK_SECRET') ?? readEnv('BEEMSPEC_LINEAR_WEBHOOK_SECRET');
   },
+
+  mcpAllowedOrigins(): string[] {
+    const value = readEnv('MCP_ALLOWED_ORIGINS');
+    if (!value) return [];
+
+    return value
+      .split(',')
+      .map((origin) => normalize(origin))
+      .filter((origin): origin is string => Boolean(origin));
+  },
 };

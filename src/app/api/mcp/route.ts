@@ -1,5 +1,5 @@
 import { authenticateMcpRequest } from '@/integrations/mcp/auth';
-import { isTrustedRequestOrigin } from '@/integrations/mcp/origin';
+import { applyMcpCorsHeaders, isTrustedRequestOrigin } from '@/integrations/mcp/origin';
 import { handleMcpRequest } from '@/integrations/mcp/server';
 
 export const runtime = 'nodejs';
@@ -7,15 +7,15 @@ export const dynamic = 'force-dynamic';
 
 async function handleMcpHttpRequest(request: Request): Promise<Response> {
   if (!isTrustedRequestOrigin(request)) {
-    return Response.json({ error: 'Forbidden origin' }, { status: 403 });
+    return applyMcpCorsHeaders(Response.json({ error: 'Forbidden origin' }, { status: 403 }), request);
   }
 
   const auth = await authenticateMcpRequest(request);
   if (!auth.ok) {
-    return auth.response;
+    return applyMcpCorsHeaders(auth.response, request);
   }
 
-  return handleMcpRequest(request, auth.supabase, auth.user);
+  return applyMcpCorsHeaders(await handleMcpRequest(request, auth.supabase, auth.user), request);
 }
 
 export async function GET(request: Request) {
@@ -30,6 +30,6 @@ export async function DELETE(request: Request) {
   return handleMcpHttpRequest(request);
 }
 
-export async function OPTIONS() {
-  return new Response(null, { status: 204 });
+export async function OPTIONS(request: Request) {
+  return applyMcpCorsHeaders(new Response(null, { status: 204 }), request);
 }
