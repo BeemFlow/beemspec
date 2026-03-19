@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
-import type { ProcessFlowFull } from '@/types';
 import type { ProcessFlowCanvasEdge, ProcessFlowCanvasNode } from './adapters';
 
 type InspectorSelection =
@@ -17,13 +16,7 @@ type InspectorSelection =
   | { kind: 'edge'; edge: ProcessFlowCanvasEdge };
 
 interface ProcessFlowInspectorProps {
-  processFlow: ProcessFlowFull;
   selection: InspectorSelection;
-  onSaveFlow: (changes: {
-    name?: string;
-    description?: string | null;
-    context_markdown?: string | null;
-  }) => Promise<void>;
   onSaveNode: (nodeId: string, changes: Record<string, unknown>) => Promise<void>;
   onDeleteNode: (nodeId: string) => Promise<void>;
   onSaveEdge: (edgeId: string, changes: Record<string, unknown>) => Promise<void>;
@@ -57,16 +50,6 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
     edgeLabel: useId(),
   };
 
-  const flowDefaults = useMemo(
-    () => ({
-      name: props.processFlow.name,
-      description: props.processFlow.description ?? '',
-      context_markdown: props.processFlow.context_markdown ?? '',
-    }),
-    [props.processFlow],
-  );
-  const [flowForm, setFlowForm] = useState(flowDefaults);
-
   const nodeDefaults = useMemo(() => {
     if (props.selection.kind !== 'node') return null;
     const node = props.selection.node;
@@ -96,7 +79,6 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
   const selectedNode = props.selection.kind === 'node' ? props.selection.node : null;
   const selectedEdge = props.selection.kind === 'edge' ? props.selection.edge : null;
 
-  useEffect(() => setFlowForm(flowDefaults), [flowDefaults]);
   useEffect(() => setNodeForm(nodeDefaults), [nodeDefaults]);
   useEffect(() => setEdgeForm(edgeDefaults), [edgeDefaults]);
 
@@ -110,56 +92,19 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full max-w-[360px] flex-col gap-4 overflow-y-auto p-4">
+    <div className="flex w-full max-w-[360px] flex-col gap-4 p-4">
       {props.selection.kind === 'flow' ? (
         <Card className="gap-0 overflow-hidden">
           <CardHeader className="border-b">
             <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-base">Flow Details</CardTitle>
-              <Badge variant="outline">Process Flow</Badge>
+              <CardTitle className="text-base">No Selection</CardTitle>
+              <Badge variant="outline">Canvas</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4 p-4">
-            <div className="space-y-2">
-              <Label htmlFor="flow-name">Name</Label>
-              <Input
-                id="flow-name"
-                value={flowForm.name}
-                onChange={(e) => setFlowForm((s) => ({ ...s, name: e.target.value }))}
-              />
+            <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+              Click a node or edge to configure its settings.
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="flow-description">Description</Label>
-              <Textarea
-                id="flow-description"
-                value={flowForm.description}
-                onChange={(e) => setFlowForm((s) => ({ ...s, description: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="flow-context">Context Markdown</Label>
-              <Textarea
-                id="flow-context"
-                className="min-h-32 font-mono text-xs"
-                value={flowForm.context_markdown}
-                onChange={(e) => setFlowForm((s) => ({ ...s, context_markdown: e.target.value }))}
-              />
-            </div>
-            <Button
-              className="w-full"
-              disabled={isSaving}
-              onClick={() =>
-                run(() =>
-                  props.onSaveFlow({
-                    name: flowForm.name,
-                    description: flowForm.description || null,
-                    context_markdown: flowForm.context_markdown || null,
-                  }),
-                )
-              }
-            >
-              Save Flow Details
-            </Button>
           </CardContent>
         </Card>
       ) : null}

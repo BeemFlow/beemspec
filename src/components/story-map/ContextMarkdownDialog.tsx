@@ -24,13 +24,22 @@ Examples:
 - Technical constraints or guidance
 - Rollout and verification notes`;
 
+const PROCESS_FLOW_PLACEHOLDER = `Use this space to capture durable operational context for this process flow.
+
+Examples:
+- Business purpose and scope of the workflow
+- Teams, roles, or systems involved
+- Operational constraints and service-level expectations
+- Pain points, risks, and bottlenecks observed in discovery
+- Notes that should guide redesign and automation decisions`;
+
 interface ContextMarkdownDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   value: string | null;
   onSave: (value: string | null) => Promise<void>;
-  variant: 'story-map' | 'release';
+  variant: 'story-map' | 'release' | 'process-flow';
 }
 
 export function ContextMarkdownDialog({
@@ -53,7 +62,12 @@ export function ContextMarkdownDialog({
   }, [open, value]);
 
   const hasChanges = (draft.trim() || null) !== (value || null);
-  const placeholder = variant === 'story-map' ? STORY_MAP_PLACEHOLDER : RELEASE_PLACEHOLDER;
+  const placeholder =
+    variant === 'story-map'
+      ? STORY_MAP_PLACEHOLDER
+      : variant === 'release'
+        ? RELEASE_PLACEHOLDER
+        : PROCESS_FLOW_PLACEHOLDER;
 
   async function handleSave(event: React.FormEvent) {
     event.preventDefault();

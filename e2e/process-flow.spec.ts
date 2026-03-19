@@ -28,17 +28,19 @@ test('can create and edit a process flow through the UI', async ({ page }) => {
   await expect(page).toHaveURL(/\/process-flows\/flow-1$/);
   await expect(page.getByText('Accounts Payable')).toBeVisible();
 
+  await page.getByRole('button', { name: 'Process flow settings' }).click();
   await page.getByLabel('Name').fill('Accounts Payable Ops');
-  await page.getByRole('button', { name: 'Save Flow Details' }).click();
+  await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Accounts Payable Ops')).toBeVisible();
 
   await page.getByRole('button', { name: 'Step' }).click();
   const newStepNode = page.getByTestId('processflow-node-step').filter({ hasText: 'New step' }).first();
   await expect(newStepNode).toBeVisible();
-  await expect(page.getByText('Node "New step" is disconnected from the process flow.')).toBeVisible();
+  await page.getByRole('button', { name: 'Validate' }).click();
+  await expect(page.getByText(/^2$/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Auto-layout' }).click();
-  await page.getByRole('button', { name: 'Reload' }).click();
+  await page.reload();
 
   await expect(page.getByText('Accounts Payable Ops')).toBeVisible();
   await expect(page.getByTestId('processflow-node-step').filter({ hasText: 'New step' }).first()).toBeVisible();
@@ -50,7 +52,8 @@ test('shows connected state after adding a new edge', async ({ page, request }) 
   await page.getByRole('button', { name: 'Step' }).click();
   const newStepNode = page.getByTestId('processflow-node-step').filter({ hasText: 'New step' }).first();
   await expect(newStepNode).toBeVisible();
-  await expect(page.getByText('Node "New step" is disconnected from the process flow.')).toBeVisible();
+  await page.getByRole('button', { name: 'Validate' }).click();
+  await expect(page.getByText(/^2$/)).toBeVisible();
 
   const response = await request.post('/api/process-flows/flow-1/edges', {
     data: {
@@ -63,7 +66,8 @@ test('shows connected state after adding a new edge', async ({ page, request }) 
   expect(response.ok()).toBeTruthy();
 
   await page.getByRole('button', { name: 'Validate' }).click();
-  await expect(page.getByText('Node "New step" is disconnected from the process flow.')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Validate' }).click();
+  await expect(page.getByText(/^1$/)).toBeVisible();
 });
 
 test('can create and open a story map from the dashboard', async ({ page }) => {

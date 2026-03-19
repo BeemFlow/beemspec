@@ -2,7 +2,6 @@ import {
   createProcessFlowEdgeSchema,
   createProcessFlowNodeSchema,
   createProcessFlowSchema,
-  processFlowAutolayoutSchema,
   updateProcessFlowEdgeSchema,
   updateProcessFlowNodeSchema,
   updateProcessFlowSchema,
@@ -35,7 +34,6 @@ import { DbErrorCode } from '@/lib/errors';
 import type { Supabase } from '@/lib/supabase/types';
 import { listTeamsForUser } from '@/lib/teams';
 import {
-  autolayoutProcessFlow,
   buildProcessFlowFull,
   createProcessFlow,
   createProcessFlowEdge,
@@ -668,9 +666,8 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
           '1) Call processflow_list(team_id?) to discover candidate flows when the target is unclear.',
           '2) Call processflow_get(process_flow_id or process_flow_name) before structural edits.',
           '3) Create or update nodes and edges in focused batches of related changes.',
-          '4) Call processflow_autolayout(process_flow_id) after structural mutation batches when layout clarity matters.',
-          '5) Call processflow_validation_get(process_flow_id) to inspect deterministic warnings after major changes.',
-          '6) Re-read with processflow_get(process_flow_id) only after material structural changes or when flow context has changed.',
+          '4) Call processflow_validation_get(process_flow_id) to inspect deterministic warnings after major changes.',
+          '5) Re-read with processflow_get(process_flow_id) only after material structural changes or when flow context has changed.',
         ],
         tool_usage_rules: [
           'Call team_list when team context is unknown or the user may have access to multiple teams.',
@@ -1013,26 +1010,6 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
       }
 
       return successResult({ deleted: data });
-    }),
-  );
-
-  server.registerTool(
-    'processflow_autolayout',
-    {
-      title: 'Auto-layout Process Flow',
-      description: 'Run ELK auto-layout for a process flow and persist updated node positions.',
-      inputSchema: processFlowAutolayoutSchema.shape,
-      annotations: mutateAnnotations,
-    },
-    withToolErrorBoundary('processflow_autolayout', async ({ process_flow_id }) => {
-      const supabase = getUserScopedClient();
-      const { data, error } = await autolayoutProcessFlow(supabase, process_flow_id);
-      if (error) {
-        if (isNotFound(error)) return errorResult('Process flow not found');
-        return errorResult('Failed to auto-layout process flow', describeDbError(error));
-      }
-
-      return successResult(data);
     }),
   );
 

@@ -16,7 +16,7 @@ export function ProcessFlowValidationPanel({ validation }: { validation: Process
           Validation
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 p-4">
+      <CardContent className="max-h-[40vh] space-y-3 overflow-y-auto p-4">
         {warnings.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
             No warnings right now.

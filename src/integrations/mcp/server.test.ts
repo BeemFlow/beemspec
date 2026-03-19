@@ -82,7 +82,6 @@ describe('mcp server', () => {
     expect(toolNames.has('processflow_update')).toBe(true);
     expect(toolNames.has('processflow_node_create')).toBe(true);
     expect(toolNames.has('processflow_edge_create')).toBe(true);
-    expect(toolNames.has('processflow_autolayout')).toBe(true);
     expect(toolNames.has('release_get')).toBe(true);
     expect(toolNames.has('storymap_delete')).toBe(false);
     expect(toolNames.has('activity_create')).toBe(true);
@@ -185,7 +184,7 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.ok).toBe(true);
     expect(payload.result.structuredContent.data.tool_sequence[0]).toContain('processflow_list');
     expect(payload.result.structuredContent.data.tool_sequence[1]).toContain('processflow_get');
-    expect(payload.result.structuredContent.data.tool_sequence[4]).toContain('processflow_validation_get');
+    expect(payload.result.structuredContent.data.tool_sequence[3]).toContain('processflow_validation_get');
     expect(payload.result.structuredContent.data.process_modeling_principles.join(' ')).toContain('step nodes');
     expect(payload.result.structuredContent.data.operating_mode[2]).toContain('operational reality');
   });

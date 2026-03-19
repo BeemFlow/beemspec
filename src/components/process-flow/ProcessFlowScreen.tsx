@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProcessFlowCanvas } from '@/components/process-flow/ProcessFlowCanvas';
 import { ProcessFlowInspector } from '@/components/process-flow/ProcessFlowInspector';
+import { ProcessFlowSettingsDialog } from '@/components/process-flow/ProcessFlowSettingsDialog';
 import { ProcessFlowToolbar } from '@/components/process-flow/ProcessFlowToolbar';
 import { ProcessFlowValidationPanel } from '@/components/process-flow/ProcessFlowValidationPanel';
+import { ContextMarkdownDialog } from '@/components/story-map/ContextMarkdownDialog';
 import { fetchJson } from '@/lib/http';
 import type { ProcessFlow, ProcessFlowFull, ProcessFlowValidationResult } from '@/types';
 import {
@@ -34,7 +36,10 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
   const [edges, setEdges] = useState<ProcessFlowCanvasEdge[]>(() => toCanvasFlow(initialProcessFlow).edges);
   const [selection, setSelection] = useState<Selection>(initialSelection);
   const [validation, setValidation] = useState<ProcessFlowValidationResult | null>(null);
+  const [validationOpen, setValidationOpen] = useState(false);
   const [uiError, setUiError] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [contextOpen, setContextOpen] = useState(false);
 
   useEffect(() => {
     setProcessFlow(initialProcessFlow);
@@ -69,10 +74,6 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
     }
   }, []);
 
-  const handleReload = useCallback(() => {
-    router.refresh();
-  }, [router]);
-
   const handleValidate = useCallback(async () => {
     const next = await request<ProcessFlowValidationResult>(
       `/api/process-flows/${processFlow.id}/validation`,
@@ -81,6 +82,13 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
     );
     setValidation(next);
   }, [processFlow.id, request]);
+
+  const handleToggleValidation = useCallback(async () => {
+    if (!validationOpen) {
+      await handleValidate();
+    }
+    setValidationOpen((current) => !current);
+  }, [handleValidate, validationOpen]);
 
   useEffect(() => {
     void handleValidate();
@@ -271,17 +279,28 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
     await handleValidate();
   }, [processFlow.id, request, handleValidate]);
 
+  const handleDeleteFlow = useCallback(async () => {
+    await request(
+      `/api/process-flows/${processFlow.id}`,
+      {
+        method: 'DELETE',
+      },
+      'Failed to delete process flow',
+    );
+    router.push('/');
+  }, [processFlow.id, request, router]);
+
   return (
     <div className="flex h-[calc(100vh-var(--header-height))] min-h-0 flex-col bg-background">
       <ProcessFlowToolbar
         name={processFlow.name}
-        nodeCount={nodes.length}
-        edgeCount={edges.length}
         warningCount={validation?.warnings.length ?? 0}
+        validationOpen={validationOpen}
         onCreateNode={handleCreateNode}
         onAutolayout={handleAutolayout}
-        onValidate={handleValidate}
-        onReload={handleReload}
+        onToggleValidation={handleToggleValidation}
+        onOpenContext={() => setContextOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       {uiError ? <div className="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">{uiError}</div> : null}
@@ -304,21 +323,43 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
           />
         </div>
 
-        <aside className="flex h-full w-[390px] min-w-[390px] flex-col border-l bg-muted/20">
-          <ProcessFlowInspector
-            processFlow={processFlow}
-            selection={selected}
-            onSaveFlow={handleSaveFlow}
-            onSaveNode={handleSaveNode}
-            onDeleteNode={handleDeleteNode}
-            onSaveEdge={handleSaveEdge}
-            onDeleteEdge={handleDeleteEdge}
-          />
-          <div className="px-4 pb-4">
-            <ProcessFlowValidationPanel validation={validation} />
+        <aside className="flex h-full w-[390px] min-w-[390px] flex-col overflow-hidden border-l bg-muted/20">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <ProcessFlowInspector
+              selection={selected}
+              onSaveNode={handleSaveNode}
+              onDeleteNode={handleDeleteNode}
+              onSaveEdge={handleSaveEdge}
+              onDeleteEdge={handleDeleteEdge}
+            />
           </div>
+          {validationOpen ? (
+            <div className="shrink-0 border-t px-4 py-4">
+              <ProcessFlowValidationPanel validation={validation} />
+            </div>
+          ) : null}
         </aside>
       </div>
+
+      <ProcessFlowSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        processFlowName={processFlow.name}
+        processFlowDescription={processFlow.description}
+        onSave={handleSaveFlow}
+        onDelete={handleDeleteFlow}
+      />
+
+      <ContextMarkdownDialog
+        open={contextOpen}
+        onOpenChange={setContextOpen}
+        title={`${processFlow.name} — Context`}
+        value={processFlow.context_markdown ?? null}
+        onSave={async (value) => {
+          await handleSaveFlow({ context_markdown: value });
+        }}
+        variant="process-flow"
+      />
     </div>
   );
 }

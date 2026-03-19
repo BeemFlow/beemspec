@@ -322,7 +322,6 @@ processflow_node_delete     — remove a node
 processflow_edge_create     — add an edge
 processflow_edge_update     — update an edge
 processflow_edge_delete     — remove an edge
-processflow_autolayout      — trigger ELK layout
 processflow_validation_get  — get deterministic warnings
 ```
 
@@ -405,7 +404,6 @@ All process flow MCP tools should be prefixed with `processflow_`.
 - `processflow_edge_create`
 - `processflow_edge_update`
 - `processflow_edge_delete`
-- `processflow_autolayout`
 
 ### Optional future tools
 
@@ -443,9 +441,8 @@ It should instruct agents how to translate unstructured input into a clean proce
 2. Load current flow state with `processflow_get` before structural edits.
 3. Read `processflow_workflow_guide` before translating notes or transcripts into mutations.
 4. Create or update nodes and edges in focused batches.
-5. Call `processflow_autolayout` after structural mutation batches.
-6. Re-read with `processflow_get` when the structure materially changes.
-7. Only after the existing flow is trustworthy, propose optimization or automation opportunities.
+5. Re-read with `processflow_get` when the structure materially changes.
+6. Only after the existing flow is trustworthy, propose optimization or automation opportunities.
 
 ## Automation and n8n Direction
 

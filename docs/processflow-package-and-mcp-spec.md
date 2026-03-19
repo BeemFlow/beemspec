@@ -517,7 +517,6 @@ Purpose:
 - `processflow_edge_create`
 - `processflow_edge_update`
 - `processflow_edge_delete`
-- `processflow_autolayout`
 
 ### Why not expose batch MCP tools in v1
 
@@ -583,18 +582,6 @@ Should accept:
 - `source_node_id`
 - `target_node_id`
 - optional `data`
-
-### `processflow_autolayout`
-
-Should accept:
-
-- `process_flow_id`
-
-Return:
-
-- updated node positions
-- updated viewport if applicable
-- any layout warnings
 
 ## Deterministic Validation Contract
 

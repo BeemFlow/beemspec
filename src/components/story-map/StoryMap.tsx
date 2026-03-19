@@ -1,9 +1,9 @@
 'use client';
 
-import { ArrowLeft, Bot, FileText, Settings } from 'lucide-react';
-import Link from 'next/link';
+import { Bot, FileText, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { EditorHeader } from '@/components/EditorHeader';
 import { ActivityDialog } from '@/components/story-map/ActivityDialog';
 import { ContextMarkdownDialog } from '@/components/story-map/ContextMarkdownDialog';
 import { McpSetupDialog } from '@/components/story-map/McpSetupDialog';
@@ -397,40 +397,42 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
 
   return (
     <div className="flex h-[calc(100vh-var(--header-height))] flex-col">
-      <header className="flex items-center gap-2 border-b px-2 py-2 sm:gap-4 sm:px-4 sm:py-3">
-        <Link href="/">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <h1 className="truncate text-base font-semibold sm:text-xl">{storyMap.name}</h1>
-        <div className="ml-auto flex items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setMapContextOpen(true)}
-                aria-label="Story map context"
-              >
-                <FileText className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left">Story map context</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={() => setMcpSetupOpen(true)} aria-label="Connect MCP Client">
-                <Bot className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left">Connect MCP Client</TooltipContent>
-          </Tooltip>
-          <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Story map settings">
-            <Settings className="h-4 w-4" />
-          </Button>
-        </div>
-      </header>
+      <EditorHeader
+        title={storyMap.name}
+        actions={
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setMapContextOpen(true)}
+                  aria-label="Story map context"
+                >
+                  <FileText className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">Story map context</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setMcpSetupOpen(true)}
+                  aria-label="Connect MCP Client"
+                >
+                  <Bot className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">Connect MCP Client</TooltipContent>
+            </Tooltip>
+            <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Story map settings">
+              <Settings className="h-4 w-4" />
+            </Button>
+          </>
+        }
+      />
 
       {uiError && (
         <div className="mx-4 mt-3 flex items-center justify-between rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
