@@ -1,13 +1,13 @@
-import { createStoryMapSchema } from '@beemspec/storymap';
+import { createProcessFlowSchema } from '@beemspec/processflow';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { createE2EStoryMap, listE2EStoryMaps } from '@/lib/e2e/processflow-store';
+import { createE2EProcessFlow, listE2EProcessFlows } from '@/lib/e2e/processflow-store';
 import { env } from '@/lib/env';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { listTeamsForUser } from '@/lib/teams';
 import { validateRequest } from '@/lib/validations';
-import { createStoryMap, listStoryMaps } from '@/storymap/service';
+import { createProcessFlow, listProcessFlows } from '@/processflow/service';
 
 export async function GET(request: Request) {
   if (env.e2eTestMode()) {
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     if (!teamId) {
       return NextResponse.json({ error: 'team_id is required in E2E test mode' }, { status: 400 });
     }
-    return NextResponse.json(listE2EStoryMaps(teamId));
+    return NextResponse.json(listE2EProcessFlows(teamId));
   }
 
   const auth = await requireAuth();
@@ -53,32 +53,32 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Failed to resolve team_id' }, { status: 400 });
   }
 
-  const { data, error } = await listStoryMaps(supabase, resolvedTeamId);
-
+  const { data, error } = await listProcessFlows(supabase, resolvedTeamId);
   if (error) {
-    return serverErrorResponse('Failed to load story maps', error);
+    return serverErrorResponse('Failed to load process flows', error);
   }
+
   return NextResponse.json(data);
 }
 
 export async function POST(request: Request) {
   if (env.e2eTestMode()) {
-    const validation = await validateRequest(request, createStoryMapSchema);
+    const validation = await validateRequest(request, createProcessFlowSchema);
     if (!validation.success) return validation.response;
-    return NextResponse.json(createE2EStoryMap(validation.data));
+    return NextResponse.json(createE2EProcessFlow(validation.data));
   }
 
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
-  const validation = await validateRequest(request, createStoryMapSchema);
+  const validation = await validateRequest(request, createProcessFlowSchema);
   if (!validation.success) return validation.response;
 
   const supabase = await createClient();
-  const { data, error } = await createStoryMap(supabase, validation.data);
-
+  const { data, error } = await createProcessFlow(supabase, validation.data);
   if (error) {
-    return serverErrorResponse('Failed to create story map', error);
+    return serverErrorResponse('Failed to create process flow', error);
   }
+
   return NextResponse.json(data);
 }

@@ -1,4 +1,18 @@
 export type {
+  ProcessFlow,
+  ProcessFlowEdge,
+  ProcessFlowEdgeData,
+  ProcessFlowEdgeType,
+  ProcessFlowFull,
+  ProcessFlowNode,
+  ProcessFlowNodeData,
+  ProcessFlowNodeType,
+  ProcessFlowValidationResult,
+  ProcessFlowValidationWarning,
+  ProcessFlowViewport,
+} from '@beemspec/processflow';
+
+export type {
   Activity,
   ActivityWithTasks,
   Release,

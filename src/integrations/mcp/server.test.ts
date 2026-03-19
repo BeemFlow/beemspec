@@ -72,8 +72,17 @@ describe('mcp server', () => {
     const toolNames = new Set(payload.result.tools.map((tool) => tool.name));
 
     expect(toolNames.has('storymap_workflow_guide')).toBe(true);
+    expect(toolNames.has('processflow_workflow_guide')).toBe(true);
     expect(toolNames.has('storymap_list')).toBe(true);
+    expect(toolNames.has('processflow_list')).toBe(true);
     expect(toolNames.has('storymap_get')).toBe(true);
+    expect(toolNames.has('processflow_get')).toBe(true);
+    expect(toolNames.has('processflow_validation_get')).toBe(true);
+    expect(toolNames.has('processflow_create')).toBe(true);
+    expect(toolNames.has('processflow_update')).toBe(true);
+    expect(toolNames.has('processflow_node_create')).toBe(true);
+    expect(toolNames.has('processflow_edge_create')).toBe(true);
+    expect(toolNames.has('processflow_autolayout')).toBe(true);
     expect(toolNames.has('release_get')).toBe(true);
     expect(toolNames.has('storymap_delete')).toBe(false);
     expect(toolNames.has('activity_create')).toBe(true);
@@ -141,6 +150,95 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.data.implementation_principles.join(' ')).toContain('Figma MCP server');
     expect(payload.result.structuredContent.data.story_quality_principles[0]).toContain('user-visible value');
     expect(payload.result.structuredContent.data.update_policy.join(' ')).toContain('metrics');
+  });
+
+  it('returns process flow workflow guide content for modeling sequence', async () => {
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 300,
+        method: 'tools/call',
+        params: {
+          name: 'processflow_workflow_guide',
+          arguments: {},
+        },
+      }),
+      supabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+
+    const payload = (await response.json()) as {
+      result: {
+        structuredContent: {
+          ok: boolean;
+          data: {
+            tool_sequence: string[];
+            process_modeling_principles: string[];
+            operating_mode: string[];
+          };
+        };
+      };
+    };
+
+    expect(payload.result.structuredContent.ok).toBe(true);
+    expect(payload.result.structuredContent.data.tool_sequence[0]).toContain('processflow_list');
+    expect(payload.result.structuredContent.data.tool_sequence[1]).toContain('processflow_get');
+    expect(payload.result.structuredContent.data.tool_sequence[4]).toContain('processflow_validation_get');
+    expect(payload.result.structuredContent.data.process_modeling_principles.join(' ')).toContain('step nodes');
+    expect(payload.result.structuredContent.data.operating_mode[2]).toContain('operational reality');
+  });
+
+  it('rejects processflow_node_update without process_flow_id', async () => {
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 301,
+        method: 'tools/call',
+        params: {
+          name: 'processflow_node_update',
+          arguments: {
+            node_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+            data: { label: 'Updated' },
+          },
+        },
+      }),
+      supabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      result: { isError: boolean; content?: Array<{ text: string }> };
+    };
+    expect(payload.result.isError).toBe(true);
+    expect(payload.result.content?.[0]?.text ?? '').toContain('process_flow_id');
+  });
+
+  it('rejects processflow_edge_delete without process_flow_id', async () => {
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 302,
+        method: 'tools/call',
+        params: {
+          name: 'processflow_edge_delete',
+          arguments: {
+            edge_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+          },
+        },
+      }),
+      supabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      result: { isError: boolean; content?: Array<{ text: string }> };
+    };
+    expect(payload.result.isError).toBe(true);
+    expect(payload.result.content?.[0]?.text ?? '').toContain('process_flow_id');
   });
 
   it('returns story map insights with warnings and recommendations', async () => {

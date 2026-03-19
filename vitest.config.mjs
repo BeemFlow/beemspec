@@ -7,10 +7,14 @@ export default {
   resolve: {
     alias: {
       '@': path.resolve(rootDir, './src'),
+      '@beemspec/processflow': path.resolve(rootDir, './packages/processflow/src/index.ts'),
       '@beemspec/storymap': path.resolve(rootDir, './packages/storymap/src/index.ts'),
       '@beemspec/opencode/runtime': path.resolve(rootDir, './packages/opencode/src/runtime.ts'),
       '@beemspec/opencode': path.resolve(rootDir, './packages/opencode/src/index.ts'),
       '@beemspec/linear': path.resolve(rootDir, './packages/linear/src/index.ts'),
     },
+  },
+  test: {
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**', '.next/**'],
   },
 };

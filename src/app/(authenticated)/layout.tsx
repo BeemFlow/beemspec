@@ -1,12 +1,26 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
+import { getE2EAuthUser, getE2ETeams } from '@/lib/e2e/processflow-store';
+import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 import type { TeamWithRole } from '@/types';
 
 const TEAM_COOKIE_KEY = 'beemspec_current_team_id';
 
 export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
+  if (env.e2eTestMode()) {
+    const teams = getE2ETeams();
+    const user = getE2EAuthUser();
+    const initialCurrentTeamId = teams[0]?.id ?? null;
+
+    return (
+      <AppShell userEmail={user.email} teams={teams} initialCurrentTeamId={initialCurrentTeamId}>
+        {children}
+      </AppShell>
+    );
+  }
+
   const supabase = await createClient();
   const cookieStore = await cookies();
   const {
