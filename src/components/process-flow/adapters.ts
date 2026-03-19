@@ -23,6 +23,46 @@ export type ProcessFlowCanvasEdge = Edge<ProcessFlowCanvasEdgeData>;
 
 const validNodeTypes: ProcessFlowNodeType[] = ['step', 'decision', 'subprocess', 'actor', 'system', 'note'];
 
+const edgeStyles = {
+  flow: {
+    type: 'smoothstep',
+    animated: false,
+    style: {
+      stroke: 'rgba(26, 23, 20, 0.55)',
+      strokeWidth: 1.75,
+    },
+  },
+  handoff: {
+    type: 'smoothstep',
+    animated: true,
+    style: {
+      stroke: 'rgba(47, 122, 77, 0.8)',
+      strokeWidth: 2,
+    },
+  },
+  exception: {
+    type: 'bezier',
+    animated: true,
+    style: {
+      stroke: 'rgba(180, 83, 9, 0.85)',
+      strokeWidth: 1.75,
+      strokeDasharray: '7 5',
+    },
+  },
+  dependency: {
+    type: 'step',
+    animated: false,
+    style: {
+      stroke: 'rgba(87, 83, 78, 0.7)',
+      strokeWidth: 1.5,
+      strokeDasharray: '3 5',
+    },
+  },
+} satisfies Record<
+  ProcessFlowEdge['type'],
+  { type: ProcessFlowCanvasEdge['type']; animated: boolean; style: NonNullable<ProcessFlowCanvasEdge['style']> }
+>;
+
 function normalizeNodeType(type: ProcessFlowNode['type'] | string | undefined): ProcessFlowNodeType {
   return validNodeTypes.includes(type as ProcessFlowNodeType) ? (type as ProcessFlowNodeType) : 'step';
 }
@@ -72,17 +112,20 @@ export function toCanvasNode(node: ProcessFlowNode): ProcessFlowCanvasNode {
 }
 
 export function toCanvasEdge(edge: ProcessFlowEdge): ProcessFlowCanvasEdge {
+  const edgeStyle = edgeStyles[edge.type];
+
   return {
     id: edge.id,
     source: edge.source_node_id,
     target: edge.target_node_id,
-    type: 'smoothstep',
+    type: edgeStyle.type,
     data: {
       ...(edge.data ?? {}),
       edgeType: edge.type,
     },
     label: edge.data?.label ?? undefined,
-    animated: edge.type === 'handoff' || edge.type === 'exception',
+    animated: edgeStyle.animated,
+    style: edgeStyle.style,
   };
 }
 
