@@ -1,7 +1,7 @@
 import { updateReleaseSchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { deleteE2ERelease, updateE2ERelease } from '@/lib/e2e/processflow-store';
+import { deleteE2ERelease, updateE2ERelease } from '@/lib/e2e/test-store';
 import { env } from '@/lib/env';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';

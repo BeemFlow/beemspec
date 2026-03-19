@@ -1,7 +1,7 @@
 import { createStorySchema, reorderStoriesSchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { createE2EStory } from '@/lib/e2e/processflow-store';
+import { createE2EStory } from '@/lib/e2e/test-store';
 import { env } from '@/lib/env';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';

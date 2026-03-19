@@ -1,7 +1,7 @@
 import { updateProcessFlowSchema } from '@beemspec/processflow';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { getE2EProcessFlow, updateE2EProcessFlow } from '@/lib/e2e/processflow-store';
+import { getE2EProcessFlow, updateE2EProcessFlow } from '@/lib/e2e/test-store';
 import { env } from '@/lib/env';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';

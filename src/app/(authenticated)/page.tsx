@@ -4,7 +4,7 @@ import { ResourceCollectionSection } from '@/components/dashboard/ResourceCollec
 import { CreateProcessFlowButton } from '@/components/process-flow/CreateProcessFlowButton';
 import { CreateStoryMapButton } from '@/components/story-map/CreateStoryMapButton';
 import { Card } from '@/components/ui/Card';
-import { getE2ETeamId, listE2EProcessFlows, listE2EStoryMaps } from '@/lib/e2e/processflow-store';
+import { getE2ETeamId, listE2EProcessFlows, listE2EStoryMaps } from '@/lib/e2e/test-store';
 import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 import { listTeamsForUser } from '@/lib/teams';

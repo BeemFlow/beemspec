@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { ProcessFlowScreen } from '@/components/process-flow/ProcessFlowScreen';
-import { getE2EProcessFlow } from '@/lib/e2e/processflow-store';
+import { getE2EProcessFlow } from '@/lib/e2e/test-store';
 import { env } from '@/lib/env';
 import { DbErrorCode } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';

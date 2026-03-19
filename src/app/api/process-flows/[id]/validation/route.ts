@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { validateE2EProcessFlow } from '@/lib/e2e/processflow-store';
+import { validateE2EProcessFlow } from '@/lib/e2e/test-store';
 import { env } from '@/lib/env';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';

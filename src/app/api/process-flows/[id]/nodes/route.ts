@@ -1,7 +1,7 @@
 import { batchProcessFlowNodesBodySchema, createProcessFlowNodeBodySchema } from '@beemspec/processflow';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { batchMutateE2EProcessFlowNodes, createE2EProcessFlowNode } from '@/lib/e2e/processflow-store';
+import { batchMutateE2EProcessFlowNodes, createE2EProcessFlowNode } from '@/lib/e2e/test-store';
 import { env } from '@/lib/env';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';

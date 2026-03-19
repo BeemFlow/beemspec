@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
-import { getE2EAuthUser, getE2ETeams } from '@/lib/e2e/processflow-store';
+import { getE2EAuthUser, getE2ETeams } from '@/lib/e2e/test-store';
 import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 import type { TeamWithRole } from '@/types';

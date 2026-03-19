@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { StoryMap } from '@/components/story-map/StoryMap';
-import { getE2EStoryMap } from '@/lib/e2e/processflow-store';
+import { getE2EStoryMap } from '@/lib/e2e/test-store';
 import { env } from '@/lib/env';
 import { DbErrorCode } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';

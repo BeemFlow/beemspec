@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { resetE2EProcessFlowStore } from '@/lib/e2e/processflow-store';
+import { resetE2EProcessFlowStore } from '@/lib/e2e/test-store';
 import { env } from '@/lib/env';
 
 export async function POST(request: Request) {
