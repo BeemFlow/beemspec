@@ -6,6 +6,7 @@ import type {
   UpdateProcessFlowEdge,
   UpdateProcessFlowNode,
 } from '@beemspec/processflow';
+import type { StoryStatus } from '@beemspec/storymap';
 import { validateProcessFlowGraph } from '@/processflow/service';
 import type {
   Activity,
@@ -39,6 +40,36 @@ type CreateStoryMapInput = {
   name: string;
   description?: string | null;
   context_markdown?: string | null;
+};
+
+type UpdateStoryMapInput = {
+  name?: string;
+  description?: string | null;
+  context_markdown?: string | null;
+};
+
+type CreateActivityInput = { story_map_id: string; name: string; description?: string | null };
+type UpdateActivityInput = { name?: string; description?: string | null };
+type CreateTaskInput = { activity_id: string; name: string; description?: string | null };
+type UpdateTaskInput = { name?: string; description?: string | null };
+type CreateReleaseInput = {
+  story_map_id: string;
+  name: string;
+  description?: string | null;
+  context_markdown?: string | null;
+};
+type UpdateReleaseInput = { name?: string; description?: string | null; context_markdown?: string | null };
+type CreateStoryInput = {
+  task_id: string;
+  release_id: string | null;
+  title: string;
+  status?: StoryStatus;
+  content: Story['content'];
+};
+type UpdateStoryInput = {
+  title?: string;
+  status?: StoryStatus;
+  content?: Story['content'];
 };
 
 function nowIso() {
@@ -203,6 +234,214 @@ export function createE2EStoryMap(input: CreateStoryMapInput): StoryMap {
   state.storyMaps.unshift(storyMap);
   const { activities: _activities, releases: _releases, team_id: _teamId, ...summary } = storyMap;
   return summary;
+}
+
+export function updateE2EStoryMap(id: string, changes: UpdateStoryMapInput): StoryMap | null {
+  const map = getE2EStoryMap(id) as E2EStoryMap | null;
+  if (!map) return null;
+  Object.assign(map, changes);
+  const { activities: _activities, releases: _releases, team_id: _teamId, ...summary } = map;
+  return summary;
+}
+
+export function deleteE2EStoryMap(id: string): StoryMap | null {
+  const state = getState();
+  const map = state.storyMaps.find((item) => item.id === id) ?? null;
+  if (!map) return null;
+  state.storyMaps = state.storyMaps.filter((item) => item.id !== id);
+  const { activities: _activities, releases: _releases, team_id: _teamId, ...summary } = map;
+  return summary;
+}
+
+function nextSortOrder(items: Array<{ sort_order: number }>) {
+  return items.length;
+}
+
+function findStoryMapByActivityId(activityId: string): E2EStoryMap | null {
+  return getState().storyMaps.find((map) => map.activities.some((activity) => activity.id === activityId)) ?? null;
+}
+
+function findStoryMapByTaskId(taskId: string): E2EStoryMap | null {
+  return (
+    getState().storyMaps.find((map) =>
+      map.activities.some((activity) => activity.tasks.some((task) => task.id === taskId)),
+    ) ?? null
+  );
+}
+
+function findStoryMapByStoryId(storyId: string): E2EStoryMap | null {
+  return (
+    getState().storyMaps.find((map) =>
+      map.activities.some((activity) =>
+        activity.tasks.some((task) => task.stories.some((story) => story.id === storyId)),
+      ),
+    ) ?? null
+  );
+}
+
+function findStoryMapByReleaseId(releaseId: string): E2EStoryMap | null {
+  return getState().storyMaps.find((map) => map.releases.some((release) => release.id === releaseId)) ?? null;
+}
+
+export function createE2EActivity(input: CreateActivityInput): Activity | null {
+  const state = getState();
+  const map = getE2EStoryMap(input.story_map_id) as E2EStoryMap | null;
+  if (!map) return null;
+  const activity: Activity & { tasks: Array<Task & { stories: Story[] }> } = {
+    id: makeId('activity', state.counters.storyMap++),
+    story_map_id: input.story_map_id,
+    name: input.name,
+    description: input.description ?? null,
+    sort_order: nextSortOrder(map.activities),
+    tasks: [],
+  };
+  map.activities.push(activity);
+  const { tasks: _tasks, ...summary } = activity;
+  return summary;
+}
+
+export function updateE2EActivity(id: string, changes: UpdateActivityInput): Activity | null {
+  const map = findStoryMapByActivityId(id);
+  const activity = map?.activities.find((item) => item.id === id);
+  if (!activity) return null;
+  Object.assign(activity, changes);
+  const { tasks: _tasks, ...summary } = activity;
+  return summary;
+}
+
+export function deleteE2EActivity(id: string): Activity | null {
+  const map = findStoryMapByActivityId(id);
+  if (!map) return null;
+  const activity = map.activities.find((item) => item.id === id) ?? null;
+  if (!activity) return null;
+  map.activities = map.activities
+    .filter((item) => item.id !== id)
+    .map((item, index) => ({ ...item, sort_order: index }));
+  const { tasks: _tasks, ...summary } = activity;
+  return summary;
+}
+
+export function createE2ETask(input: CreateTaskInput): Task | null {
+  const state = getState();
+  const map = findStoryMapByActivityId(input.activity_id);
+  const activity = map?.activities.find((item) => item.id === input.activity_id);
+  if (!activity) return null;
+  const task: Task & { stories: Story[] } = {
+    id: makeId('task', state.counters.storyMap++),
+    activity_id: input.activity_id,
+    name: input.name,
+    description: input.description ?? null,
+    sort_order: nextSortOrder(activity.tasks),
+    stories: [],
+  };
+  activity.tasks.push(task);
+  const { stories: _stories, ...summary } = task;
+  return summary;
+}
+
+export function updateE2ETask(id: string, changes: UpdateTaskInput): Task | null {
+  const map = findStoryMapByTaskId(id);
+  const task = map?.activities.flatMap((activity) => activity.tasks).find((item) => item.id === id);
+  if (!task) return null;
+  Object.assign(task, changes);
+  const { stories: _stories, ...summary } = task;
+  return summary;
+}
+
+export function deleteE2ETask(id: string): Task | null {
+  const map = findStoryMapByTaskId(id);
+  if (!map) return null;
+  for (const activity of map.activities) {
+    const task = activity.tasks.find((item) => item.id === id);
+    if (!task) continue;
+    activity.tasks = activity.tasks
+      .filter((item) => item.id !== id)
+      .map((item, index) => ({ ...item, sort_order: index }));
+    const { stories: _stories, ...summary } = task;
+    return summary;
+  }
+  return null;
+}
+
+export function createE2ERelease(input: CreateReleaseInput): Release | null {
+  const state = getState();
+  const map = getE2EStoryMap(input.story_map_id) as E2EStoryMap | null;
+  if (!map) return null;
+  const release: Release = {
+    id: makeId('release', state.counters.storyMap++),
+    story_map_id: input.story_map_id,
+    name: input.name,
+    description: input.description ?? null,
+    context_markdown: input.context_markdown ?? null,
+    sort_order: nextSortOrder(map.releases),
+  };
+  map.releases.push(release);
+  return release;
+}
+
+export function updateE2ERelease(id: string, changes: UpdateReleaseInput): Release | null {
+  const map = findStoryMapByReleaseId(id);
+  const release = map?.releases.find((item) => item.id === id);
+  if (!release) return null;
+  Object.assign(release, changes);
+  return release;
+}
+
+export function deleteE2ERelease(id: string): Release | null {
+  const map = findStoryMapByReleaseId(id);
+  if (!map) return null;
+  const release = map.releases.find((item) => item.id === id) ?? null;
+  if (!release) return null;
+  map.releases = map.releases.filter((item) => item.id !== id).map((item, index) => ({ ...item, sort_order: index }));
+  for (const activity of map.activities) {
+    for (const task of activity.tasks) {
+      task.stories = task.stories.map((story) => (story.release_id === id ? { ...story, release_id: null } : story));
+    }
+  }
+  return release;
+}
+
+export function createE2EStory(input: CreateStoryInput): Story | null {
+  const state = getState();
+  const map = findStoryMapByTaskId(input.task_id);
+  const task = map?.activities.flatMap((activity) => activity.tasks).find((item) => item.id === input.task_id);
+  if (!task) return null;
+  const story: Story = {
+    id: makeId('story', state.counters.storyMap++),
+    task_id: input.task_id,
+    release_id: input.release_id,
+    sort_order: nextSortOrder(task.stories.filter((item) => item.release_id === input.release_id)),
+    status: input.status ?? 'backlog',
+    title: input.title,
+    content: input.content,
+  };
+  task.stories.push(story);
+  return story;
+}
+
+export function updateE2EStory(id: string, changes: UpdateStoryInput): Story | null {
+  const map = findStoryMapByStoryId(id);
+  const story = map?.activities
+    .flatMap((activity) => activity.tasks)
+    .flatMap((task) => task.stories)
+    .find((item) => item.id === id);
+  if (!story) return null;
+  Object.assign(story, changes);
+  return story;
+}
+
+export function deleteE2EStory(id: string): Story | null {
+  const map = findStoryMapByStoryId(id);
+  if (!map) return null;
+  for (const activity of map.activities) {
+    for (const task of activity.tasks) {
+      const story = task.stories.find((item) => item.id === id);
+      if (!story) continue;
+      task.stories = task.stories.filter((item) => item.id !== id);
+      return story;
+    }
+  }
+  return null;
 }
 
 export function listE2EProcessFlows(teamId: string): ProcessFlow[] {

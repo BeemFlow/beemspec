@@ -1,12 +1,19 @@
 import { moveStorySchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { env } from '@/lib/env';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 import { moveStory } from '@/storymap/service';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (env.e2eTestMode()) {
+    const validation = await validateRequest(request, moveStorySchema);
+    if (!validation.success) return validation.response;
+    return NextResponse.json({ success: true });
+  }
+
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 

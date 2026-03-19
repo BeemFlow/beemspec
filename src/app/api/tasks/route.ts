@@ -1,12 +1,18 @@
 import { createTaskSchema, reorderTasksSchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { createE2ETask } from '@/lib/e2e/processflow-store';
+import { env } from '@/lib/env';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { validateRequest } from '@/lib/validations';
 import { createTask, reorderTasks } from '@/storymap/service';
 
 export async function PUT(request: Request) {
+  if (env.e2eTestMode()) {
+    return NextResponse.json({ success: true });
+  }
+
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
@@ -23,6 +29,19 @@ export async function PUT(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (env.e2eTestMode()) {
+    const body = (await request.json()) as { activity_id?: string; name?: string; description?: string | null };
+    if (!body.activity_id || !body.name?.trim()) {
+      return NextResponse.json({ error: 'activity_id and name are required' }, { status: 400 });
+    }
+    const task = createE2ETask({
+      activity_id: body.activity_id,
+      name: body.name.trim(),
+      description: body.description ?? null,
+    });
+    return task ? NextResponse.json(task) : NextResponse.json({ error: 'Activity not found' }, { status: 404 });
+  }
+
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
