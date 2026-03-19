@@ -96,8 +96,7 @@ export function ProcessFlowCanvas(props: ProcessFlowCanvasProps) {
           <div className="pointer-events-auto max-w-md rounded-xl border border-dashed border-border bg-background/95 p-6 text-center shadow-lg backdrop-blur-sm">
             <p className="font-serif text-2xl text-foreground">Start mapping the flow</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Add the first operational step, actor, or decision. The canvas will stay fully BeemSpec-styled even though
-              React Flow powers the interactions underneath.
+              Add the first operational step, actor, or decision.
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               {(['step', 'decision', 'actor', 'system', 'note'] as const).map((type) => (
