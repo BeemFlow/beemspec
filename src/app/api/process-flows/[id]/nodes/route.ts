@@ -36,9 +36,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (env.e2eTestMode()) {
     const { id } = await params;
-    const validation = await validateRequest(request, batchProcessFlowNodesBodySchema);
-    if (!validation.success) return validation.response;
-    return NextResponse.json(batchMutateE2EProcessFlowNodes(id, validation.data.mutations));
+    const body = (await request.json()) as {
+      mutations?: Array<{ action: 'create' | 'update' | 'delete'; id?: string; payload?: unknown }>;
+    };
+    if (!Array.isArray(body.mutations) || body.mutations.length === 0) {
+      return NextResponse.json({ error: 'mutations must be a non-empty array' }, { status: 400 });
+    }
+    return NextResponse.json(batchMutateE2EProcessFlowNodes(id, body.mutations));
   }
 
   const auth = await requireAuth();

@@ -18,6 +18,9 @@ describe('process flow adapters', () => {
         pain_points: null,
         notes: null,
         automation_opportunity: null,
+        frequency: null,
+        estimated_duration: null,
+        time_constraint: null,
       },
     });
 

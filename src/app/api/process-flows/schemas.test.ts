@@ -24,7 +24,7 @@ describe('process-flow schemas', () => {
     expect(updateProcessFlowEdgeSchema.safeParse({}).success).toBe(false);
   });
 
-  it('accepts explicit node and edge batch mutations', () => {
+  it('accepts batch node mutations with operational metadata fields', () => {
     expect(
       batchProcessFlowNodesBodySchema.safeParse({
         mutations: [
@@ -33,7 +33,12 @@ describe('process-flow schemas', () => {
             payload: {
               type: 'step',
               position: { x: 0, y: 0 },
-              data: { label: 'Receive invoice' },
+              data: {
+                label: 'Receive invoice',
+                frequency: '~200/day',
+                estimated_duration: '5-10 min',
+                time_constraint: 'same-day turnaround',
+              },
             },
           },
           {
@@ -46,15 +51,45 @@ describe('process-flow schemas', () => {
         ],
       }).success,
     ).toBe(true);
+  });
 
+  it('accepts batch edge mutations with branch condition fields', () => {
     expect(
       batchProcessFlowEdgesBodySchema.safeParse({
         mutations: [
           {
-            action: 'delete',
+            action: 'update',
             id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+            payload: {
+              data: {
+                label: 'High value',
+                condition: 'amount > $10,000',
+              },
+            },
           },
         ],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts direct node and edge updates for the new metadata fields', () => {
+    expect(
+      updateProcessFlowNodeSchema.safeParse({
+        data: {
+          label: 'Review invoice',
+          frequency: '~200/day',
+          estimated_duration: '5-10 min',
+          time_constraint: 'must complete within 48h',
+        },
+      }).success,
+    ).toBe(true);
+
+    expect(
+      updateProcessFlowEdgeSchema.safeParse({
+        data: {
+          label: 'High value',
+          condition: 'amount > $10,000 AND vendor not on approved list',
+        },
       }).success,
     ).toBe(true);
   });

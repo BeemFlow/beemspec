@@ -96,7 +96,7 @@ describe('processflow service', () => {
     expect(eqFlow).toHaveBeenCalledWith('process_flow_id', 'flow-1');
   });
 
-  it('uses transactional rpc for batch node mutations', async () => {
+  it('preserves operational metadata through batch node rpc mutations', async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: {
         created: [
@@ -108,7 +108,12 @@ describe('processflow service', () => {
             position_y: 2,
             width: null,
             height: null,
-            data: { label: 'Receive invoice' },
+            data: {
+              label: 'Receive invoice',
+              frequency: '~200/day',
+              estimated_duration: '5-10 min',
+              time_constraint: 'must complete within 48h',
+            },
           },
         ],
         updated: [],
@@ -121,14 +126,38 @@ describe('processflow service', () => {
     const result = await batchMutateProcessFlowNodes(supabase, {
       process_flow_id: 'flow-1',
       mutations: [
-        { action: 'create', payload: { type: 'step', position: { x: 1, y: 2 }, data: { label: 'Receive invoice' } } },
+        {
+          action: 'create',
+          payload: {
+            type: 'step',
+            position: { x: 1, y: 2 },
+            data: {
+              label: 'Receive invoice',
+              frequency: '~200/day',
+              estimated_duration: '5-10 min',
+              time_constraint: 'must complete within 48h',
+            },
+          },
+        },
       ],
     });
 
     expect(rpc).toHaveBeenCalledWith('batch_mutate_process_flow_nodes', {
       p_process_flow_id: 'flow-1',
       p_mutations: [
-        { action: 'create', payload: { type: 'step', position: { x: 1, y: 2 }, data: { label: 'Receive invoice' } } },
+        {
+          action: 'create',
+          payload: {
+            type: 'step',
+            position: { x: 1, y: 2 },
+            data: {
+              label: 'Receive invoice',
+              frequency: '~200/day',
+              estimated_duration: '5-10 min',
+              time_constraint: 'must complete within 48h',
+            },
+          },
+        },
       ],
     });
     expect(result.data?.created[0]).toEqual({
@@ -137,11 +166,16 @@ describe('processflow service', () => {
       type: 'step',
       position: { x: 1, y: 2 },
       size: null,
-      data: { label: 'Receive invoice' },
+      data: {
+        label: 'Receive invoice',
+        frequency: '~200/day',
+        estimated_duration: '5-10 min',
+        time_constraint: 'must complete within 48h',
+      },
     });
   });
 
-  it('uses transactional rpc for batch edge mutations', async () => {
+  it('preserves edge conditions through batch edge rpc mutations', async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: {
         created: [],
@@ -152,7 +186,7 @@ describe('processflow service', () => {
             type: 'handoff',
             source_node_id: 'node-a',
             target_node_id: 'node-b',
-            data: { label: 'Hand off' },
+            data: { label: 'Hand off', condition: 'approval denied' },
           },
         ],
         deleted: [],
@@ -163,12 +197,24 @@ describe('processflow service', () => {
 
     const result = await batchMutateProcessFlowEdges(supabase, {
       process_flow_id: 'flow-1',
-      mutations: [{ action: 'update', id: 'edge-1', payload: { type: 'handoff', data: { label: 'Hand off' } } }],
+      mutations: [
+        {
+          action: 'update',
+          id: 'edge-1',
+          payload: { type: 'handoff', data: { label: 'Hand off', condition: 'approval denied' } },
+        },
+      ],
     });
 
     expect(rpc).toHaveBeenCalledWith('batch_mutate_process_flow_edges', {
       p_process_flow_id: 'flow-1',
-      p_mutations: [{ action: 'update', id: 'edge-1', payload: { type: 'handoff', data: { label: 'Hand off' } } }],
+      p_mutations: [
+        {
+          action: 'update',
+          id: 'edge-1',
+          payload: { type: 'handoff', data: { label: 'Hand off', condition: 'approval denied' } },
+        },
+      ],
     });
     expect(result.data?.updated[0]).toEqual({
       id: 'edge-1',
@@ -176,7 +222,7 @@ describe('processflow service', () => {
       type: 'handoff',
       source_node_id: 'node-a',
       target_node_id: 'node-b',
-      data: { label: 'Hand off' },
+      data: { label: 'Hand off', condition: 'approval denied' },
     });
   });
 });

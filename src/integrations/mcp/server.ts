@@ -238,6 +238,8 @@ type ProcessFlowNodeLike = {
     label?: string;
     owner_role?: string | null;
     automation_opportunity?: string | null;
+    frequency?: string | null;
+    time_constraint?: string | null;
   } | null;
 };
 
@@ -248,6 +250,7 @@ type ProcessFlowEdgeLike = {
   target_node_id: string;
   data?: {
     label?: string | null;
+    condition?: string | null;
   } | null;
 };
 
@@ -610,14 +613,20 @@ function buildProcessFlowAgentInsights(nodes: ProcessFlowNodeLike[], edges: Proc
 
   const automationCandidates = nodes.filter((node) => node.data?.automation_opportunity?.trim()).length;
   const ownershipTaggedNodes = nodes.filter((node) => node.data?.owner_role?.trim()).length;
+  const frequencyTaggedNodes = nodes.filter((node) => node.data?.frequency?.trim()).length;
+  const timeConstrainedNodes = nodes.filter((node) => node.data?.time_constraint?.trim()).length;
   const labeledEdges = edges.filter((edge) => edge.data?.label?.trim()).length;
+  const conditionedEdges = edges.filter((edge) => edge.data?.condition?.trim()).length;
 
   return {
     nodeCountsByType,
     edgeCount: edges.length,
     automationCandidates,
     ownershipTaggedNodes,
+    frequencyTaggedNodes,
+    timeConstrainedNodes,
     labeledEdges,
+    conditionedEdges,
   };
 }
 
@@ -687,12 +696,15 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
           safe_to_infer: [
             'Minor node wording cleanup that preserves the same operational meaning.',
             'Simple edge labels for clearly described yes/no style decisions when the transcript explicitly implies them.',
+            'Reasonable frequency estimates when the interviewee describes volume qualitatively (e.g., "we do this constantly" can be captured as "high volume, multiple times per day").',
             'Reasonable layout choices that do not alter the process semantics.',
           ],
           unsafe_to_infer: [
             'Inventing systems, teams, approvals, or exception paths that the source material never mentioned.',
             'Rewriting the real-world process into an optimized future process without making that transition explicit to the user.',
             'Assuming automation feasibility without evidence about tools, systems, or constraints.',
+            'Precise numeric frequency or duration values when the source material only gives vague qualitative descriptions.',
+            'Time constraints or SLAs that were not explicitly stated in the source material — do not invent compliance requirements.',
           ],
         },
         process_modeling_principles: [
@@ -700,6 +712,8 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
           'Keep labels short, operational, and specific.',
           'Prefer one node per meaningful operational step rather than large paragraphs inside nodes.',
           'Use handoff edges when work meaningfully changes owner, team, or system context.',
+          'Capture frequency, estimated duration, and time constraints when the source material mentions them — these are high-signal for automation prioritization. Frequency times duration equals operational cost; time constraints indicate urgency and compliance pressure. Both matter for automation ROI but answer different questions.',
+          'Use the condition field on decision outbound edges to record the actual branch logic separately from the display label. The label is what humans read on the diagram; the condition is the rule the automation agent needs to generate workflow logic.',
           'Treat disconnected nodes as a warning sign unless they are intentionally exploratory notes.',
         ],
       });
@@ -883,7 +897,8 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     'processflow_node_create',
     {
       title: 'Create Process Flow Node',
-      description: 'Create a node in a process flow.',
+      description:
+        'Create a node in a process flow. Node data fields include label, owner_role, systems, inputs, outputs, pain_points, notes, automation_opportunity, frequency, estimated_duration, and time_constraint.',
       inputSchema: createProcessFlowNodeSchema.shape,
       annotations: mutateAnnotations,
     },
@@ -900,7 +915,8 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     'processflow_node_update',
     {
       title: 'Update Process Flow Node',
-      description: 'Update a process flow node. Use this for label, ownership, metadata, or position changes.',
+      description:
+        'Update a process flow node. Use this for label, ownership, metadata, position, or node data changes including systems, inputs, outputs, pain_points, notes, automation_opportunity, frequency, estimated_duration, and time_constraint.',
       inputSchema: {
         process_flow_id: z.string().uuid(),
         node_id: z.string().uuid(),
@@ -950,7 +966,7 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     'processflow_edge_create',
     {
       title: 'Create Process Flow Edge',
-      description: 'Create an edge between two nodes in a process flow.',
+      description: 'Create an edge between two nodes in a process flow. Edge data fields include label and condition.',
       inputSchema: createProcessFlowEdgeSchema.shape,
       annotations: mutateAnnotations,
     },
@@ -967,7 +983,8 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
     'processflow_edge_update',
     {
       title: 'Update Process Flow Edge',
-      description: 'Update a process flow edge. Use this for type or label changes.',
+      description:
+        'Update a process flow edge. Use this for type changes or edge data updates including label and condition.',
       inputSchema: {
         process_flow_id: z.string().uuid(),
         edge_id: z.string().uuid(),

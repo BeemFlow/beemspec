@@ -70,6 +70,41 @@ test('shows connected state after adding a new edge', async ({ page, request }) 
   await expect(page.getByText(/^1$/)).toBeVisible();
 });
 
+test('can edit and persist operational metadata for nodes and edges', async ({ page }) => {
+  await page.goto('/process-flows/flow-1');
+
+  await page.getByTestId('processflow-node-step').filter({ hasText: 'Receive invoice' }).first().click();
+  await page.getByLabel('Frequency').fill('~200/day');
+  await page.getByLabel('Est. Duration').fill('5-10 min');
+  await page.getByLabel('Time Constraint').fill('must complete within 48h');
+  await Promise.all([
+    page.waitForResponse(
+      (response) => response.url().includes('/api/process-flows/flow-1/nodes') && response.request().method() === 'PUT',
+    ),
+    page.getByRole('button', { name: 'Save Node' }).click(),
+  ]);
+
+  await page.reload();
+  await page.getByTestId('processflow-node-step').filter({ hasText: 'Receive invoice' }).first().click();
+  await expect(page.getByLabel('Frequency')).toHaveValue('~200/day');
+  await expect(page.getByLabel('Est. Duration')).toHaveValue('5-10 min');
+  await expect(page.getByLabel('Time Constraint')).toHaveValue('must complete within 48h');
+
+  await page.getByText('Review').click({ force: true });
+  await expect(page.getByText('Edge Details')).toBeVisible();
+  await page.getByLabel('Condition').fill('invoice total > $10,000');
+  await Promise.all([
+    page.waitForResponse(
+      (response) => response.url().includes('/api/process-flows/flow-1/edges') && response.request().method() === 'PUT',
+    ),
+    page.getByRole('button', { name: 'Save Edge' }).click(),
+  ]);
+
+  await page.reload();
+  await page.getByText('Review').click({ force: true });
+  await expect(page.getByLabel('Condition')).toHaveValue('invoice total > $10,000');
+});
+
 test('can create and open a story map from the dashboard', async ({ page }) => {
   await page.goto('/');
 

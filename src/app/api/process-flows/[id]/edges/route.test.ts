@@ -32,7 +32,7 @@ describe('process flow edges route', () => {
           type: 'flow',
           source_node_id: '34e8bb98-8f40-4331-8df2-8f83fd8c7af4',
           target_node_id: '87c65304-2faf-4ccf-bad5-3d0cd632bffd',
-          data: { label: 'Yes' },
+          data: { label: 'Yes', condition: 'approval denied' },
         }),
       }),
       { params: Promise.resolve({ id: FLOW_ID }) },
@@ -44,7 +44,7 @@ describe('process flow edges route', () => {
       type: 'flow',
       source_node_id: '34e8bb98-8f40-4331-8df2-8f83fd8c7af4',
       target_node_id: '87c65304-2faf-4ccf-bad5-3d0cd632bffd',
-      data: { label: 'Yes' },
+      data: { label: 'Yes', condition: 'approval denied' },
     });
   });
 

@@ -31,12 +31,16 @@ export const processFlowNodeDataSchema = z
     pain_points: nullableString.optional(),
     notes: nullableString.optional(),
     automation_opportunity: nullableString.optional(),
+    frequency: nullableString.optional(),
+    estimated_duration: nullableString.optional(),
+    time_constraint: nullableString.optional(),
   })
   .strict();
 
 export const processFlowEdgeDataSchema = z
   .object({
     label: nullableString.optional(),
+    condition: nullableString.optional(),
   })
   .strict();
 

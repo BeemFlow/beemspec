@@ -37,6 +37,9 @@ export interface ProcessFlowNodeData {
   pain_points?: string | null;
   notes?: string | null;
   automation_opportunity?: string | null;
+  frequency?: string | null;
+  estimated_duration?: string | null;
+  time_constraint?: string | null;
 }
 
 export interface ProcessFlowNode {
@@ -50,6 +53,7 @@ export interface ProcessFlowNode {
 
 export interface ProcessFlowEdgeData {
   label?: string | null;
+  condition?: string | null;
 }
 
 export interface ProcessFlowEdge {

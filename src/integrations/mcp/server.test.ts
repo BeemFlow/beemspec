@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as processflowService from '@/processflow/service';
 import * as storymapService from '@/storymap/service';
 
 import { handleMcpRequest } from './server';
@@ -176,6 +177,10 @@ describe('mcp server', () => {
             tool_sequence: string[];
             process_modeling_principles: string[];
             operating_mode: string[];
+            safe_vs_unsafe_inference: {
+              safe_to_infer: string[];
+              unsafe_to_infer: string[];
+            };
           };
         };
       };
@@ -186,7 +191,160 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.data.tool_sequence[1]).toContain('processflow_get');
     expect(payload.result.structuredContent.data.tool_sequence[3]).toContain('processflow_validation_get');
     expect(payload.result.structuredContent.data.process_modeling_principles.join(' ')).toContain('step nodes');
+    expect(payload.result.structuredContent.data.process_modeling_principles.join(' ')).toContain(
+      'Frequency times duration',
+    );
+    expect(payload.result.structuredContent.data.process_modeling_principles.join(' ')).toContain('condition field');
+    expect(payload.result.structuredContent.data.safe_vs_unsafe_inference.safe_to_infer.join(' ')).toContain(
+      'high volume, multiple times per day',
+    );
+    expect(payload.result.structuredContent.data.safe_vs_unsafe_inference.unsafe_to_infer.join(' ')).toContain(
+      'do not invent compliance requirements',
+    );
     expect(payload.result.structuredContent.data.operating_mode[2]).toContain('operational reality');
+  });
+
+  it('documents new process flow metadata fields in tool descriptions', async () => {
+    const initializeResponse = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 101,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-03-26',
+          capabilities: {},
+          clientInfo: { name: 'vitest', version: '1.0.0' },
+        },
+      }),
+      supabase,
+      user,
+    );
+    expect(initializeResponse.status).toBe(200);
+
+    await handleMcpRequest(rpcRequest({ jsonrpc: '2.0', method: 'notifications/initialized' }), supabase, user);
+
+    const listResponse = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 102,
+        method: 'tools/list',
+        params: {},
+      }),
+      supabase,
+      user,
+    );
+
+    const payload = (await listResponse.json()) as {
+      result: {
+        tools: Array<{ name: string; description?: string }>;
+      };
+    };
+
+    const tools = new Map(payload.result.tools.map((tool) => [tool.name, tool.description ?? '']));
+    expect(tools.get('processflow_node_create')).toContain('frequency, estimated_duration, and time_constraint');
+    expect(tools.get('processflow_node_update')).toContain('automation_opportunity, frequency, estimated_duration');
+    expect(tools.get('processflow_edge_create')).toContain('label and condition');
+    expect(tools.get('processflow_edge_update')).toContain('label and condition');
+  });
+
+  it('returns process flow agent insights for new metadata fields', async () => {
+    vi.spyOn(processflowService, 'getProcessFlowMcpContext').mockResolvedValue({
+      flowResult: {
+        data: {
+          id: 'flow-1',
+          team_id: 'team-1',
+          name: 'Accounts Payable',
+          description: 'Invoice intake and approval',
+          context_markdown: null,
+          viewport: null,
+          schema_version: 1,
+        },
+        error: null,
+      },
+      nodesResult: {
+        data: [
+          {
+            id: 'node-1',
+            process_flow_id: 'flow-1',
+            type: 'step',
+            position: { x: 0, y: 0 },
+            size: null,
+            data: {
+              label: 'Receive invoice',
+              owner_role: 'AP Clerk',
+              automation_opportunity: 'OCR intake',
+              frequency: '~200/day',
+              time_constraint: 'same-day turnaround',
+            },
+          },
+          {
+            id: 'node-2',
+            process_flow_id: 'flow-1',
+            type: 'decision',
+            position: { x: 100, y: 0 },
+            size: null,
+            data: { label: 'High value?' },
+          },
+        ],
+        error: null,
+      },
+      edgesResult: {
+        data: [
+          {
+            id: 'edge-1',
+            process_flow_id: 'flow-1',
+            type: 'flow',
+            source_node_id: 'node-1',
+            target_node_id: 'node-2',
+            data: { label: 'Review', condition: 'amount > $10,000' },
+          },
+        ],
+        error: null,
+      },
+    } as never);
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 103,
+        method: 'tools/call',
+        params: {
+          name: 'processflow_get',
+          arguments: { process_flow_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4' },
+        },
+      }),
+      supabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      result: {
+        structuredContent: {
+          ok: boolean;
+          data: {
+            agent_insights: {
+              automationCandidates: number;
+              ownershipTaggedNodes: number;
+              frequencyTaggedNodes: number;
+              timeConstrainedNodes: number;
+              conditionedEdges: number;
+            };
+          };
+        };
+      };
+    };
+
+    expect(payload.result.structuredContent.ok).toBe(true);
+    expect(payload.result.structuredContent.data.agent_insights).toEqual(
+      expect.objectContaining({
+        automationCandidates: 1,
+        ownershipTaggedNodes: 1,
+        frequencyTaggedNodes: 1,
+        timeConstrainedNodes: 1,
+        conditionedEdges: 1,
+      }),
+    );
   });
 
   it('rejects processflow_node_update without process_flow_id', async () => {

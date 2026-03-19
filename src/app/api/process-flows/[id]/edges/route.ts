@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       type?: string;
       source_node_id?: string;
       target_node_id?: string;
-      data?: { label?: string | null } | null;
+      data?: { label?: string | null; condition?: string | null } | null;
     };
     if (!body.type || !body.source_node_id || !body.target_node_id) {
       return NextResponse.json({ error: 'type, source_node_id, and target_node_id are required' }, { status: 400 });

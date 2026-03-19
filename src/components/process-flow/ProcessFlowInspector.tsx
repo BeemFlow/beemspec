@@ -46,8 +46,12 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
     nodePainPoints: useId(),
     nodeNotes: useId(),
     nodeAutomation: useId(),
+    nodeFrequency: useId(),
+    nodeEstimatedDuration: useId(),
+    nodeTimeConstraint: useId(),
     edgeType: useId(),
     edgeLabel: useId(),
+    edgeCondition: useId(),
   };
 
   const nodeDefaults = useMemo(() => {
@@ -63,6 +67,9 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
       pain_points: node.data.pain_points ?? '',
       notes: node.data.notes ?? '',
       automation_opportunity: node.data.automation_opportunity ?? '',
+      frequency: node.data.frequency ?? '',
+      estimated_duration: node.data.estimated_duration ?? '',
+      time_constraint: node.data.time_constraint ?? '',
     };
   }, [props.selection]);
   const [nodeForm, setNodeForm] = useState(nodeDefaults);
@@ -72,6 +79,7 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
     return {
       type: props.selection.edge.data?.edgeType ?? 'flow',
       label: props.selection.edge.data?.label ?? props.selection.edge.label?.toString() ?? '',
+      condition: props.selection.edge.data?.condition ?? '',
     };
   }, [props.selection]);
   const [edgeForm, setEdgeForm] = useState(edgeDefaults);
@@ -140,6 +148,7 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
               <Label htmlFor={ids.nodeLabel}>Label</Label>
               <Input
                 id={ids.nodeLabel}
+                placeholder='e.g., "Review invoice", "Escalate to finance"'
                 value={nodeForm.label}
                 onChange={(e) => setNodeForm((s) => (s ? { ...s, label: e.target.value } : s))}
               />
@@ -148,6 +157,7 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
               <Label htmlFor={ids.nodeOwnerRole}>Owner Role</Label>
               <Input
                 id={ids.nodeOwnerRole}
+                placeholder='e.g., "AP clerk", "Finance manager"'
                 value={nodeForm.owner_role}
                 onChange={(e) => setNodeForm((s) => (s ? { ...s, owner_role: e.target.value } : s))}
               />
@@ -156,6 +166,7 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
               <Label htmlFor={ids.nodeSystems}>Systems</Label>
               <Textarea
                 id={ids.nodeSystems}
+                placeholder='e.g., "NetSuite", "Slack", "Email"'
                 value={nodeForm.systems}
                 onChange={(e) => setNodeForm((s) => (s ? { ...s, systems: e.target.value } : s))}
               />
@@ -164,6 +175,7 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
               <Label htmlFor={ids.nodeInputs}>Inputs</Label>
               <Textarea
                 id={ids.nodeInputs}
+                placeholder='e.g., "Invoice PDF", "Vendor details", "PO number"'
                 value={nodeForm.inputs}
                 onChange={(e) => setNodeForm((s) => (s ? { ...s, inputs: e.target.value } : s))}
               />
@@ -172,6 +184,7 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
               <Label htmlFor={ids.nodeOutputs}>Outputs</Label>
               <Textarea
                 id={ids.nodeOutputs}
+                placeholder='e.g., "Approved invoice", "Payment request", "Status update"'
                 value={nodeForm.outputs}
                 onChange={(e) => setNodeForm((s) => (s ? { ...s, outputs: e.target.value } : s))}
               />
@@ -180,6 +193,7 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
               <Label htmlFor={ids.nodePainPoints}>Pain Points</Label>
               <Textarea
                 id={ids.nodePainPoints}
+                placeholder='e.g., "Manual re-entry causes errors", "Approvals often stall here"'
                 value={nodeForm.pain_points}
                 onChange={(e) => setNodeForm((s) => (s ? { ...s, pain_points: e.target.value } : s))}
               />
@@ -188,6 +202,7 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
               <Label htmlFor={ids.nodeNotes}>Notes</Label>
               <Textarea
                 id={ids.nodeNotes}
+                placeholder='e.g., "Exception path for international vendors", "Only used for urgent requests"'
                 value={nodeForm.notes}
                 onChange={(e) => setNodeForm((s) => (s ? { ...s, notes: e.target.value } : s))}
               />
@@ -196,8 +211,36 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
               <Label htmlFor={ids.nodeAutomation}>Automation Opportunity</Label>
               <Textarea
                 id={ids.nodeAutomation}
+                placeholder='e.g., "Auto-route for approval", "Sync data into ERP"'
                 value={nodeForm.automation_opportunity}
                 onChange={(e) => setNodeForm((s) => (s ? { ...s, automation_opportunity: e.target.value } : s))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={ids.nodeFrequency}>Frequency</Label>
+              <Input
+                id={ids.nodeFrequency}
+                placeholder='e.g., "~200/day", "weekly", "ad-hoc"'
+                value={nodeForm.frequency}
+                onChange={(e) => setNodeForm((s) => (s ? { ...s, frequency: e.target.value } : s))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={ids.nodeEstimatedDuration}>Est. Duration</Label>
+              <Input
+                id={ids.nodeEstimatedDuration}
+                placeholder='e.g., "5-10 min", "2 days waiting on approval"'
+                value={nodeForm.estimated_duration}
+                onChange={(e) => setNodeForm((s) => (s ? { ...s, estimated_duration: e.target.value } : s))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={ids.nodeTimeConstraint}>Time Constraint</Label>
+              <Input
+                id={ids.nodeTimeConstraint}
+                placeholder='e.g., "must complete within 48h", "regulatory: 30 days max"'
+                value={nodeForm.time_constraint}
+                onChange={(e) => setNodeForm((s) => (s ? { ...s, time_constraint: e.target.value } : s))}
               />
             </div>
             <div className="flex gap-2">
@@ -217,6 +260,9 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
                         pain_points: nodeForm.pain_points || null,
                         notes: nodeForm.notes || null,
                         automation_opportunity: nodeForm.automation_opportunity || null,
+                        frequency: nodeForm.frequency || null,
+                        estimated_duration: nodeForm.estimated_duration || null,
+                        time_constraint: nodeForm.time_constraint || null,
                       },
                     }),
                   )
@@ -267,8 +313,18 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
               <Label htmlFor={ids.edgeLabel}>Label</Label>
               <Input
                 id={ids.edgeLabel}
+                placeholder='e.g., "Approved", "Needs review", "Enterprise"'
                 value={edgeForm.label}
                 onChange={(e) => setEdgeForm((s) => (s ? { ...s, label: e.target.value } : s))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={ids.edgeCondition}>Condition</Label>
+              <Input
+                id={ids.edgeCondition}
+                placeholder='e.g., "amount > $10,000", "approval denied"'
+                value={edgeForm.condition}
+                onChange={(e) => setEdgeForm((s) => (s ? { ...s, condition: e.target.value } : s))}
               />
             </div>
             <div className="flex gap-2">
@@ -279,7 +335,7 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
                   run(() =>
                     props.onSaveEdge(selectedEdge.id, {
                       type: edgeForm.type,
-                      data: { label: edgeForm.label || null },
+                      data: { label: edgeForm.label || null, condition: edgeForm.condition || null },
                     }),
                   )
                 }

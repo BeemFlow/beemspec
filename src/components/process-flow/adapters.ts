@@ -50,6 +50,9 @@ function normalizeNodeData(node: Partial<ProcessFlowNode>, nodeType: ProcessFlow
     pain_points: typeof raw.pain_points === 'string' ? raw.pain_points : null,
     notes: typeof raw.notes === 'string' ? raw.notes : null,
     automation_opportunity: typeof raw.automation_opportunity === 'string' ? raw.automation_opportunity : null,
+    frequency: typeof raw.frequency === 'string' ? raw.frequency : null,
+    estimated_duration: typeof raw.estimated_duration === 'string' ? raw.estimated_duration : null,
+    time_constraint: typeof raw.time_constraint === 'string' ? raw.time_constraint : null,
     nodeType,
   };
 }
