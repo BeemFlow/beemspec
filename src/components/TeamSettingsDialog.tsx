@@ -9,6 +9,7 @@ import { DeleteButton } from '@/components/ui/delete-button';
 import { Input } from '@/components/ui/input';
 import { IntegrationSection } from '@/components/ui/integration-section';
 import { Label } from '@/components/ui/label';
+import { nonCredentialFieldProps, nonCredentialFormProps } from '@/components/ui/non-credential-fields';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { SettingsDialog } from '@/components/ui/settings-dialog';
@@ -103,10 +104,16 @@ function linearOAuthNoticeToStatus(input: { status: 'success' | 'error'; reason?
 
 function TeamGeneralTab({ isOwner, teamName, name, onNameChange, onSubmit }: TeamGeneralTabProps) {
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form {...nonCredentialFormProps} onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="team-name">Team name</Label>
-        <Input id="team-name" value={name} onChange={(event) => onNameChange(event.target.value)} disabled={!isOwner} />
+        <Input
+          id="team-name"
+          value={name}
+          onChange={(event) => onNameChange(event.target.value)}
+          disabled={!isOwner}
+          {...nonCredentialFieldProps}
+        />
       </div>
       {isOwner && (
         <Button type="submit" disabled={!name.trim() || name === teamName}>
@@ -190,10 +197,17 @@ export function LinearSettingsForm(input: {
   const selectedTeam = input.teamOptions.find((team) => team.id === input.teamId);
 
   return (
-    <form onSubmit={input.onSave} className="space-y-3">
+    <form {...nonCredentialFormProps} onSubmit={input.onSave} className="space-y-3">
       <div className="space-y-2">
         <Label htmlFor="linear-workspace-name">Linear workspace</Label>
-        <Input id="linear-workspace-name" value={input.workspaceName} disabled readOnly placeholder="Not connected" />
+        <Input
+          id="linear-workspace-name"
+          value={input.workspaceName}
+          disabled
+          readOnly
+          placeholder="Not connected"
+          {...nonCredentialFieldProps}
+        />
       </div>
       <div className="space-y-2">
         <Label>Linear team</Label>
@@ -334,7 +348,7 @@ function TeamMembersTab({
     <div className="space-y-4">
       {isOwner && (
         <>
-          <form onSubmit={onInviteSubmit} className="space-y-2">
+          <form {...nonCredentialFormProps} onSubmit={onInviteSubmit} className="space-y-2">
             <div className="flex gap-2">
               <Input
                 type="email"
@@ -342,6 +356,7 @@ function TeamMembersTab({
                 value={inviteEmail}
                 onChange={(event) => onInviteEmailChange(event.target.value)}
                 disabled={inviteStatus.type === 'loading'}
+                {...nonCredentialFieldProps}
               />
               <Button type="submit" disabled={!inviteEmail.trim() || inviteStatus.type === 'loading'}>
                 {inviteStatus.type === 'loading' ? (

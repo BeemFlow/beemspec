@@ -6,6 +6,7 @@ import { DeleteButton } from '@/components/ui/delete-button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { nonCredentialFieldProps, nonCredentialFormProps } from '@/components/ui/non-credential-fields';
 import type { Task } from '@/types';
 
 interface Props {
@@ -58,7 +59,7 @@ export function TaskDialog({ open, onOpenChange, task, onSave, onDelete }: Props
         <DialogHeader>
           <DialogTitle>{task ? 'Edit Task' : 'New Task'}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form {...nonCredentialFormProps} onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="task-name">Name</Label>
             <Input
@@ -68,6 +69,7 @@ export function TaskDialog({ open, onOpenChange, task, onSave, onDelete }: Props
               placeholder="Create account"
               disabled={isSubmitting}
               required
+              {...nonCredentialFieldProps}
             />
           </div>
 

@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { nonCredentialFieldProps, nonCredentialFormProps } from '@/components/ui/non-credential-fields';
 import { Textarea } from '@/components/ui/textarea';
 
 const STORY_MAP_PLACEHOLDER = `Use this space to capture durable product context that applies across the entire story map.
@@ -90,7 +91,7 @@ export function ContextMarkdownDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSave} className="flex flex-col gap-4 flex-1 min-h-0">
+        <form {...nonCredentialFormProps} onSubmit={handleSave} className="flex flex-col gap-4 flex-1 min-h-0">
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Textarea
             value={draft}
@@ -98,6 +99,7 @@ export function ContextMarkdownDialog({
             placeholder={placeholder}
             disabled={saving}
             className="min-h-[240px] flex-1 font-mono text-sm"
+            {...nonCredentialFieldProps}
           />
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>

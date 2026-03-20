@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { nonCredentialFieldProps, nonCredentialFormProps } from '@/components/ui/non-credential-fields';
 
 interface PromptDialogProps {
   open: boolean;
@@ -57,7 +58,7 @@ export function PromptDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form {...nonCredentialFormProps} onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             {label && <Label htmlFor="prompt-input">{label}</Label>}
             <Input
@@ -67,6 +68,7 @@ export function PromptDialog({
               placeholder={placeholder}
               disabled={isSubmitting}
               autoFocus
+              {...nonCredentialFieldProps}
             />
           </div>
           <DialogFooter>

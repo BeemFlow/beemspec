@@ -8,6 +8,7 @@ import { DeleteButton } from '@/components/ui/delete-button';
 import { Input } from '@/components/ui/input';
 import { IntegrationSection } from '@/components/ui/integration-section';
 import { Label } from '@/components/ui/label';
+import { nonCredentialFieldProps, nonCredentialFormProps } from '@/components/ui/non-credential-fields';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SettingsDialog } from '@/components/ui/settings-dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -93,7 +94,7 @@ function GeneralTab({
   error: string | null;
 }) {
   return (
-    <form onSubmit={onSave} className="space-y-4">
+    <form {...nonCredentialFormProps} onSubmit={onSave} className="space-y-4">
       {error && <p className="text-sm text-destructive">{error}</p>}
       {notice && <p className="text-sm text-success">{notice}</p>}
 
@@ -104,6 +105,7 @@ function GeneralTab({
           value={name}
           onChange={(event) => onNameChange(event.target.value)}
           disabled={saving}
+          {...nonCredentialFieldProps}
         />
       </div>
 
@@ -115,6 +117,7 @@ function GeneralTab({
           onChange={(event) => onDescriptionChange(event.target.value)}
           placeholder="Optional description"
           disabled={saving}
+          {...nonCredentialFieldProps}
         />
       </div>
 
@@ -181,7 +184,7 @@ function IntegrationsTab({
   return (
     <div className="space-y-6">
       <IntegrationSection title="Linear" description="Configure Linear sync behavior for this story map.">
-        <form onSubmit={onSave} className="space-y-4">
+        <form {...nonCredentialFormProps} onSubmit={onSave} className="space-y-4">
           {error && <p className="text-sm text-destructive">{error}</p>}
           {notice && <p className="text-sm text-success">{notice}</p>}
 
@@ -295,6 +298,7 @@ function IntegrationsTab({
                   onChange={(event) => onImportLabelNameChange(event.target.value)}
                   placeholder="Story"
                   disabled={!canEdit || saving}
+                  {...nonCredentialFieldProps}
                 />
               </div>
 

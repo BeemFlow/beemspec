@@ -7,6 +7,7 @@ import { DangerZone } from '@/components/ui/danger-zone';
 import { DeleteButton } from '@/components/ui/delete-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { nonCredentialFieldProps, nonCredentialFormProps } from '@/components/ui/non-credential-fields';
 import { SettingsDialog } from '@/components/ui/settings-dialog';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -102,7 +103,7 @@ export function ProcessFlowSettingsDialog({
           value: 'general',
           label: 'General',
           content: (
-            <form onSubmit={handleSave} className="space-y-4">
+            <form {...nonCredentialFormProps} onSubmit={handleSave} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="process-flow-name">Name</Label>
                 <Input
@@ -110,6 +111,7 @@ export function ProcessFlowSettingsDialog({
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   disabled={saving}
+                  {...nonCredentialFieldProps}
                 />
               </div>
 
@@ -121,6 +123,7 @@ export function ProcessFlowSettingsDialog({
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="Optional description"
                   disabled={saving}
+                  {...nonCredentialFieldProps}
                 />
               </div>
 

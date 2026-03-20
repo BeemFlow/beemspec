@@ -10,6 +10,7 @@ import { DeleteButton } from '@/components/ui/delete-button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { nonCredentialFieldProps, nonCredentialFormProps } from '@/components/ui/non-credential-fields';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { Release, Story, StoryStatus } from '@/types';
@@ -126,7 +127,7 @@ export function StoryDialog({
         <DialogHeader>
           <DialogTitle>{story ? 'Edit Story' : 'New Story'}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form {...nonCredentialFormProps} onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="title">Title *</Label>
             <Input
@@ -137,6 +138,7 @@ export function StoryDialog({
               disabled={isSubmitting}
               required
               pattern=".*\S.*"
+              {...nonCredentialFieldProps}
             />
           </div>
 
@@ -150,6 +152,7 @@ export function StoryDialog({
               rows={3}
               disabled={isSubmitting}
               required
+              {...nonCredentialFieldProps}
             />
           </div>
 
@@ -163,6 +166,7 @@ export function StoryDialog({
               rows={3}
               disabled={isSubmitting}
               required
+              {...nonCredentialFieldProps}
             />
           </div>
 
@@ -174,6 +178,7 @@ export function StoryDialog({
               onChange={(e) => setFigmaLink(e.target.value)}
               placeholder="https://figma.com/file/..."
               disabled={isSubmitting}
+              {...nonCredentialFieldProps}
             />
           </div>
 
@@ -186,6 +191,7 @@ export function StoryDialog({
               placeholder="- User cancels OAuth flow&#10;- Email already exists with password auth"
               rows={2}
               disabled={isSubmitting}
+              {...nonCredentialFieldProps}
             />
           </div>
 
@@ -198,6 +204,7 @@ export function StoryDialog({
               placeholder="Use NextAuth.js with Google provider. Follow existing auth patterns..."
               rows={2}
               disabled={isSubmitting}
+              {...nonCredentialFieldProps}
             />
           </div>
 

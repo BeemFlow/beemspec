@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { nonCredentialFieldProps, nonCredentialFormProps } from '@/components/ui/non-credential-fields';
 import { Textarea } from '@/components/ui/textarea';
 import { errorMessage } from '@/lib/errors';
 import { fetchJson } from '@/lib/http';
@@ -96,7 +97,7 @@ export function CreateNamedResourceButton({
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={createResource} className="space-y-4">
+        <form {...nonCredentialFormProps} onSubmit={createResource} className="space-y-4">
           {error ? (
             <Card className="border-destructive bg-destructive/5 p-4">
               <p className="text-sm text-destructive">{error}</p>
@@ -110,6 +111,7 @@ export function CreateNamedResourceButton({
               onChange={(event) => setName(event.target.value)}
               placeholder={placeholderName}
               required
+              {...nonCredentialFieldProps}
             />
           </div>
           <div className="space-y-2">
@@ -119,6 +121,7 @@ export function CreateNamedResourceButton({
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="A brief description..."
+              {...nonCredentialFieldProps}
             />
           </div>
           <Button type="submit" className="w-full" disabled={isCreating || !name.trim()}>
