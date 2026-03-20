@@ -119,17 +119,22 @@ describe('teams routes', () => {
 
   it('invites pending user and handles rollback/failure cases', async () => {
     const { client, stubs } = createInvitesPostClient({ members: [] });
+    const inviteUserByEmail = vi.fn().mockResolvedValue({ data: { user: null }, error: { message: 'smtp failed' } });
     vi.mocked(createClient).mockResolvedValue(client as never);
     vi.mocked(createAdminClient).mockReturnValue({
       auth: {
         admin: {
-          inviteUserByEmail: vi.fn().mockResolvedValue({ data: { user: null }, error: { message: 'smtp failed' } }),
+          inviteUserByEmail,
         },
       },
     } as never);
 
     const response = await postInvite(jsonRequest({ email: 'person@example.com' }), {
       params: Promise.resolve({ id: VALID_ID }),
+    });
+    expect(inviteUserByEmail).toHaveBeenCalledWith('person@example.com', {
+      redirectTo: 'http://localhost/auth/callback?next=%2Finvite%2Faccept',
+      data: { invite_id: 'invite-1' },
     });
     expect(stubs.remove).toHaveBeenCalled();
     expect(response.status).toBe(500);

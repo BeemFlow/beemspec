@@ -20,15 +20,27 @@ import type {
   StoryMap,
   StoryMapFull,
   Task,
+  TeamInvite,
+  TeamMember,
 } from '@/types';
 
 const TEAM_ID = '00000000-0000-4000-8000-000000000001';
 
 type StoreState = {
   teams: Array<{ id: string; name: string; created_at: string; updated_at: string; role: 'owner' }>;
+  teamMembers: TeamMember[];
+  teamInvites: TeamInvite[];
   storyMaps: E2EStoryMap[];
   processFlows: ProcessFlowFull[];
-  counters: { flow: number; node: number; edge: number; storyMap: number };
+  counters: {
+    flow: number;
+    node: number;
+    edge: number;
+    storyMap: number;
+    member: number;
+    invite: number;
+    user: number;
+  };
 };
 
 type E2EStoryMap = StoryMapFull & {
@@ -81,6 +93,14 @@ function makeId(prefix: string, value: number) {
 }
 
 function createInitialState(scenario: 'default' | 'malformed' = 'default'): StoreState {
+  const ownerMember: TeamMember = {
+    id: 'member-1',
+    user_id: 'e2e-user-1',
+    role: 'owner',
+    email: 'e2e@example.com',
+    created_at: nowIso(),
+  };
+
   const release: Release = {
     id: 'release-1',
     story_map_id: 'story-map-1',
@@ -186,9 +206,11 @@ function createInitialState(scenario: 'default' | 'malformed' = 'default'): Stor
 
   return {
     teams: [{ id: TEAM_ID, name: 'E2E Team', created_at: nowIso(), updated_at: nowIso(), role: 'owner' }],
+    teamMembers: [ownerMember],
+    teamInvites: [],
     storyMaps: [storyMap],
     processFlows: [processFlow],
-    counters: { flow: 2, node: 3, edge: 2, storyMap: 2 },
+    counters: { flow: 2, node: 3, edge: 2, storyMap: 2, member: 2, invite: 1, user: 2 },
   };
 }
 
@@ -207,6 +229,62 @@ export function resetE2EProcessFlowStore(scenario: 'default' | 'malformed' = 'de
 
 export function getE2ETeams() {
   return getState().teams;
+}
+
+export function listE2ETeamMembers(teamId: string) {
+  if (!getState().teams.some((team) => team.id === teamId)) return [];
+  return getState().teamMembers;
+}
+
+export function listE2ETeamInvites(teamId: string) {
+  return getState().teamInvites.filter((invite) => invite.team_id === teamId && invite.accepted_at === null);
+}
+
+export function createE2ETeamInvite(input: { team_id: string; email: string; invited_by: string }) {
+  const state = getState();
+  const invite: TeamInvite = {
+    id: makeId('invite', state.counters.invite++),
+    team_id: input.team_id,
+    email: input.email,
+    invited_by: input.invited_by,
+    created_at: nowIso(),
+    accepted_at: null,
+  };
+  state.teamInvites.unshift(invite);
+  return invite;
+}
+
+export function deleteE2ETeamInvite(teamId: string, inviteId: string) {
+  const state = getState();
+  const invite = state.teamInvites.find((item) => item.id === inviteId && item.team_id === teamId) ?? null;
+  if (!invite) return null;
+  state.teamInvites = state.teamInvites.filter((item) => item.id !== inviteId);
+  return invite;
+}
+
+export function acceptE2ETeamInvite(inviteId: string, email: string) {
+  const state = getState();
+  const invite = state.teamInvites.find(
+    (item) => item.id === inviteId && item.accepted_at === null && item.email.toLowerCase() === email.toLowerCase(),
+  );
+  if (!invite) return null;
+
+  invite.accepted_at = nowIso();
+
+  const existingMember = state.teamMembers.find((member) => member.email.toLowerCase() === email.toLowerCase());
+  if (existingMember) {
+    return existingMember;
+  }
+
+  const member: TeamMember = {
+    id: makeId('member', state.counters.member++),
+    user_id: makeId('user', state.counters.user++),
+    role: 'member',
+    email,
+    created_at: nowIso(),
+  };
+  state.teamMembers.push(member);
+  return member;
 }
 
 export function listE2EStoryMaps(teamId: string) {

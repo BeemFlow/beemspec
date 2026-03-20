@@ -2,8 +2,8 @@
 
 import { FileText, GitBranch, Network, Plus, RefreshCw, ScanSearch, Settings, Sparkles, User } from 'lucide-react';
 import { EditorHeader } from '@/components/EditorHeader';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 interface ProcessFlowToolbarProps {
   name: string;

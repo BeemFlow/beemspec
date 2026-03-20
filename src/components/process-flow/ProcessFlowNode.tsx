@@ -2,7 +2,7 @@
 
 import { Handle, type NodeProps, Position } from '@xyflow/react';
 import { Circle, Diamond, FileText, Server, User } from 'lucide-react';
-import { Badge } from '@/components/ui/Badge';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/components/ui/utils';
 import type { ProcessFlowCanvasNode } from './adapters';
 

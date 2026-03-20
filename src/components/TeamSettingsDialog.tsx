@@ -2,15 +2,15 @@
 
 import { Clock, Loader2, UserPlus } from 'lucide-react';
 import { useCallback } from 'react';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { DangerZone } from '@/components/ui/DangerZone';
 import { DeleteButton } from '@/components/ui/DeleteButton';
-import { Input } from '@/components/ui/Input';
+import { Input } from '@/components/ui/input';
 import { IntegrationSection } from '@/components/ui/IntegrationSection';
-import { Label } from '@/components/ui/Label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
-import { Separator } from '@/components/ui/Separator';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { SettingsDialog } from '@/components/ui/SettingsDialog';
 import {
   type InviteStatus,

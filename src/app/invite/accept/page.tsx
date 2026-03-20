@@ -1,4 +1,6 @@
 import { redirect } from 'next/navigation';
+import { acceptE2ETeamInvite } from '@/lib/e2e/test-store';
+import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 
 async function clearInviteAndRedirect(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -6,7 +8,23 @@ async function clearInviteAndRedirect(supabase: Awaited<ReturnType<typeof create
   redirect('/');
 }
 
-export default async function AcceptInvitePage() {
+export default async function AcceptInvitePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  if (env.e2eTestMode()) {
+    const resolvedSearchParams = searchParams ? await searchParams : {};
+    const inviteId = resolvedSearchParams.invite_id;
+    const email = resolvedSearchParams.email;
+
+    if (typeof inviteId === 'string' && typeof email === 'string') {
+      acceptE2ETeamInvite(inviteId, email);
+    }
+
+    redirect('/');
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

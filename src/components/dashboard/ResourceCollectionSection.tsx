@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface ResourceItem {
   id: string;

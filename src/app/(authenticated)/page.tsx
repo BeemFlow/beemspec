@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { ResourceCollectionSection } from '@/components/dashboard/ResourceCollectionSection';
 import { CreateProcessFlowButton } from '@/components/process-flow/CreateProcessFlowButton';
 import { CreateStoryMapButton } from '@/components/story-map/CreateStoryMapButton';
-import { Card } from '@/components/ui/Card';
+import { Card } from '@/components/ui/card';
 import { getE2ETeamId, listE2EProcessFlows, listE2EStoryMaps } from '@/lib/e2e/test-store';
 import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';

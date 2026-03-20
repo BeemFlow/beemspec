@@ -2,13 +2,13 @@
 
 import { Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { DangerZone } from '@/components/ui/DangerZone';
 import { DeleteButton } from '@/components/ui/DeleteButton';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { SettingsDialog } from '@/components/ui/SettingsDialog';
-import { Textarea } from '@/components/ui/Textarea';
+import { Textarea } from '@/components/ui/textarea';
 
 type ProcessFlowSettingsTab = 'general' | 'danger';
 

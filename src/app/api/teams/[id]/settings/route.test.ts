@@ -78,4 +78,44 @@ describe('team settings route', () => {
 
     expect(response.status).toBe(404);
   });
+
+  it('does not load pending invites or owner-only connection data for non-owners', async () => {
+    vi.mocked(getTeamRoleForUser).mockResolvedValue('member');
+
+    const integrationMaybeSingle = vi.fn().mockResolvedValue({
+      data: null,
+      error: null,
+    });
+    const integrationEq = vi.fn().mockReturnValue({ maybeSingle: integrationMaybeSingle });
+    const integrationSelect = vi.fn().mockReturnValue({ eq: integrationEq });
+
+    const invitesOrder = vi.fn();
+    const invitesIs = vi.fn().mockReturnValue({ order: invitesOrder });
+    const invitesEq = vi.fn().mockReturnValue({ is: invitesIs });
+    const invitesSelect = vi.fn().mockReturnValue({ eq: invitesEq });
+
+    const from = vi.fn((table: string) => {
+      if (table === 'integration_settings') return { select: integrationSelect };
+      if (table === 'team_invites') return { select: invitesSelect };
+      return {};
+    });
+    const rpc = vi.fn().mockResolvedValue({ data: [{ id: 'member_1' }], error: null });
+
+    vi.mocked(createClient).mockResolvedValue({ from, rpc } as never);
+
+    const response = await GET(new Request('http://localhost/api/test'), { params: Promise.resolve({ id: TEAM_ID }) });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      team_id: TEAM_ID,
+      role: 'member',
+      permissions: { is_owner: false },
+      invites: [],
+      linear: {
+        connection: { connected: false, scope: null },
+      },
+    });
+    expect(invitesSelect).not.toHaveBeenCalled();
+    expect(getLinearOAuthConnectionStatusForTeam).not.toHaveBeenCalled();
+  });
 });

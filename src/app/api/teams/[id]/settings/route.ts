@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/connections';
 import { requireAuth } from '@/lib/auth';
+import { getE2EAuthUser, listE2ETeamInvites, listE2ETeamMembers } from '@/lib/e2e/test-store';
+import { env } from '@/lib/env';
 import { serverErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -8,6 +10,28 @@ import { getTeamRoleForUser } from '@/lib/teams';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (env.e2eTestMode()) {
+    const { id: teamId } = await params;
+    if (!isValidUuid(teamId)) return invalidIdResponse();
+
+    return NextResponse.json({
+      team_id: teamId,
+      role: 'owner',
+      permissions: { is_owner: true },
+      members: listE2ETeamMembers(teamId),
+      invites: listE2ETeamInvites(teamId),
+      linear: {
+        settings: null,
+        connection: {
+          connected: false,
+          expires_at: null,
+          scope: null,
+        },
+      },
+      e2e_user: getE2EAuthUser(),
+    });
+  }
+
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 

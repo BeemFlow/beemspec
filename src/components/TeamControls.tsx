@@ -4,7 +4,7 @@ import { Check, ChevronDown, LogOut, Plus, Settings, User } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { TeamSettingsDialog } from '@/components/TeamSettingsDialog';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -15,7 +15,7 @@ import {
   type OnNodesDelete,
   ReactFlow,
 } from '@xyflow/react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import type { ProcessFlowCanvasEdge, ProcessFlowCanvasNode } from './adapters';
 import { processFlowNodeTypes } from './ProcessFlowNode';
 
