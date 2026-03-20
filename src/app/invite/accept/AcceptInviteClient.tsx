@@ -40,16 +40,8 @@ export function AcceptInviteClient() {
         return;
       }
 
-      const inviteId = typeof user.user_metadata?.invite_id === 'string' ? user.user_metadata.invite_id : null;
-      if (!inviteId) {
-        window.location.replace('/');
-        return;
-      }
-
       const response = await fetch('/api/invite/accept', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inviteId }),
       });
 
       if (!response.ok) {
