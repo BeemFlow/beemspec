@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
   if (!user) {
     const loginUrl = resolveRequestUrl(request, '/auth/login');
-    const response = NextResponse.redirect(loginUrl);
+    const response = NextResponse.redirect(loginUrl, { status: 303 });
     setOAuthLoginResumeCookie(
       response.cookies,
       `/oauth/consent?authorization_id=${encodeURIComponent(authorizationId)}`,
@@ -67,5 +67,5 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.redirect(outcome.data.redirect_url);
+  return NextResponse.redirect(outcome.data.redirect_url, { status: 303 });
 }
