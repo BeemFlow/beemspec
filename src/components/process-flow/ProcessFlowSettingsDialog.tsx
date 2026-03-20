@@ -3,11 +3,11 @@
 import { Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { DangerZone } from '@/components/ui/DangerZone';
-import { DeleteButton } from '@/components/ui/DeleteButton';
+import { DangerZone } from '@/components/ui/danger-zone';
+import { DeleteButton } from '@/components/ui/delete-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { SettingsDialog } from '@/components/ui/SettingsDialog';
+import { SettingsDialog } from '@/components/ui/settings-dialog';
 import { Textarea } from '@/components/ui/textarea';
 
 type ProcessFlowSettingsTab = 'general' | 'danger';

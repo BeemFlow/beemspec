@@ -13,9 +13,8 @@ import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas';
 import { StoryMapSettingsDialog } from '@/components/story-map/StoryMapSettingsDialog';
 import { TaskDialog } from '@/components/story-map/TaskDialog';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { PromptDialog } from '@/components/ui/PromptDialog';
-import { ScrollArea, ScrollBar } from '@/components/ui/ScrollArea';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { PromptDialog } from '@/components/ui/prompt-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { errorMessage } from '@/lib/errors';
 import { fetchJson } from '@/lib/http';
@@ -443,8 +442,10 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
         </div>
       )}
 
-      <ScrollArea className="flex-1">
-        <div className="p-4">
+      {/* Native overflow container instead of Radix ScrollArea — Radix wraps
+          children in display:table which breaks position:sticky on the backbone. */}
+      <div className="flex-1 overflow-auto">
+        <div className="px-4 pb-4">
           <StoryMapCanvas
             storyMap={storyMap}
             storyMapName={storyMap.name}
@@ -472,8 +473,7 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
             onStoryMapChange={setStoryMap}
           />
         </div>
-        <ScrollBar orientation="horizontal" />
-      </ScrollArea>
+      </div>
 
       <StoryMapSettingsDialog
         open={settingsOpen}

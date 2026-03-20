@@ -6,7 +6,7 @@ import { AgentKickoffButton, buildStoryKickoffPrompt } from '@/components/story-
 import type { StoryEditSave } from '@/components/story-map/payloads';
 import { STATUS_OPTIONS } from '@/components/story-map/story-status';
 import { Button } from '@/components/ui/button';
-import { DeleteButton } from '@/components/ui/DeleteButton';
+import { DeleteButton } from '@/components/ui/delete-button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

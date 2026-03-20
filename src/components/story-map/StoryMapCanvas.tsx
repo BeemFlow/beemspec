@@ -19,16 +19,16 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { ArrowDown, ArrowUp, FileText, Pencil, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, FileText, Pencil, Plus } from 'lucide-react';
+import { useId, useState } from 'react';
 import { AddButton } from '@/components/story-map/AddButton';
 import { AgentKickoffButton, buildReleaseKickoffPrompt } from '@/components/story-map/AgentKickoffButton';
 import { ADD_BUTTON_WIDTH, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, GROUP_GAP } from '@/components/story-map/constants';
 import { MapCard } from '@/components/story-map/MapCard';
-import { STATUS_LABELS, STATUS_VARIANTS } from '@/components/story-map/story-status';
+import { STATUS_CLASS, STATUS_LABELS, STATUS_VARIANTS } from '@/components/story-map/story-status';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DeleteButton } from '@/components/ui/DeleteButton';
+import { DeleteButton } from '@/components/ui/delete-button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { assertNever, errorMessage } from '@/lib/errors';
@@ -285,6 +285,20 @@ export function StoryMapCanvas({
   const [activeDrag, setActiveDrag] = useState<DragId | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [dragError, setDragError] = useState<string | null>(null);
+  const [collapsedReleases, setCollapsedReleases] = useState<Set<string>>(new Set());
+  const dndContextId = useId();
+
+  function toggleRelease(releaseId: string) {
+    setCollapsedReleases((prev) => {
+      const next = new Set(prev);
+      if (next.has(releaseId)) {
+        next.delete(releaseId);
+      } else {
+        next.add(releaseId);
+      }
+      return next;
+    });
+  }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -479,6 +493,7 @@ export function StoryMapCanvas({
 
   return (
     <DndContext
+      id={dndContextId}
       sensors={sensors}
       collisionDetection={rectIntersection}
       onDragStart={handleDragStart}
@@ -503,69 +518,74 @@ export function StoryMapCanvas({
             </Button>
           </div>
         )}
-        {/* Activities Row */}
-        <SortableContext
-          items={sortedActivities.map((a) => encodeDragId({ type: 'activity', id: a.id }))}
-          strategy={horizontalListSortingStrategy}
-        >
-          <div className="flex" style={{ gap: GROUP_GAP }}>
-            {sortedActivities.map((activity) => {
-              const tasks = getTasksForActivity(activity.id);
+        {/* Backbone: Activities + Tasks — sticky so it stays visible while releases scroll */}
+        <div className="sticky top-0 z-10 bg-background pt-4 pb-2">
+          {/* Activities Row */}
+          <SortableContext
+            items={sortedActivities.map((a) => encodeDragId({ type: 'activity', id: a.id }))}
+            strategy={horizontalListSortingStrategy}
+          >
+            <div className="flex" style={{ gap: GROUP_GAP }}>
+              {sortedActivities.map((activity) => {
+                const tasks = getTasksForActivity(activity.id);
 
-              return (
-                <div key={activity.id} className="flex justify-between" style={{ width: getGroupWidth(tasks.length) }}>
-                  <SortableActivity
-                    activity={activity}
-                    onClick={() => onEditActivity(activity)}
-                    showIndicator={isDropTarget(encodeDragId({ type: 'activity', id: activity.id }))}
-                  />
-                  <AddActivityDropZone
-                    afterActivityId={activity.id}
-                    onAddActivity={onAddActivity}
-                    showIndicator={isDropTarget(encodeDragId({ type: 'activity-end', afterActivityId: activity.id }))}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </SortableContext>
-
-        {/* Tasks Row */}
-        <SortableContext
-          items={allTasksOrdered.map((t) => encodeDragId({ type: 'task', id: t.id }))}
-          strategy={horizontalListSortingStrategy}
-        >
-          <div className="flex mt-2" style={{ gap: GROUP_GAP }}>
-            {sortedActivities.map((activity) => {
-              const tasks = getTasksForActivity(activity.id);
-
-              return (
-                <div key={activity.id} className="flex" style={{ width: getGroupWidth(tasks.length), gap: CARD_GAP }}>
-                  {tasks.map((task) => (
-                    <SortableTask
-                      key={task.id}
-                      task={task}
-                      onClick={() => onEditTask(task)}
-                      showIndicator={isDropTarget(encodeDragId({ type: 'task', id: task.id }))}
+                return (
+                  <div key={activity.id} className="group/actrow flex justify-between" style={{ width: getGroupWidth(tasks.length) }}>
+                    <SortableActivity
+                      activity={activity}
+                      onClick={() => onEditActivity(activity)}
+                      showIndicator={isDropTarget(encodeDragId({ type: 'activity', id: activity.id }))}
                     />
-                  ))}
-                  <AddTaskDropZone
-                    activityId={activity.id}
-                    onAddTask={onAddTask}
-                    showIndicator={isDropTarget(encodeDragId({ type: 'task-end', activityId: activity.id }))}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </SortableContext>
+                    <AddActivityDropZone
+                      afterActivityId={activity.id}
+                      onAddActivity={onAddActivity}
+                      showIndicator={isDropTarget(encodeDragId({ type: 'activity-end', afterActivityId: activity.id }))}
+                      buttonClassName="opacity-0 group-hover/actrow:opacity-100 transition-opacity"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </SortableContext>
+
+          {/* Tasks Row */}
+          <SortableContext
+            items={allTasksOrdered.map((t) => encodeDragId({ type: 'task', id: t.id }))}
+            strategy={horizontalListSortingStrategy}
+          >
+            <div className="flex mt-2" style={{ gap: GROUP_GAP }}>
+              {sortedActivities.map((activity) => {
+                const tasks = getTasksForActivity(activity.id);
+
+                return (
+                  <div key={activity.id} className="group/taskrow flex" style={{ width: getGroupWidth(tasks.length), gap: CARD_GAP }}>
+                    {tasks.map((task) => (
+                      <SortableTask
+                        key={task.id}
+                        task={task}
+                        onClick={() => onEditTask(task)}
+                        showIndicator={isDropTarget(encodeDragId({ type: 'task', id: task.id }))}
+                      />
+                    ))}
+                    <AddTaskDropZone
+                      activityId={activity.id}
+                      onAddTask={onAddTask}
+                      showIndicator={isDropTarget(encodeDragId({ type: 'task-end', activityId: activity.id }))}
+                      buttonClassName="opacity-0 group-hover/taskrow:opacity-100 transition-opacity"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </SortableContext>
+        </div>
 
         {activities.length > 0 && (
           <SortableContext
             items={sortedStories.map((s) => encodeDragId({ type: 'story', id: s.id }))}
             strategy={verticalListSortingStrategy}
           >
-            <div className="mt-6 space-y-2">
+            <div className="space-y-2">
               {[...releases]
                 .sort((a, b) => a.sort_order - b.sort_order)
                 .map((release, index, arr) => (
@@ -587,6 +607,8 @@ export function StoryMapCanvas({
                       onEditContext={onEditReleaseContext ? () => onEditReleaseContext(release.id) : undefined}
                       isFirst={index === 0}
                       isLast={index === arr.length - 1}
+                      isCollapsed={collapsedReleases.has(release.id)}
+                      onToggleCollapse={() => toggleRelease(release.id)}
                       isDropTarget={isDropTarget}
                     />
                     <AddReleaseZone onAddRelease={onAddRelease} />
@@ -628,7 +650,7 @@ export function StoryMapCanvas({
           <MapCard variant="story" className="shadow-lg cursor-grabbing">
             <div className="text-xs leading-4 line-clamp-2">{draggedStory.title}</div>
             {draggedStory.status !== 'backlog' && (
-              <Badge variant={STATUS_VARIANTS[draggedStory.status]} className="mt-auto text-[10px] self-start">
+              <Badge variant={STATUS_VARIANTS[draggedStory.status]} className={`mt-auto text-[10px] self-start ${STATUS_CLASS[draggedStory.status] ?? ''}`}>
                 {STATUS_LABELS[draggedStory.status]}
               </Badge>
             )}
@@ -643,10 +665,12 @@ function AddActivityDropZone({
   afterActivityId,
   onAddActivity,
   showIndicator,
+  buttonClassName,
 }: {
   afterActivityId: string;
   onAddActivity: () => void;
   showIndicator: boolean;
+  buttonClassName?: string;
 }) {
   const { setNodeRef } = useDroppable({
     id: encodeDragId({ type: 'activity-end', afterActivityId }),
@@ -661,6 +685,7 @@ function AddActivityDropZone({
         orientation="vertical"
         style={{ width: ADD_BUTTON_WIDTH, height: CARD_HEIGHT }}
         onClick={onAddActivity}
+        className={buttonClassName}
       />
     </div>
   );
@@ -670,10 +695,12 @@ function AddTaskDropZone({
   activityId,
   onAddTask,
   showIndicator,
+  buttonClassName,
 }: {
   activityId: string;
   onAddTask: (activityId: string) => void;
   showIndicator: boolean;
+  buttonClassName?: string;
 }) {
   const { setNodeRef } = useDroppable({
     id: encodeDragId({ type: 'task-end', activityId }),
@@ -688,6 +715,7 @@ function AddTaskDropZone({
         orientation="vertical"
         style={{ width: ADD_BUTTON_WIDTH, height: CARD_HEIGHT }}
         onClick={() => onAddTask(activityId)}
+        className={buttonClassName}
       />
     </div>
   );
@@ -767,6 +795,8 @@ interface ReleaseRowProps {
   onEditContext?: () => void;
   isFirst?: boolean;
   isLast?: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
   isDropTarget: (itemId: string) => boolean;
 }
 
@@ -802,6 +832,8 @@ function ReleaseRow({
   onEditContext,
   isFirst,
   isLast,
+  isCollapsed = false,
+  onToggleCollapse,
   isDropTarget,
 }: ReleaseRowProps) {
   const showActions = releaseId !== null;
@@ -810,6 +842,15 @@ function ReleaseRow({
     <div className="pt-4">
       <Separator className="mb-4" />
       <div className="group flex items-center gap-2 mb-3">
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            aria-label={isCollapsed ? 'Expand release' : 'Collapse release'}
+          >
+            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+        )}
         <div className={`text-sm font-medium ${labelMuted ? 'text-muted-foreground' : ''}`}>{label}</div>
         {showActions && (
           <div className="flex items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
@@ -885,6 +926,7 @@ function ReleaseRow({
           </div>
         )}
       </div>
+      {!isCollapsed && (
       <div className="flex items-start" style={{ gap: GROUP_GAP }}>
         {activities.map((activity) => {
           const tasks = getTasksForActivity(activity.id);
@@ -907,6 +949,7 @@ function ReleaseRow({
           );
         })}
       </div>
+      )}
     </div>
   );
 }
@@ -927,7 +970,7 @@ function StoryCell({
   isDropTarget: (itemId: string) => boolean;
 }) {
   return (
-    <div className="flex flex-col gap-2 min-h-[40px]" style={{ width: CARD_WIDTH }}>
+    <div className="group/cell flex flex-col gap-2 min-h-[40px]" style={{ width: CARD_WIDTH }}>
       {stories.map((story) => (
         <SortableStory
           key={story.id}
@@ -941,6 +984,7 @@ function StoryCell({
         releaseId={releaseId}
         onAddStory={onAddStory}
         showIndicator={isDropTarget(encodeDragId({ type: 'story-end', taskId, releaseId }))}
+        buttonClassName="opacity-0 group-hover/cell:opacity-100 transition-opacity"
       />
     </div>
   );
@@ -951,11 +995,13 @@ function AddStoryDropZone({
   releaseId,
   onAddStory,
   showIndicator,
+  buttonClassName,
 }: {
   taskId: string;
   releaseId: string | null;
   onAddStory: (taskId: string, releaseId: string | null) => void;
   showIndicator: boolean;
+  buttonClassName?: string;
 }) {
   const { setNodeRef } = useDroppable({
     id: encodeDragId({ type: 'story-end', taskId, releaseId }),
@@ -964,7 +1010,7 @@ function AddStoryDropZone({
   return (
     <div className="flex flex-col gap-1">
       {showIndicator && <DropLine direction="horizontal" />}
-      <AddButton ref={setNodeRef} label="Story" className="w-full h-8" onClick={() => onAddStory(taskId, releaseId)} />
+      <AddButton ref={setNodeRef} label="Story" className={`w-full h-8 ${buttonClassName ?? ''}`} onClick={() => onAddStory(taskId, releaseId)} />
     </div>
   );
 }
@@ -997,7 +1043,7 @@ function SortableStory({
       >
         <div className="text-xs leading-4 line-clamp-2">{story.title}</div>
         {story.status !== 'backlog' && (
-          <Badge variant={STATUS_VARIANTS[story.status]} className="mt-auto text-[10px] self-start">
+          <Badge variant={STATUS_VARIANTS[story.status]} className={`mt-auto text-[10px] self-start ${STATUS_CLASS[story.status] ?? ''}`}>
             {STATUS_LABELS[story.status]}
           </Badge>
         )}

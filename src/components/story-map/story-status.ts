@@ -12,8 +12,13 @@ export const STATUS_VARIANTS: Record<StoryStatus, 'default' | 'secondary' | 'out
   backlog: 'outline',
   todo: 'secondary',
   in_progress: 'default',
-  in_review: 'secondary',
-  done: 'default',
+  in_review: 'default',
+  done: 'outline',
+};
+
+// Extra className overrides for statuses that need colors outside the standard badge variants
+export const STATUS_CLASS: Partial<Record<StoryStatus, string>> = {
+  done: 'bg-success text-white border-transparent',
 };
 
 export const STATUS_OPTIONS: { value: StoryStatus; label: string }[] = [

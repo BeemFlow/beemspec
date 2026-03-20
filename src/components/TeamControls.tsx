@@ -11,8 +11,8 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/DropdownMenu';
-import { PromptDialog } from '@/components/ui/PromptDialog';
+} from '@/components/ui/dropdown-menu';
+import { PromptDialog } from '@/components/ui/prompt-dialog';
 import type { TeamWithRole } from '@/types';
 
 type TeamDialog = { type: 'closed' } | { type: 'create' } | { type: 'settings' };
