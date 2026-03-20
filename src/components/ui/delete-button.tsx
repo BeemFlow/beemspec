@@ -3,7 +3,7 @@
 import { Loader2, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface DeleteButtonProps {
   onDelete: () => Promise<void> | void;
