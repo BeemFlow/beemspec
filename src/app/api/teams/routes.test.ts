@@ -133,7 +133,7 @@ describe('teams routes', () => {
       params: Promise.resolve({ id: VALID_ID }),
     });
     expect(inviteUserByEmail).toHaveBeenCalledWith('person@example.com', {
-      redirectTo: 'http://localhost/auth/callback?next=%2Finvite%2Faccept',
+      redirectTo: 'http://localhost/invite/accept',
       data: { invite_id: 'invite-1' },
     });
     expect(stubs.remove).toHaveBeenCalled();

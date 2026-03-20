@@ -104,8 +104,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const origin = resolveRequestOrigin(request);
 
-  const inviteRedirectUrl = new URL('/auth/callback', origin);
-  inviteRedirectUrl.searchParams.set('next', '/invite/accept');
+  const inviteRedirectUrl = new URL('/invite/accept', origin);
 
   // Call Supabase inviteUserByEmail
   const adminClient = createAdminClient();

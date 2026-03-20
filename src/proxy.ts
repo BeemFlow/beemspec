@@ -5,6 +5,7 @@ import { setOAuthLoginResumeCookie } from '@/lib/oauth-login-resume';
 import { resolveRequestUrl, resolveSafeRedirectPath } from '@/lib/request-url';
 
 const GUEST_ONLY_AUTH_ROUTES = new Set(['/auth/login', '/auth/signup']);
+const PUBLIC_AUTH_COMPLETION_ROUTES = new Set(['/invite/accept']);
 
 export async function proxy(request: NextRequest) {
   if (env.e2eTestMode()) {
@@ -45,6 +46,7 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAuthRoute = pathname.startsWith('/auth');
   const isGuestOnlyAuthRoute = GUEST_ONLY_AUTH_ROUTES.has(pathname);
+  const isPublicAuthCompletionRoute = PUBLIC_AUTH_COMPLETION_ROUTES.has(pathname);
   const isApiRoute = pathname.startsWith('/api');
   const isWellKnownRoute = pathname.startsWith('/.well-known/');
 
@@ -57,7 +59,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Redirect unauthenticated users to login (except auth routes)
-  if (!user && !isAuthRoute) {
+  if (!user && !isAuthRoute && !isPublicAuthCompletionRoute) {
     const url = resolveRequestUrl(request, '/auth/login');
 
     if (pathname === '/oauth/consent') {

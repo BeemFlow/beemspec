@@ -53,6 +53,12 @@ describe('proxy auth redirects', () => {
     );
   });
 
+  it('allows unauthenticated invite acceptance page requests through', async () => {
+    const response = await proxy(makeRequest('/invite/accept'));
+
+    expect(response.status).toBe(200);
+  });
+
   it('redirects authenticated users away from login using the forwarded public origin', async () => {
     getUserMock.mockResolvedValue({ data: { user: { id: 'user-1' } } });
 
