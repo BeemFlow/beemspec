@@ -27,7 +27,10 @@ describe('story map linear sync route', () => {
 
   it('syncs all stories in the story map and returns summary', async () => {
     const storiesIn = vi.fn().mockResolvedValue({
-      data: [{ id: 'story_1' }, { id: 'story_2' }],
+      data: [
+        { id: 'story_1', title: 'Story One' },
+        { id: 'story_2', title: 'Story Two' },
+      ],
       error: null,
     });
     const storiesSelect = vi.fn().mockReturnValue({ in: storiesIn });
@@ -58,7 +61,20 @@ describe('story map linear sync route', () => {
       considered: 2,
       succeeded: 2,
       failed: 0,
-      responses: [],
+      ignored: 0,
+      createdRemote: 1,
+      localToRemote: 1,
+      remoteToLocal: 0,
+      responses: [
+        {
+          storyId: 'story_1',
+          response: Response.json({ success: true, action: 'created_remote', linear_issue_id: 'lin_1' }),
+        },
+        {
+          storyId: 'story_2',
+          response: Response.json({ success: true, action: 'local_to_remote', linear_issue_id: 'lin_2' }),
+        },
+      ],
     });
 
     const response = await POST(new Request('http://localhost/api/test', { method: 'POST' }), {
@@ -72,7 +88,37 @@ describe('story map linear sync route', () => {
       }),
     );
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ success: true, considered: 2, succeeded: 2, failed: 0 });
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      stories: {
+        considered: 2,
+        succeeded: 2,
+        failed: 0,
+        created_in_linear: 1,
+        synced_to_linear: 1,
+        synced_from_linear: 0,
+      },
+      imports: {
+        considered: 0,
+        imported: 0,
+        skipped: 0,
+      },
+      story_results: [
+        {
+          story_id: 'story_1',
+          title: 'Story One',
+          outcome: 'created_in_linear',
+          linear_issue_id: 'lin_1',
+        },
+        {
+          story_id: 'story_2',
+          title: 'Story Two',
+          outcome: 'synced_to_linear',
+          linear_issue_id: 'lin_2',
+        },
+      ],
+      import_results: [],
+    });
   });
 
   it('returns zero summary when no tasks exist in map', async () => {
@@ -101,7 +147,101 @@ describe('story map linear sync route', () => {
 
     expect(syncStoriesByIdList).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ success: true, considered: 0, succeeded: 0, failed: 0 });
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      stories: {
+        considered: 0,
+        succeeded: 0,
+        failed: 0,
+      },
+      imports: {
+        considered: 0,
+        imported: 0,
+        skipped: 0,
+      },
+      story_results: [],
+      import_results: [],
+    });
+  });
+
+  it('includes ignored and failed per-story debug results', async () => {
+    const storiesIn = vi.fn().mockResolvedValue({
+      data: [
+        { id: 'story_1', title: 'Ignored Story' },
+        { id: 'story_2', title: 'Failed Story' },
+      ],
+      error: null,
+    });
+    const storiesSelect = vi.fn().mockReturnValue({ in: storiesIn });
+
+    const tasksEq = vi.fn().mockResolvedValue({
+      data: [{ id: 'task_1' }],
+      error: null,
+    });
+    const tasksSelect = vi.fn().mockReturnValue({ eq: tasksEq });
+
+    const from = vi.fn((table: string) => {
+      if (table === 'tasks') return { select: tasksSelect };
+      if (table === 'stories') return { select: storiesSelect };
+      if (table === 'story_map_integration_settings') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({ data: { linear_project_id: 'project_1' }, error: null }),
+            }),
+          }),
+        };
+      }
+      return {};
+    });
+
+    vi.mocked(createClient).mockResolvedValue({ from } as never);
+    vi.mocked(syncStoriesByIdList).mockResolvedValue({
+      considered: 2,
+      succeeded: 1,
+      failed: 1,
+      ignored: 1,
+      createdRemote: 0,
+      localToRemote: 0,
+      remoteToLocal: 0,
+      responses: [
+        {
+          storyId: 'story_1',
+          response: Response.json({ success: true, ignored: true, reason: 'Linear integration is not enabled' }),
+        },
+        {
+          storyId: 'story_2',
+          response: Response.json({ error: 'boom' }, { status: 500 }),
+        },
+      ],
+    });
+
+    const response = await POST(new Request('http://localhost/api/test', { method: 'POST' }), {
+      params: Promise.resolve({ id: STORY_MAP_ID }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      stories: {
+        ignored: 1,
+        failed: 1,
+      },
+      story_results: [
+        {
+          story_id: 'story_1',
+          title: 'Ignored Story',
+          outcome: 'ignored',
+          reason: 'Linear integration is not enabled',
+        },
+        {
+          story_id: 'story_2',
+          title: 'Failed Story',
+          outcome: 'failed',
+          reason: 'sync failed',
+        },
+      ],
+    });
   });
 
   it('returns 422 when no project is configured for the map', async () => {

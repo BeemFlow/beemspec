@@ -1,6 +1,7 @@
 import { buildStoryPatchFromLinearIssue, mapStoryToLinearIssueInput } from '@beemspec/linear';
 import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
+import { maybeSyncStoryToLinear } from '@/integrations/linear/sync';
 import {
   buildDbUpdateFromPatch,
   type IssueSync,
@@ -17,6 +18,26 @@ function ignored(reason: string): Response {
 
 function isSuccessResponseStatus(status: number): boolean {
   return status >= 200 && status < 300;
+}
+
+type SyncAction = 'ignored' | 'created_remote' | 'local_to_remote' | 'remote_to_local';
+
+interface SyncResponsePayload {
+  success: boolean;
+  ignored?: boolean;
+  reason?: string;
+  direction?: typeof SYNC_DIRECTION.localToRemote | typeof SYNC_DIRECTION.remoteToLocal;
+  story_id?: string;
+  linear_issue_id?: string;
+  action?: SyncAction;
+}
+
+async function readSyncResponsePayload(response: Response): Promise<SyncResponsePayload | null> {
+  try {
+    return (await response.clone().json()) as SyncResponsePayload;
+  } catch {
+    return null;
+  }
 }
 
 async function syncRemoteToLocal(
@@ -51,7 +72,13 @@ async function syncRemoteToLocal(
     lastLinearUpdatedAt: remote.updatedAt,
   });
 
-  return Response.json({ success: true, direction: SYNC_DIRECTION.remoteToLocal, story_id: story.id });
+  return Response.json({
+    success: true,
+    direction: SYNC_DIRECTION.remoteToLocal,
+    story_id: story.id,
+    linear_issue_id: remote.id,
+    action: 'remote_to_local',
+  });
 }
 
 async function syncLocalToRemote(
@@ -73,7 +100,13 @@ async function syncLocalToRemote(
     lastLinearUpdatedAt: synced.updatedAt,
   });
 
-  return Response.json({ success: true, direction: SYNC_DIRECTION.localToRemote, story_id: story.id });
+  return Response.json({
+    success: true,
+    direction: SYNC_DIRECTION.localToRemote,
+    story_id: story.id,
+    linear_issue_id: synced.id,
+    action: 'local_to_remote',
+  });
 }
 
 export async function syncStoryById(input: { supabase: Supabase; storyId: string }): Promise<Response> {
@@ -99,7 +132,18 @@ export async function syncStoryById(input: { supabase: Supabase; storyId: string
   }
 
   const link = await getStoryLinearLink(input.supabase, story.id);
-  if (!link) return ignored('story is not linked to Linear');
+  if (!link) {
+    const created = await maybeSyncStoryToLinear(input.supabase, story.id);
+    if (!created) return ignored('story is not linked and could not be created in Linear');
+
+    return Response.json({
+      success: true,
+      direction: SYNC_DIRECTION.localToRemote,
+      story_id: story.id,
+      linear_issue_id: created.id,
+      action: 'created_remote',
+    });
+  }
 
   const remote = await linearSyncContext.linearIssueSync.getIssueById(link.linearIssueId);
   if (!remote) return ignored('linked Linear issue was not found');
@@ -116,11 +160,19 @@ export async function syncStoriesByIdList(input: { supabase: Supabase; storyIds:
   considered: number;
   succeeded: number;
   failed: number;
+  ignored: number;
+  createdRemote: number;
+  localToRemote: number;
+  remoteToLocal: number;
   responses: Array<{ storyId: string; response: Response }>;
 }> {
   const responses: Array<{ storyId: string; response: Response }> = [];
   let succeeded = 0;
   let failed = 0;
+  let ignored = 0;
+  let createdRemote = 0;
+  let localToRemote = 0;
+  let remoteToLocal = 0;
 
   for (const storyId of input.storyIds) {
     try {
@@ -132,6 +184,11 @@ export async function syncStoriesByIdList(input: { supabase: Supabase; storyIds:
 
       if (isSuccessResponseStatus(response.status)) {
         succeeded += 1;
+        const payload = await readSyncResponsePayload(response);
+        if (payload?.ignored) ignored += 1;
+        if (payload?.action === 'created_remote') createdRemote += 1;
+        if (payload?.action === 'local_to_remote') localToRemote += 1;
+        if (payload?.action === 'remote_to_local') remoteToLocal += 1;
       } else {
         failed += 1;
       }
@@ -148,6 +205,10 @@ export async function syncStoriesByIdList(input: { supabase: Supabase; storyIds:
     considered: input.storyIds.length,
     succeeded,
     failed,
+    ignored,
+    createdRemote,
+    localToRemote,
+    remoteToLocal,
     responses,
   };
 }

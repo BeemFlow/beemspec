@@ -622,29 +622,47 @@ export function StoryMapSettingsDialog({
 
     try {
       const result = await fetchJson<{
-        considered: number;
-        succeeded: number;
-        failed: number;
-        import_considered: number;
-        imported: number;
-        import_skipped: number;
+        stories: {
+          considered: number;
+          processed: number;
+          succeeded: number;
+          failed: number;
+          ignored: number;
+          created_in_linear: number;
+          synced_to_linear: number;
+          synced_from_linear: number;
+        };
+        imports: {
+          considered: number;
+          imported: number;
+          skipped: number;
+          skipped_already_linked: number;
+          skipped_no_candidate: number;
+        };
       }>(
         `/api/story-maps/${storyMapId}/integrations/linear/sync`,
         { method: 'POST' },
         'Failed to sync story map with Linear',
       );
 
-      const existingSyncSummary = `${result.succeeded}/${result.considered} existing stories synced`;
-      const importSummary = `${result.imported}/${result.import_considered} labeled issues imported`;
+      const storySummary = [
+        `${result.stories.created_in_linear} created in Linear`,
+        `${result.stories.synced_to_linear} pushed to Linear`,
+        `${result.stories.synced_from_linear} pulled from Linear`,
+        `${result.stories.ignored} ignored`,
+      ].join('; ');
+      const importSummary = [
+        `${result.imports.imported}/${result.imports.considered} labeled issues imported`,
+        `${result.imports.skipped_already_linked} already linked`,
+        `${result.imports.skipped_no_candidate} no candidate`,
+      ].join('; ');
 
-      if (result.failed > 0) {
+      if (result.stories.failed > 0) {
         setIntegrationsError(
-          `Manual sync completed with ${result.failed} failures (${existingSyncSummary}; ${importSummary}).`,
+          `Manual sync completed with ${result.stories.failed} failures (${storySummary}; ${importSummary}).`,
         );
       } else {
-        setIntegrationsNotice(
-          `Manual sync complete: ${existingSyncSummary}; ${importSummary} (${result.import_skipped} skipped).`,
-        );
+        setIntegrationsNotice(`Manual sync complete: ${storySummary}; ${importSummary}.`);
       }
       onSyncComplete?.();
     } catch (err) {
