@@ -646,23 +646,20 @@ export function StoryMapSettingsDialog({
       );
 
       const storySummary = [
-        `${result.stories.created_in_linear} created in Linear`,
-        `${result.stories.synced_to_linear} pushed to Linear`,
-        `${result.stories.synced_from_linear} pulled from Linear`,
-        `${result.stories.ignored} ignored`,
+        `${result.stories.created_in_linear} new Linear issues created`,
+        `${result.stories.synced_to_linear} existing Linear issues updated`,
+        `${result.stories.synced_from_linear} linked stories updated from Linear`,
       ].join('; ');
-      const importSummary = [
-        `${result.imports.imported}/${result.imports.considered} labeled issues imported`,
-        `${result.imports.skipped_already_linked} already linked`,
-        `${result.imports.skipped_no_candidate} no candidate`,
-      ].join('; ');
+      const importSummary = `Of ${result.imports.considered} Linear issues checked, ${result.imports.imported} were imported, ${result.imports.skipped_already_linked} were already linked, and ${result.imports.skipped_no_candidate} did not match this story map`;
+
+      const ignoredSummary = result.stories.ignored > 0 ? `; ${result.stories.ignored} stories were skipped` : '';
 
       if (result.stories.failed > 0) {
         setIntegrationsError(
-          `Manual sync completed with ${result.stories.failed} failures (${storySummary}; ${importSummary}).`,
+          `Manual sync completed with ${result.stories.failed} failures (${storySummary}${ignoredSummary}; ${importSummary}).`,
         );
       } else {
-        setIntegrationsNotice(`Manual sync complete: ${storySummary}; ${importSummary}.`);
+        setIntegrationsNotice(`Manual sync complete: ${storySummary}${ignoredSummary}; ${importSummary}.`);
       }
       onSyncComplete?.();
     } catch (err) {
