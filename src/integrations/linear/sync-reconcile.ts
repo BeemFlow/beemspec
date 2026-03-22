@@ -87,8 +87,9 @@ async function syncLocalToRemote(
   target: { teamId: string; projectId?: string; stateId?: string },
   story: Record<string, unknown>,
   link: { linearIssueId: string },
+  options: { preserveFromDescription?: string | null } = {},
 ): Promise<Response> {
-  const input = mapStoryToLinearIssueInput(story as never, target);
+  const input = mapStoryToLinearIssueInput(story as never, target, options);
   const synced = await syncStoryToRemote(issueSync, input, link.linearIssueId);
   if (!synced) return ignored('sync did not produce a remote issue snapshot');
 
@@ -153,7 +154,9 @@ export async function syncStoryById(input: { supabase: Supabase; storyId: string
     return syncRemoteToLocal(input.supabase, story, remote);
   }
 
-  return syncLocalToRemote(input.supabase, linearSyncContext.linearIssueSync, linearSyncContext.target, story, link);
+  return syncLocalToRemote(input.supabase, linearSyncContext.linearIssueSync, linearSyncContext.target, story, link, {
+    preserveFromDescription: remote.description,
+  });
 }
 
 export async function syncStoriesByIdList(input: { supabase: Supabase; storyIds: string[] }): Promise<{

@@ -35,10 +35,13 @@
     "elkjs": "^0.11.1",
     "jose": "^6.2.0",
     "lucide-react": "^0.564.0",
+    "mdast-util-to-string": "^4.0.0",
     "next": "16.1.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "remark-parse": "^11.0.0",
     "tailwind-merge": "^3.4.1",
+    "unified": "^11.0.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {

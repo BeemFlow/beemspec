@@ -120,4 +120,35 @@ describe('processStoryLinearSyncById', () => {
 
     expect(upsertStoryLinearLink).toHaveBeenCalled();
   });
+
+  it('preserves unknown remote markdown sections when updating an existing linked issue', async () => {
+    vi.mocked(getStoryLinearLink).mockResolvedValue({ linearIssueId: 'lin_existing' } as never);
+    vi.mocked(resolveLinearSyncContextForStoryMap).mockResolvedValue({
+      teamId: 'team_1',
+      targetConfigured: true,
+      target: { teamId: 'linear_team_1', statusMapping: { todo: 'mapped_state_todo' } },
+      linearIssueSync: {
+        createIssue: vi.fn(),
+        getIssueById: vi.fn().mockResolvedValue({
+          id: 'lin_existing',
+          identifier: 'BEE-9',
+          title: 'Story',
+          description: '## QA Notes\nKeep this section',
+          stateId: null,
+          updatedAt: '2026-03-05T00:00:00.000Z',
+        }),
+        updateIssue: vi.fn(),
+        deleteIssue: vi.fn(),
+      },
+    });
+
+    await processStoryLinearSyncById({} as never, { storyId: 'story_1' });
+
+    expect(mapStoryToLinearIssueInput).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ preserveFromDescription: '## QA Notes\nKeep this section' }),
+    );
+    expect(syncStoryToRemote).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'lin_existing');
+  });
 });

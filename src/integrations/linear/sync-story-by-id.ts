@@ -31,7 +31,19 @@ export async function processStoryLinearSyncById(
 
   const { story } = context.data;
   const existingLink = await getStoryLinearLink(supabase, input.storyId);
-  const input_ = mapStoryToLinearIssueInput(story, linearSyncContext.target);
+  let preserveFromDescription: string | null = null;
+  if (existingLink) {
+    try {
+      const remote = await linearSyncContext.linearIssueSync.getIssueById(existingLink.linearIssueId);
+      preserveFromDescription = remote?.description ?? null;
+    } catch {
+      preserveFromDescription = null;
+    }
+  }
+
+  const input_ = mapStoryToLinearIssueInput(story, linearSyncContext.target, {
+    preserveFromDescription,
+  });
   const mappedStateId = linearSyncContext.target.statusMapping?.[story.status as StoryStatus];
   if (mappedStateId) input_.stateId = mappedStateId;
 
