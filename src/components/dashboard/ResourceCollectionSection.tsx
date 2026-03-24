@@ -46,14 +46,14 @@ export function ResourceCollectionSection({
           {emptyCreateButton}
         </Card>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,280px))] justify-center gap-6">
+        <div className="flex flex-col gap-2">
           {items.map((item) => (
-            <Link key={item.id} href={`${hrefBase}/${item.id}`} className="block w-[280px] max-w-full">
-              <Card className="h-full min-h-[192px] w-full transition-colors hover:bg-muted/50">
-                <CardHeader className="h-full content-start">
-                  <CardTitle className="line-clamp-2 text-xl leading-tight">{item.name}</CardTitle>
+            <Link key={item.id} href={`${hrefBase}/${item.id}`} className="block">
+              <Card className="w-full py-6 transition-colors hover:bg-muted/50">
+                <CardHeader className="flex-row items-baseline gap-6 py-0">
+                  <CardTitle className="shrink-0 text-base leading-tight">{item.name}</CardTitle>
                   {item.description ? (
-                    <CardDescription className="line-clamp-4 text-sm">{item.description}</CardDescription>
+                    <CardDescription className="line-clamp-1 text-sm">{item.description}</CardDescription>
                   ) : null}
                 </CardHeader>
               </Card>
