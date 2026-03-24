@@ -445,7 +445,7 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
       {/* Native overflow container instead of Radix ScrollArea — Radix wraps
           children in display:table which breaks position:sticky on the backbone. */}
       <div className="flex-1 overflow-auto">
-        <div className="px-4 pb-4">
+        <div className="pb-4">
           <StoryMapCanvas
             storyMap={storyMap}
             storyMapName={storyMap.name}
