@@ -519,7 +519,7 @@ export function StoryMapCanvas({
           </div>
         )}
         {/* Backbone: Activities + Tasks — sticky so it stays visible while releases scroll */}
-        <div className="sticky top-0 z-10 bg-background pt-4 pb-2">
+        <div className="sticky top-0 z-10 bg-background pt-4">
           {/* Activities Row */}
           <SortableContext
             items={sortedActivities.map((a) => encodeDragId({ type: 'activity', id: a.id }))}
