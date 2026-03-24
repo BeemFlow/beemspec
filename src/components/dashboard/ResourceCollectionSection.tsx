@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 
 interface ResourceItem {
   id: string;
@@ -16,7 +16,7 @@ interface ResourceCollectionSectionProps {
   emptyTitle: string;
   emptyDescription: string;
   emptyCreateButton: React.ReactNode;
-  emptyIcon: LucideIcon;
+  icon: LucideIcon;
 }
 
 export function ResourceCollectionSection({
@@ -27,7 +27,7 @@ export function ResourceCollectionSection({
   emptyTitle,
   emptyDescription,
   emptyCreateButton,
-  emptyIcon: EmptyIcon,
+  icon: Icon,
 }: ResourceCollectionSectionProps) {
   const showEmpty = items.length === 0;
 
@@ -40,7 +40,7 @@ export function ResourceCollectionSection({
 
       {showEmpty ? (
         <Card className="border-dashed p-8 text-center">
-          <EmptyIcon className="mx-auto h-12 w-12 text-muted-foreground/50" />
+          <Icon className="mx-auto h-12 w-12 text-muted-foreground/50" />
           <h3 className="mt-4 font-medium">{emptyTitle}</h3>
           <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">{emptyDescription}</p>
           {emptyCreateButton}
@@ -49,13 +49,16 @@ export function ResourceCollectionSection({
         <div className="flex flex-col gap-2">
           {items.map((item) => (
             <Link key={item.id} href={`${hrefBase}/${item.id}`} className="block">
-              <Card className="w-full py-6 transition-colors hover:bg-muted/50">
-                <CardHeader className="flex-row items-baseline gap-6 py-0">
-                  <CardTitle className="shrink-0 text-base leading-tight">{item.name}</CardTitle>
+              <Card className="w-full flex-row items-stretch gap-0 overflow-hidden py-0 transition-colors hover:bg-muted/50">
+                <div className="flex w-16 shrink-0 items-center justify-center bg-muted/60">
+                  <Icon className="size-8 text-muted-foreground" />
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-4 py-4">
+                  <span className="text-base font-semibold leading-tight">{item.name}</span>
                   {item.description ? (
-                    <CardDescription className="line-clamp-1 text-sm">{item.description}</CardDescription>
+                    <span className="line-clamp-1 text-sm text-muted-foreground">{item.description}</span>
                   ) : null}
-                </CardHeader>
+                </div>
               </Card>
             </Link>
           ))}

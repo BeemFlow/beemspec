@@ -36,7 +36,7 @@ export default async function Dashboard() {
             emptyTitle="No story maps yet"
             emptyDescription="Story maps help you plan your product from the user's perspective. Start by mapping out the user journey."
             emptyCreateButton={<CreateStoryMapButton teamId={currentTeamId} empty />}
-            emptyIcon={MapIcon}
+            icon={MapIcon}
           />
 
           <ResourceCollectionSection
@@ -47,7 +47,7 @@ export default async function Dashboard() {
             emptyTitle="No process flows yet"
             emptyDescription="Process flows help you map operational reality, document handoffs, and identify automation opportunities before implementation work starts."
             emptyCreateButton={<CreateProcessFlowButton teamId={currentTeamId} empty />}
-            emptyIcon={GitBranch}
+            icon={GitBranch}
           />
         </div>
       </div>
@@ -96,7 +96,7 @@ export default async function Dashboard() {
               emptyTitle="No story maps yet"
               emptyDescription="Story maps help you plan your product from the user's perspective. Start by mapping out the user journey."
               emptyCreateButton={<CreateStoryMapButton teamId={currentTeamId} empty />}
-              emptyIcon={MapIcon}
+              icon={MapIcon}
             />
 
             <ResourceCollectionSection
@@ -107,7 +107,7 @@ export default async function Dashboard() {
               emptyTitle="No process flows yet"
               emptyDescription="Process flows help you map operational reality, document handoffs, and identify automation opportunities before implementation work starts."
               emptyCreateButton={<CreateProcessFlowButton teamId={currentTeamId} empty />}
-              emptyIcon={GitBranch}
+              icon={GitBranch}
             />
           </>
         ) : null}
