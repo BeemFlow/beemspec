@@ -841,7 +841,7 @@ function ReleaseRow({
   return (
     <div className="pt-4">
       <Separator className="mb-4" />
-      <div className="group flex items-center gap-2 mb-3">
+      <div className="group sticky left-4 w-fit flex items-center gap-2 mb-3">
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
