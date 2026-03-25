@@ -1,53 +1,146 @@
 # BeemSpec
 
-BeemSpec is the planning layer for AI-native software teams. It connects product planning directly to AI coding agents via MCP, so your team can go from story to working code without manual handoff.
+BeemSpec is a planning context system for software teams.
 
-## The problem
+It gives teams a structured way to map user journeys, operational processes, and implementation work, then makes that context available to coding agents through MCP. The goal is simple: better alignment before work starts, and better implementation output once work moves into execution.
 
-Product teams spend significant effort translating plans into work that developers (or AI agents) can act on. User stories live in one tool, tasks in another, and context is lost at every handoff. When AI coding agents enter the picture, the gap gets worse -- they need structured, complete context to produce good output, and most planning tools weren't built to provide that.
+## Why it exists
+
+Most teams still split planning across too many surfaces.
+
+- Story maps or workshop boards live in one place
+- Process knowledge lives in docs, diagrams, or people's heads
+- Tickets live in an issue tracker
+- Coding agents see only a thin slice of the real context
+
+That usually creates two problems.
+
+First, stakeholders align in the workshop and then lose that shared picture once the work gets broken into tickets.
+
+Second, the planning artifact goes stale because keeping it current takes too much manual effort.
+
+BeemSpec is built to close that gap.
+
+## How to use it
+
+### Story mapping
+
+One common pattern looks like this:
+
+1. Connect the BeemSpec MCP server to Claude, ChatGPT, OpenCode, Codex, or Claude Code.
+2. Discuss the product with the team.
+3. Feed the meeting transcript or notes to an agent.
+4. Have the agent organize the discussion into a story map in BeemSpec.
+5. Review the map together and make adjustments.
+6. Let coding agents pull the full context through MCP during implementation.
+
+This works well because the team does not have to manually translate every conversation into fully formed stories up front. The map becomes the shared planning structure, and agents can keep working from that same structure later.
+
+### Process flows and workflow automation
+
+Another common pattern looks like this:
+
+1. Interview the people doing the work and capture detailed notes about systems, tools, handoffs, and failure points.
+2. Feed the transcript or notes to an agent.
+3. Have the agent map the operational process flow in BeemSpec.
+4. Review the process flow with the operators and correct anything that is missing or inaccurate.
+5. Use the process flow as the basis for designing and deploying workflow automations.
+
+This is where process modeling becomes more than documentation. The map can help teams spot bottlenecks, clarify ownership, and hand a much better representation of the workflow to automation tools and coding agents.
 
 ## What BeemSpec does
 
-BeemSpec is a **story mapping and release planning tool** with an **agent-ready MCP surface**. You plan your product visually, then agents fetch structured context directly from BeemSpec through MCP tools.
+BeemSpec combines three things that are usually separate.
 
-### Plan visually with story maps
+### 1. Story maps for planning the product
 
-Lay out your product as a story map -- a grid where columns represent user activities and tasks, and rows represent releases. Drop stories into the grid to define what ships when. Each story captures a user story, acceptance criteria, design links, edge cases, and technical guidelines in structured fields that both humans and AI agents can consume.
+BeemSpec uses a structured, Jeff Patton-style story map model.
 
-### Build with AI agents
+You can organize work around activities, tasks, stories, releases, and personas instead of dropping notes onto a generic canvas.
 
-Use the Agent Kickoff panel to copy a starter prompt, paste it into your coding agent, and have the agent pull the latest planning and implementation context via MCP. Agents use `storymap_get` for whole-map or release planning and `story_context_get` only for the specific story being implemented. This keeps execution local to the developer's agent while BeemSpec stays the shared planning source of truth.
+Stories carry structured implementation context such as user story text, acceptance criteria, edge cases, design links, and technical guidelines.
 
-### Stay in sync with Linear
+This gives teams a better way to talk about what should ship, why it matters, and how to slice it into releases.
 
-BeemSpec syncs bidirectionally with [Linear](https://linear.app). Stories created or updated in BeemSpec automatically appear as Linear issues, and changes in Linear flow back. Your planning stays in BeemSpec, your execution tracking stays in Linear, and they never drift apart.
+### 2. Process flows for understanding how work really moves
 
-## How the three systems work together
+BeemSpec also supports process flow mapping as a first-class planning artifact.
 
-| System | Role | Owns |
-|---|---|---|
-| **BeemSpec** | Planning source of truth | *What* to build and *why* |
-| **Linear** | Execution coordination | *When* and *who* |
-| **Coding agent** | Local execution runtime | *How* (the code) |
+That matters because product work does not happen in isolation.
 
-BeemSpec sits at the top of this stack. It syncs planning state to Linear and exposes MCP tools so any compatible coding agent can fetch context and report progress/blockers.
+Teams often need to understand approvals, handoffs, systems, failure cases, bottlenecks, and automation opportunities before they can make good roadmap or implementation decisions.
 
-## Key capabilities
+Process flows in BeemSpec are meant to capture operational reality clearly enough that product, operations, and engineering can work from the same model.
 
-- **Story map management**: activities, tasks, stories, and release slicing with full drag-and-drop
-- **Structured story specs**: user story, acceptance criteria, design links, edge cases, and technical notes
-- **Agent kickoff prompts**: copy a release-targeted starter prompt that instructs agents to fetch current context through MCP
-- **Linear integration**: bidirectional sync with OAuth, webhook ingestion, and batch backfill for drift correction
-- **Team collaboration**: authentication, team switching, member invites, role-based access
-- **MCP server**: exposes end-to-end story map management tools (maps, activities, tasks, releases, stories, personas) plus story context and blocker reporting for coding agents
+### 3. MCP for giving coding agents real planning context
+
+BeemSpec exposes its planning model through MCP.
+
+That means coding agents can pull:
+
+- story-level context
+- release-level context
+- story map context
+- process flow context
+
+instead of relying only on ticket text or a copied prompt.
+
+This is one of the main ideas behind the product. BeemSpec is not just a place to create planning artifacts. It is a structured context layer that helps coding agents understand the end-to-end flow around the work they are implementing.
+
+## How it fits with Linear
+
+BeemSpec is not trying to replace an execution system like Linear.
+
+The intended split is:
+
+| System | Job |
+| --- | --- |
+| `BeemSpec` | planning context, story maps, process flows, release structure |
+| `Linear` | issue tracking, project execution, delivery coordination |
+| coding agent | implementation work in the local development environment |
+
+BeemSpec includes a Linear integration layer with team OAuth, status mapping, project mapping, automatic sync, webhook ingestion, and story import/sync flows.
+
+Linear is where teams run execution, while BeemSpec is where teams keep the richer planning and process context that execution depends on.
+
+## What is different about this approach
+
+There are good tools for story mapping, good tools for roadmapping, good tools for issue tracking, and good tools for whiteboarding.
+
+What is usually missing is a system that does all of the following at once:
+
+- supports real story mapping instead of a loose template
+- supports process modeling without forcing teams into a generic whiteboard
+- keeps planning context structured enough to be useful to coding agents
+- stays connected to downstream execution systems
+
+That is the gap BeemSpec is trying to fill.
+
+## The maintenance problem
+
+One of the hard truths about story maps and similar planning artifacts is that they are valuable when they are current and easy to ignore when they are not.
+
+BeemSpec does not magically remove the need for discipline, but MCP changes the maintenance cost.
+
+Instead of rewriting stories, reshuffling releases, and editing context by hand, teams can use LLMs to update and reshape the model conversationally. That makes it much more realistic for the artifact to stay alive after the initial workshop.
+
+## Current capabilities
+
+- Structured story map editing with activities, tasks, stories, releases, and personas
+- Process flow modeling with nodes, edges, validation, and operational metadata
+- Team collaboration with invites, ownership, and team-scoped workspaces
+- MCP server for reading and mutating planning data through agent tools
+- Free-form story, release, map, and process context for coding agents
+- Linear integration with OAuth, webhook handling, project/status mapping, sync, and import
 
 ## Tech stack
 
-- **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS, Radix UI, dnd-kit
-- **Backend**: Next.js API Routes, Supabase (PostgreSQL + Auth), row-level security
-- **Integrations**: Linear SDK, MCP SDK
-- **Tooling**: Biome (lint/format), Vitest (testing)
-
-## Documentation
-
-- `docs/mcp-api-capability-matrix.md`: MCP vs REST API coverage, recommended agent flows, and safety boundaries
+- Next.js
+- React
+- TypeScript
+- Supabase
+- PostgreSQL with row-level security
+- MCP SDK
+- Tailwind CSS
+- Radix UI
+- Vitest
