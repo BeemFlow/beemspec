@@ -1131,6 +1131,8 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
         ],
         update_policy: [
           'If you refine scope, acceptance criteria, or story wording during discussion, update the relevant BeemSpec entities so the map stays trustworthy.',
+          'If you create an architecture document or other synthesized planning artifact from the story map and new decisions are made, ask the user whether those decisions should be reflected back into BeemSpec before the session ends.',
+          'When asking about BeemSpec follow-through after decisions, explicitly check whether release context, story context, acceptance criteria, edge cases, or technical guidelines should be updated.',
           'If the conversation reveals durable product goals, release goals, metrics, success criteria, or business context that should guide future work, suggest capturing them in story map or release context markdown.',
           'Use move and reorder operations instead of delete-and-recreate when preserving history and ordering matters.',
           'Keep newly synthesized planning content clearly framed as draft unless the user asked you to formalize it.',

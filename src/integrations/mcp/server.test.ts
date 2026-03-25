@@ -150,6 +150,8 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.data.implementation_principles.join(' ')).toContain('Figma MCP server');
     expect(payload.result.structuredContent.data.story_quality_principles[0]).toContain('user-visible value');
     expect(payload.result.structuredContent.data.update_policy.join(' ')).toContain('metrics');
+    expect(payload.result.structuredContent.data.update_policy.join(' ')).toContain('architecture document');
+    expect(payload.result.structuredContent.data.update_policy.join(' ')).toContain('technical guidelines');
   });
 
   it('returns process flow workflow guide content for modeling sequence', async () => {
