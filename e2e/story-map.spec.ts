@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { resetE2EState } from './helpers';
 
 test.beforeEach(async ({ request }) => {
-  const response = await request.post('/api/e2e/reset');
-  expect(response.ok()).toBeTruthy();
+  await resetE2EState(request);
 });
 
-test('can create and open a story map from the dashboard', async ({ page }) => {
+test('can create and open the story map created from the dashboard', async ({ page }) => {
   await page.goto('/');
 
   await page.getByRole('button', { name: 'New Story Map' }).click();
@@ -15,12 +15,10 @@ test('can create and open a story map from the dashboard', async ({ page }) => {
 
   await expect(page.getByRole('link', { name: /Ops Transformation/i })).toBeVisible();
 
-  await page.getByRole('link', { name: /Platform Core/i }).click();
-  await expect(page).toHaveURL(/\/story-map\/story-map-1$/);
-  await expect(page.getByText('Platform Core')).toBeVisible();
-  await expect(page.getByText('Finance intake')).toBeVisible();
-  await expect(page.getByText('Invoice submission')).toBeVisible();
-  await expect(page.getByText('Customer can submit invoice')).toBeVisible();
+  await page.getByRole('link', { name: /Ops Transformation/i }).click();
+  await expect(page).toHaveURL(/\/story-map\/story-map-\d+$/);
+  await expect(page.getByText('Ops Transformation')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add Activity' })).toBeVisible();
 });
 
 test('can create activity, task, and story inside a story map', async ({ page }) => {

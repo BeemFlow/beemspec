@@ -54,6 +54,7 @@ export function ProcessFlowToolbar(props: ProcessFlowToolbarProps) {
             {props.warningCount > 0 ? (
               <Badge
                 variant="default"
+                data-testid="processflow-warning-count"
                 className="pointer-events-none absolute -right-1 -top-1.5 h-4 min-w-4 justify-center rounded-sm px-0.5 text-[10px] leading-none shadow-sm"
               >
                 {props.warningCount}
