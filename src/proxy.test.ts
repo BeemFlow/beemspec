@@ -59,6 +59,12 @@ describe('proxy auth redirects', () => {
     expect(response.status).toBe(200);
   });
 
+  it('allows unauthenticated embed page requests through', async () => {
+    const response = await proxy(makeRequest('/embed/process-flows/token-123'));
+
+    expect(response.status).toBe(200);
+  });
+
   it('redirects authenticated users away from login using the forwarded public origin', async () => {
     getUserMock.mockResolvedValue({ data: { user: { id: 'user-1' } } });
 

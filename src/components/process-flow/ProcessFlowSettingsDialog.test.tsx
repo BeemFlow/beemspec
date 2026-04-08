@@ -13,6 +13,9 @@ vi.mock('@/components/ui/settings-dialog', () => ({
         <button type="button" onClick={() => onTabChange('general')}>
           General
         </button>
+        <button type="button" onClick={() => onTabChange('embed')}>
+          Embed
+        </button>
         <button type="button" onClick={() => onTabChange('danger')}>
           Danger
         </button>
@@ -59,6 +62,7 @@ describe('ProcessFlowSettingsDialog', () => {
         processFlowName="Accounts Payable"
         processFlowDescription="Original description"
         onSave={onSave}
+        onCreateShareLink={vi.fn()}
         onDelete={vi.fn()}
       />,
     );
@@ -76,8 +80,18 @@ describe('ProcessFlowSettingsDialog', () => {
   it('shows save errors and supports deleting from the danger tab', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn().mockRejectedValue(new Error('Save failed'));
+    const onCreateShareLink = vi.fn().mockResolvedValue('https://app.example.com/embed/process-flows/token-123');
     const onDelete = vi.fn().mockResolvedValue(undefined);
     const onOpenChange = vi.fn();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.assign(globalThis, {
+      navigator: {
+        clipboard: {
+          writeText,
+        },
+      },
+    });
 
     render(
       <ProcessFlowSettingsDialog
@@ -86,6 +100,7 @@ describe('ProcessFlowSettingsDialog', () => {
         processFlowName="Accounts Payable"
         processFlowDescription={null}
         onSave={onSave}
+        onCreateShareLink={onCreateShareLink}
         onDelete={onDelete}
       />,
     );
@@ -94,6 +109,26 @@ describe('ProcessFlowSettingsDialog', () => {
     await user.type(screen.getByLabelText('Name'), 'AP Flow');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Save failed')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Embed' }));
+    await user.click(screen.getByRole('button', { name: 'Generate Link' }));
+
+    expect(onCreateShareLink).toHaveBeenCalledTimes(1);
+    expect((screen.getByLabelText('Embed Link') as HTMLInputElement).value).toBe(
+      'https://app.example.com/embed/process-flows/token-123',
+    );
+    expect((screen.getByLabelText('Embed Code') as HTMLTextAreaElement).value).toContain(
+      'src="https://app.example.com/embed/process-flows/token-123"',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Copy Link' }));
+    await user.click(screen.getByRole('button', { name: 'Copy Code' }));
+
+    expect(writeText).toHaveBeenNthCalledWith(1, 'https://app.example.com/embed/process-flows/token-123');
+    expect(writeText).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('src="https://app.example.com/embed/process-flows/token-123"'),
+    );
 
     await user.click(screen.getByRole('button', { name: 'Danger' }));
     await user.click(screen.getByRole('button', { name: 'Delete process flow' }));

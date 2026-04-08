@@ -9,6 +9,7 @@ import { ProcessFlowSettingsDialog } from '@/components/process-flow/ProcessFlow
 import { ProcessFlowToolbar } from '@/components/process-flow/ProcessFlowToolbar';
 import { ProcessFlowValidationPanel } from '@/components/process-flow/ProcessFlowValidationPanel';
 import { ContextMarkdownDialog } from '@/components/story-map/ContextMarkdownDialog';
+import { McpSetupDialog } from '@/components/story-map/McpSetupDialog';
 import { fetchJson } from '@/lib/http';
 import type { ProcessFlow, ProcessFlowFull, ProcessFlowValidationResult } from '@/types';
 import {
@@ -40,6 +41,7 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
   const [uiError, setUiError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
+  const [mcpSetupOpen, setMcpSetupOpen] = useState(false);
 
   useEffect(() => {
     setProcessFlow(initialProcessFlow);
@@ -312,6 +314,7 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
         onAutolayout={handleAutolayout}
         onToggleValidation={handleToggleValidation}
         onOpenContext={() => setContextOpen(true)}
+        onOpenMcpSetup={() => setMcpSetupOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
@@ -359,6 +362,15 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
         processFlowName={processFlow.name}
         processFlowDescription={processFlow.description}
         onSave={handleSaveFlow}
+        onCreateShareLink={() =>
+          request<{ url: string }>(
+            `/api/process-flows/${processFlow.id}/shares`,
+            {
+              method: 'POST',
+            },
+            'Failed to create share link',
+          ).then((result) => result.url)
+        }
         onDelete={handleDeleteFlow}
       />
 
@@ -371,6 +383,12 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
           await handleSaveFlow({ context_markdown: value });
         }}
         variant="process-flow"
+      />
+
+      <McpSetupDialog
+        open={mcpSetupOpen}
+        onOpenChange={setMcpSetupOpen}
+        appOrigin={typeof window === 'undefined' ? '' : window.location.origin}
       />
     </div>
   );

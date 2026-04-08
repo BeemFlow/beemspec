@@ -19,7 +19,6 @@ interface SettingsDialogProps {
   error?: string | null;
 }
 
-// Tailwind requires full class names at compile time — no dynamic interpolation.
 const GRID_COLS: Record<number, string> = {
   2: 'grid w-full grid-cols-2',
   3: 'grid w-full grid-cols-3',

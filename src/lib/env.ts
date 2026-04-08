@@ -33,6 +33,10 @@ export const env = {
     return readEnv('LINEAR_WEBHOOK_SECRET') ?? readEnv('BEEMSPEC_LINEAR_WEBHOOK_SECRET');
   },
 
+  shareLinkSecret(): string | null {
+    return readEnv('SHARE_LINK_SECRET');
+  },
+
   mcpAllowedOrigins(): string[] {
     const value = readEnv('MCP_ALLOWED_ORIGINS');
     if (!value) return [];

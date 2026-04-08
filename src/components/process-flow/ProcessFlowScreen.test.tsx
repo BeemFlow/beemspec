@@ -102,6 +102,10 @@ vi.mock('@/components/story-map/ContextMarkdownDialog', () => ({
     ) : null,
 }));
 
+vi.mock('@/components/story-map/McpSetupDialog', () => ({
+  McpSetupDialog: ({ open }: { open: boolean }) => (open ? <div>Connect BeemSpec MCP</div> : null),
+}));
+
 function createFlow() {
   return {
     id: 'flow-1',

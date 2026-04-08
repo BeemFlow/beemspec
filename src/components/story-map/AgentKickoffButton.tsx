@@ -1,9 +1,9 @@
 'use client';
 
 import { Bot, Check, Copy } from 'lucide-react';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard';
 import type { Story } from '@/types';
 
 export function buildReleaseKickoffPrompt(input: {
@@ -53,13 +53,10 @@ export function AgentKickoffButton({
   variant = 'outline',
   size = 'sm',
 }: AgentKickoffButtonProps) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
 
   async function handleCopy() {
-    if (typeof navigator === 'undefined' || !navigator.clipboard) return;
-    await navigator.clipboard.writeText(prompt);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
+    await copy(prompt);
   }
 
   const icon = copied ? (

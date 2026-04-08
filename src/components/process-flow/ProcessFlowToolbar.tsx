@@ -1,6 +1,6 @@
 'use client';
 
-import { FileText, GitBranch, Network, Plus, RefreshCw, ScanSearch, Settings, Sparkles, User } from 'lucide-react';
+import { Bot, FileText, GitBranch, Network, Plus, RefreshCw, ScanSearch, Settings, Sparkles, User } from 'lucide-react';
 import { EditorHeader } from '@/components/EditorHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ interface ProcessFlowToolbarProps {
   onAutolayout: () => void;
   onToggleValidation: () => void;
   onOpenContext: () => void;
+  onOpenMcpSetup: () => void;
   onOpenSettings: () => void;
 }
 
@@ -63,6 +64,9 @@ export function ProcessFlowToolbar(props: ProcessFlowToolbarProps) {
           </div>
           <Button variant="ghost" size="icon" onClick={props.onOpenContext} aria-label="Process flow context">
             <FileText className="size-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={props.onOpenMcpSetup} aria-label="Connect MCP Client">
+            <Bot className="size-4" />
           </Button>
           <Button variant="ghost" size="icon" onClick={props.onOpenSettings} aria-label="Process flow settings">
             <Settings className="size-4" />

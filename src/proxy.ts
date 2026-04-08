@@ -6,6 +6,7 @@ import { resolveRequestUrl, resolveSafeRedirectPath } from '@/lib/request-url';
 
 const GUEST_ONLY_AUTH_ROUTES = new Set(['/auth/login', '/auth/signup']);
 const PUBLIC_AUTH_COMPLETION_ROUTES = new Set(['/invite/accept']);
+const PUBLIC_ROUTE_PREFIXES = ['/embed/'];
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -43,6 +44,7 @@ export async function proxy(request: NextRequest) {
   const isAuthRoute = pathname.startsWith('/auth');
   const isGuestOnlyAuthRoute = GUEST_ONLY_AUTH_ROUTES.has(pathname);
   const isPublicAuthCompletionRoute = PUBLIC_AUTH_COMPLETION_ROUTES.has(pathname);
+  const isPublicRoute = PUBLIC_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
   const isApiRoute = pathname.startsWith('/api');
   const isWellKnownRoute = pathname.startsWith('/.well-known/');
 
@@ -55,7 +57,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Redirect unauthenticated users to login (except auth routes)
-  if (!user && !isAuthRoute && !isPublicAuthCompletionRoute) {
+  if (!user && !isAuthRoute && !isPublicAuthCompletionRoute && !isPublicRoute) {
     const url = resolveRequestUrl(request, '/auth/login');
 
     if (pathname === '/oauth/consent') {

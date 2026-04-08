@@ -1,8 +1,8 @@
 /* @vitest-environment jsdom */
 
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProcessFlowCanvas } from './ProcessFlowCanvas';
 
 const { reactFlowProps } = vi.hoisted(() => ({
@@ -25,6 +25,10 @@ vi.mock('@xyflow/react', () => ({
 vi.mock('./ProcessFlowNode', () => ({
   processFlowNodeTypes: { step: () => null },
 }));
+
+afterEach(() => {
+  cleanup();
+});
 
 describe('ProcessFlowCanvas', () => {
   it('shows the empty-state creation actions when no nodes exist', async () => {
@@ -120,5 +124,31 @@ describe('ProcessFlowCanvas', () => {
     expect(onPaneClick).toHaveBeenCalledTimes(1);
     expect(onNodesDelete).toHaveBeenCalledWith([{ id: 'node-1' }]);
     expect(onEdgesDelete).toHaveBeenCalledWith([{ id: 'edge-1' }]);
+  });
+
+  it('disables editor-only chrome and interactions in viewer mode', () => {
+    render(<ProcessFlowCanvas mode="viewer" nodes={[]} edges={[]} />);
+
+    const props = reactFlowProps.current as Record<string, any>;
+    expect(props.deleteKeyCode).toBeNull();
+    expect(props.nodesDraggable).toBe(false);
+    expect(props.nodesConnectable).toBe(false);
+    expect(props.elementsSelectable).toBe(false);
+    expect(screen.queryByText('Controls')).toBeNull();
+    expect(screen.queryByText(/MiniMap:/)).toBeNull();
+    expect(screen.queryByText('Start mapping the flow')).toBeNull();
+  });
+
+  it('can show the minimap in viewer mode when requested', () => {
+    const { container } = render(<ProcessFlowCanvas mode="viewer" showMiniMap nodes={[]} edges={[]} />);
+
+    expect(container.textContent).toContain('MiniMap:#92400e');
+    expect(screen.queryByText('Controls')).toBeNull();
+  });
+
+  it('can show controls in viewer mode when requested', () => {
+    render(<ProcessFlowCanvas mode="viewer" showControls nodes={[]} edges={[]} />);
+
+    expect(screen.getByText('Controls')).toBeTruthy();
   });
 });
