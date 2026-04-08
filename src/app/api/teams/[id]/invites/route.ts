@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { inviteEmailSchema } from '@/app/api/teams/schemas';
 import { requireAuth } from '@/lib/auth';
-import { createE2ETeamInvite, getE2EAuthUser, listE2ETeamInvites, listE2ETeamMembers } from '@/lib/e2e/test-store';
-import { env } from '@/lib/env';
 import { serverErrorResponse } from '@/lib/errors';
 import { resolveRequestOrigin } from '@/lib/request-url';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -10,12 +8,6 @@ import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (env.e2eTestMode()) {
-    const { id } = await params;
-    if (!isValidUuid(id)) return invalidIdResponse();
-    return NextResponse.json(listE2ETeamInvites(id));
-  }
-
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
@@ -38,28 +30,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (env.e2eTestMode()) {
-    const { id: teamId } = await params;
-    if (!isValidUuid(teamId)) return invalidIdResponse();
-
-    const validation = await validateRequest(request, inviteEmailSchema);
-    if (!validation.success) return validation.response;
-
-    const email = validation.data.email.toLowerCase();
-    const existingMember = listE2ETeamMembers(teamId).find((member) => member.email.toLowerCase() === email);
-    if (existingMember) {
-      return NextResponse.json({ error: 'User is already a team member' }, { status: 400 });
-    }
-
-    const existingInvite = listE2ETeamInvites(teamId).find((invite) => invite.email.toLowerCase() === email);
-    if (existingInvite) {
-      return NextResponse.json({ error: 'Invite already pending for this email' }, { status: 400 });
-    }
-
-    createE2ETeamInvite({ team_id: teamId, email, invited_by: getE2EAuthUser().id });
-    return NextResponse.json({ status: 'invited', message: 'Invitation sent' }, { status: 201 });
-  }
-
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 

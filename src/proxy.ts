@@ -8,10 +8,6 @@ const GUEST_ONLY_AUTH_ROUTES = new Set(['/auth/login', '/auth/signup']);
 const PUBLIC_AUTH_COMPLETION_ROUTES = new Set(['/invite/accept']);
 
 export async function proxy(request: NextRequest) {
-  if (env.e2eTestMode()) {
-    return NextResponse.next({ request });
-  }
-
   let supabaseResponse = NextResponse.next({ request });
 
   const supabaseUrl = env.supabaseUrl();

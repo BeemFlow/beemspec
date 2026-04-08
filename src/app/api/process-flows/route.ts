@@ -1,8 +1,6 @@
 import { createProcessFlowSchema } from '@beemspec/processflow';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { createE2EProcessFlow, listE2EProcessFlows } from '@/lib/e2e/test-store';
-import { env } from '@/lib/env';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { listTeamsForUser } from '@/lib/teams';
@@ -10,15 +8,6 @@ import { validateRequest } from '@/lib/validations';
 import { createProcessFlow, listProcessFlows } from '@/processflow/service';
 
 export async function GET(request: Request) {
-  if (env.e2eTestMode()) {
-    const { searchParams } = new URL(request.url);
-    const teamId = searchParams.get('team_id');
-    if (!teamId) {
-      return NextResponse.json({ error: 'team_id is required in E2E test mode' }, { status: 400 });
-    }
-    return NextResponse.json(listE2EProcessFlows(teamId));
-  }
-
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
@@ -62,12 +51,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (env.e2eTestMode()) {
-    const validation = await validateRequest(request, createProcessFlowSchema);
-    if (!validation.success) return validation.response;
-    return NextResponse.json(createE2EProcessFlow(validation.data));
-  }
-
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 

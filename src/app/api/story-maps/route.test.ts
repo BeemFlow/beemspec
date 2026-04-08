@@ -77,6 +77,30 @@ describe('story maps route', () => {
     );
   });
 
+  it('returns 400 when the requested team is not accessible', async () => {
+    const { client } = createStoryMapsClient();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const response = await getStoryMaps(
+      new Request('http://localhost/api/story-maps?team_id=34e8bb98-8f40-4331-8df2-8f83fd8c7af4'),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Provided team_id is not accessible to authenticated user',
+    });
+  });
+
+  it('returns 400 when the user has no accessible teams', async () => {
+    const { client } = createStoryMapsClient({ teams: [] });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+
+    const response = await getStoryMaps(new Request('http://localhost/api/story-maps'));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'No accessible teams found for authenticated user' });
+  });
+
   it('creates a story map with context markdown', async () => {
     const single = vi.fn().mockResolvedValue({
       data: { id: 'map-1', name: 'Core', context_markdown: '## Goals' },

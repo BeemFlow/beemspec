@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { updateTask } from '@/storymap/service';
-import { PUT as updateTaskRoute } from './route';
+import { deleteTask, updateTask } from '@/storymap/service';
+import { DELETE as deleteTaskRoute, PUT as updateTaskRoute } from './route';
 
 vi.mock('@/lib/auth', () => ({
   requireAuth: vi.fn(),
@@ -56,5 +56,19 @@ describe('tasks [id] route', () => {
 
     expect(response.status).toBe(200);
     expect(updateTask).toHaveBeenCalledWith(client, VALID_ID, { name: 'Updated task' });
+  });
+
+  it('deletes a task and returns the deleted payload', async () => {
+    const client = {};
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    vi.mocked(deleteTask).mockResolvedValue({ data: { id: VALID_ID }, error: null } as never);
+
+    const response = await deleteTaskRoute(new Request('http://localhost/api/tasks/id', { method: 'DELETE' }), {
+      params: Promise.resolve({ id: VALID_ID }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true, deleted: { id: VALID_ID } });
+    expect(deleteTask).toHaveBeenCalledWith(client, VALID_ID);
   });
 });

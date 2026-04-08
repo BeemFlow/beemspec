@@ -22,7 +22,10 @@ describe('process flow edges route', () => {
   it('injects process_flow_id from route when creating an edge', async () => {
     const client = {};
     vi.mocked(createClient).mockResolvedValue(client as never);
-    vi.mocked(createProcessFlowEdge).mockResolvedValue({ data: { id: 'edge-1' }, error: null } as never);
+    vi.mocked(createProcessFlowEdge).mockResolvedValue({
+      data: { id: 'edge-1', process_flow_id: FLOW_ID },
+      error: null,
+    } as never);
 
     const response = await createEdgeRoute(
       new Request('http://localhost/api/process-flows/id/edges', {
@@ -39,6 +42,7 @@ describe('process flow edges route', () => {
     );
 
     expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ id: 'edge-1', process_flow_id: FLOW_ID });
     expect(createProcessFlowEdge).toHaveBeenCalledWith(client, {
       process_flow_id: FLOW_ID,
       type: 'flow',
@@ -68,9 +72,67 @@ describe('process flow edges route', () => {
     );
 
     expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ created: [], updated: [], deleted: [] });
     expect(batchMutateProcessFlowEdges).toHaveBeenCalledWith(client, {
       process_flow_id: FLOW_ID,
       mutations: [{ action: 'delete', id: '34e8bb98-8f40-4331-8df2-8f83fd8c7af4' }],
     });
+  });
+
+  it('rejects invalid route ids before calling edge services', async () => {
+    const response = await createEdgeRoute(
+      new Request('http://localhost/api/process-flows/id/edges', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          type: 'flow',
+          source_node_id: '34e8bb98-8f40-4331-8df2-8f83fd8c7af4',
+          target_node_id: '87c65304-2faf-4ccf-bad5-3d0cd632bffd',
+          data: null,
+        }),
+      }),
+      { params: Promise.resolve({ id: 'bad-id' }) },
+    );
+
+    expect(response.status).toBe(400);
+    expect(createClient).not.toHaveBeenCalled();
+    expect(createProcessFlowEdge).not.toHaveBeenCalled();
+  });
+
+  it('returns the auth response for unauthorized requests', async () => {
+    vi.mocked(requireAuth).mockResolvedValue({
+      success: false,
+      response: new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }),
+    } as never);
+
+    const response = await mutateEdgesRoute(
+      new Request('http://localhost/api/process-flows/id/edges', { method: 'PUT' }),
+      {
+        params: Promise.resolve({ id: FLOW_ID }),
+      },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+    expect(createClient).not.toHaveBeenCalled();
+    expect(batchMutateProcessFlowEdges).not.toHaveBeenCalled();
+  });
+
+  it('translates edge service failures into server responses', async () => {
+    const client = {};
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    vi.mocked(batchMutateProcessFlowEdges).mockResolvedValue({ data: null, error: { message: 'rpc failed' } } as never);
+
+    const response = await mutateEdgesRoute(
+      new Request('http://localhost/api/process-flows/id/edges', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ mutations: [{ action: 'delete', id: '34e8bb98-8f40-4331-8df2-8f83fd8c7af4' }] }),
+      }),
+      { params: Promise.resolve({ id: FLOW_ID }) },
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: 'Failed to mutate process flow edges' });
   });
 });

@@ -1,22 +1,12 @@
 import { updateActivitySchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { deleteE2EActivity, updateE2EActivity } from '@/lib/e2e/test-store';
-import { env } from '@/lib/env';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 import { deleteActivity, updateActivity } from '@/storymap/service';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (env.e2eTestMode()) {
-    const { id } = await params;
-    const validation = await validateRequest(request, updateActivitySchema);
-    if (!validation.success) return validation.response;
-    const activity = updateE2EActivity(id, validation.data);
-    return activity ? NextResponse.json(activity) : notFoundResponse('Activity');
-  }
-
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
@@ -39,12 +29,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (env.e2eTestMode()) {
-    const { id } = await params;
-    const activity = deleteE2EActivity(id);
-    return activity ? NextResponse.json({ success: true, deleted: activity }) : notFoundResponse('Activity');
-  }
-
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 

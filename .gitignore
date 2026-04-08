@@ -24,6 +24,7 @@
 .DS_Store
 *.pem
 supabase/.temp/
+supabase/.branches/
 
 # debug
 npm-debug.log*
@@ -33,6 +34,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.local.example
 
 # vercel
 .vercel

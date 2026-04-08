@@ -1,22 +1,12 @@
 import { updateTaskSchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { deleteE2ETask, updateE2ETask } from '@/lib/e2e/test-store';
-import { env } from '@/lib/env';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 import { deleteTask, updateTask } from '@/storymap/service';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (env.e2eTestMode()) {
-    const { id } = await params;
-    const validation = await validateRequest(request, updateTaskSchema);
-    if (!validation.success) return validation.response;
-    const task = updateE2ETask(id, validation.data);
-    return task ? NextResponse.json(task) : notFoundResponse('Task');
-  }
-
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
@@ -39,12 +29,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (env.e2eTestMode()) {
-    const { id } = await params;
-    const task = deleteE2ETask(id);
-    return task ? NextResponse.json({ success: true, deleted: task }) : notFoundResponse('Task');
-  }
-
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { updateStory } from '@/storymap/service';
-import { PUT as updateStoryRoute } from './route';
+import { deleteStory, getStory, updateStory } from '@/storymap/service';
+import { DELETE as deleteStoryRoute, GET as getStoryRoute, PUT as updateStoryRoute } from './route';
 
 vi.mock('@/lib/auth', () => ({
   requireAuth: vi.fn(),
@@ -24,6 +24,32 @@ describe('stories [id] route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user-1' } } as never);
+  });
+
+  it('loads a story by id', async () => {
+    const client = {};
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    vi.mocked(getStory).mockResolvedValue({ data: { id: VALID_ID, title: 'Approve invoice' }, error: null } as never);
+
+    const response = await getStoryRoute(new Request('http://localhost/api/stories/id'), {
+      params: Promise.resolve({ id: VALID_ID }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ id: VALID_ID, title: 'Approve invoice' });
+    expect(getStory).toHaveBeenCalledWith(client, VALID_ID);
+  });
+
+  it('returns 404 when a story is missing', async () => {
+    const client = {};
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    vi.mocked(getStory).mockResolvedValue({ data: null, error: { code: 'PGRST116' } } as never);
+
+    const response = await getStoryRoute(new Request('http://localhost/api/stories/id'), {
+      params: Promise.resolve({ id: VALID_ID }),
+    });
+
+    expect(response.status).toBe(404);
   });
 
   it('rejects placement changes through the generic update route', async () => {
@@ -57,5 +83,19 @@ describe('stories [id] route', () => {
 
     expect(response.status).toBe(200);
     expect(updateStory).toHaveBeenCalledWith(client, VALID_ID, { status: 'done' });
+  });
+
+  it('deletes a story and returns the deleted payload', async () => {
+    const client = {};
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    vi.mocked(deleteStory).mockResolvedValue({ data: { id: VALID_ID }, error: null } as never);
+
+    const response = await deleteStoryRoute(new Request('http://localhost/api/stories/id', { method: 'DELETE' }), {
+      params: Promise.resolve({ id: VALID_ID }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true, deleted: { id: VALID_ID } });
+    expect(deleteStory).toHaveBeenCalledWith(client, VALID_ID);
   });
 });

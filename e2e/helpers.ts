@@ -1,12 +1,54 @@
 import { type APIRequestContext, expect, type Locator, type Page } from '@playwright/test';
+import {
+  E2E_ACTIVITY_ID,
+  E2E_INVITEE_EMAIL,
+  E2E_NODE_APPROVED_ID,
+  E2E_NODE_RECEIVE_ID,
+  E2E_OWNER_EMAIL,
+  E2E_OWNER_PASSWORD,
+  E2E_PROCESS_FLOW_ID,
+  E2E_STORY_ID,
+  E2E_STORY_MAP_ID,
+  E2E_TEAM_ID,
+  resetLocalAppState,
+} from './local-fixtures';
 
-export const E2E_TEAM_ID = '00000000-0000-4000-8000-000000000001';
-export const FIRST_E2E_INVITE_ID = 'invite-1';
+const MAILPIT_BASE_URL = process.env.MAILPIT_URL?.trim() || 'http://127.0.0.1:55324';
 
-export async function resetE2EState(request: APIRequestContext, scenario: 'default' | 'malformed' = 'default') {
-  const search = scenario === 'malformed' ? '?scenario=malformed' : '';
-  const response = await request.post(`/api/e2e/reset${search}`);
-  expect(response.ok()).toBeTruthy();
+export {
+  E2E_ACTIVITY_ID,
+  E2E_INVITEE_EMAIL,
+  E2E_NODE_APPROVED_ID,
+  E2E_NODE_RECEIVE_ID,
+  E2E_PROCESS_FLOW_ID,
+  E2E_STORY_ID,
+  E2E_STORY_MAP_ID,
+};
+
+export async function resetE2EState(scenario: 'default' | 'malformed' = 'default') {
+  await resetLocalAppState(scenario);
+}
+
+export async function loginAsOwner(page: Page) {
+  await page.goto('/auth/logout');
+  await page.evaluate(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+  await page.goto('/auth/login');
+  await page.getByLabel('Email').fill(E2E_OWNER_EMAIL);
+  await page.getByLabel('Password').fill(E2E_OWNER_PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL(/\/$/);
+  await page.context().addCookies([
+    {
+      name: 'beemspec_current_team_id',
+      value: E2E_TEAM_ID,
+      url: page.url(),
+    },
+  ]);
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: /E2E Team/i })).toBeVisible();
 }
 
 export async function connectNodes(page: Page, sourceHandle: Locator, targetHandle: Locator) {
@@ -17,6 +59,7 @@ export async function connectNodes(page: Page, sourceHandle: Locator, targetHand
     throw new Error('Unable to connect process flow nodes because a handle is missing');
   }
 
+  await sourceHandle.hover({ force: true });
   await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 16 });
@@ -29,10 +72,53 @@ export async function openTeamMembersSettings(page: Page) {
   await page.getByRole('tab', { name: 'Members' }).click();
 }
 
-export function buildInviteAcceptPath(inviteId: string, email: string) {
-  return `/invite/accept?invite_id=${inviteId}&email=${encodeURIComponent(email)}`;
-}
-
 export async function expectProcessFlowWarningCount(page: Page, count: number) {
   await expect(page.getByTestId('processflow-warning-count')).toHaveText(String(count));
+}
+
+function extractFirstUrl(value: string) {
+  const inviteMatch = value.match(/https?:\/\/[^\s"'<>]*\/auth\/v1\/verify\?[^\s"'<>]+/i);
+  if (inviteMatch) return inviteMatch[0].replace(/&amp;/g, '&');
+
+  const match = value.match(/https?:\/\/[^\s"'<>]+/i);
+  return match?.[0] ?? null;
+}
+
+export async function waitForInviteLink(request: APIRequestContext, email: string) {
+  const normalizedEmail = email.toLowerCase();
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const messagesResponse = await request.get(`${MAILPIT_BASE_URL}/api/v1/messages`);
+    expect(messagesResponse.ok()).toBeTruthy();
+    const messages = (await messagesResponse.json()) as {
+      messages?: Array<{ ID?: string; To?: Array<{ Address?: string }> }>;
+    };
+
+    const message = messages.messages?.find((entry) =>
+      entry.To?.some((recipient) => recipient.Address?.toLowerCase() === normalizedEmail),
+    );
+
+    if (message?.ID) {
+      const detailResponse = await request.get(`${MAILPIT_BASE_URL}/api/v1/message/${message.ID}`);
+      expect(detailResponse.ok()).toBeTruthy();
+      const detail = (await detailResponse.json()) as {
+        HTML?: string;
+        Text?: string;
+        Html?: string;
+        TextBody?: string;
+        HTMLBody?: string;
+      };
+      const body = [detail.Text, detail.TextBody, detail.HTML, detail.Html, detail.HTMLBody].find(Boolean) ?? '';
+      const url = extractFirstUrl(body);
+      if (url) return url;
+    }
+
+    await pageWait(500);
+  }
+
+  throw new Error(`Invite email for ${email} did not arrive in Mailpit`);
+}
+
+function pageWait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

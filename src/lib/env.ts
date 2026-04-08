@@ -5,10 +5,6 @@ function readEnv(name: string): string | null {
 }
 
 export const env = {
-  e2eTestMode(): boolean {
-    return readEnv('E2E_TEST_MODE') === '1';
-  },
-
   supabaseUrl(): string | null {
     return readEnv('NEXT_PUBLIC_SUPABASE_URL');
   },

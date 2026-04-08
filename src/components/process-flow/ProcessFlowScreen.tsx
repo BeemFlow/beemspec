@@ -75,12 +75,16 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
   }, []);
 
   const handleValidate = useCallback(async () => {
-    const next = await request<ProcessFlowValidationResult>(
-      `/api/process-flows/${processFlow.id}/validation`,
-      undefined,
-      'Failed to validate process flow',
-    );
-    setValidation(next);
+    try {
+      const next = await request<ProcessFlowValidationResult>(
+        `/api/process-flows/${processFlow.id}/validation`,
+        undefined,
+        'Failed to validate process flow',
+      );
+      setValidation(next);
+    } catch {
+      // request() already records a user-visible error message; swallow to avoid unhandled rejection noise.
+    }
   }, [processFlow.id, request]);
 
   const handleToggleValidation = useCallback(async () => {
@@ -134,26 +138,30 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
 
   const handleCreateNode = useCallback(
     async (type: ProcessFlowCanvasNode['type']) => {
-      const offset = nodes.length * 24;
-      const created = await request<ProcessFlowFull['nodes'][number]>(
-        `/api/process-flows/${processFlow.id}/nodes`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type,
-            position: { x: 120 + offset, y: 120 + offset / 2 },
-            data: { label: `New ${type}` },
-          }),
-        },
-        'Failed to create process flow node',
-      );
+      try {
+        const offset = nodes.length * 24;
+        const created = await request<ProcessFlowFull['nodes'][number]>(
+          `/api/process-flows/${processFlow.id}/nodes`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type,
+              position: { x: 120 + offset, y: 120 + offset / 2 },
+              data: { label: `New ${type}` },
+            }),
+          },
+          'Failed to create process flow node',
+        );
 
-      setNodes((current) => mergeCanvasNode(current, created));
-      setSelection({ kind: 'node', id: created.id });
-      await handleValidate();
+        setNodes((current) => mergeCanvasNode(current, created));
+        setSelection({ kind: 'node', id: created.id });
+        await handleValidate();
+      } catch {
+        // request() already records a user-visible error message; swallow to avoid unhandled rejection noise.
+      }
     },
-    [nodes.length, processFlow.id, request, handleValidate],
+    [handleValidate, nodes.length, processFlow.id, request],
   );
 
   const handleSaveNode = useCallback(
@@ -268,16 +276,20 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
   );
 
   const handleAutolayout = useCallback(async () => {
-    const layouted = await request<{ nodes: ProcessFlowFull['nodes']; edges: ProcessFlowFull['edges'] }>(
-      `/api/process-flows/${processFlow.id}/layout`,
-      { method: 'POST' },
-      'Failed to auto-layout process flow',
-    );
+    try {
+      const layouted = await request<{ nodes: ProcessFlowFull['nodes']; edges: ProcessFlowFull['edges'] }>(
+        `/api/process-flows/${processFlow.id}/layout`,
+        { method: 'POST' },
+        'Failed to auto-layout process flow',
+      );
 
-    setNodes((layouted.nodes ?? []).map((node) => ({ ...mergeCanvasNode([], node)[0], selected: false })));
-    setEdges((layouted.edges ?? []).map((edge) => ({ ...mergeCanvasEdge([], edge)[0], selected: false })));
-    await handleValidate();
-  }, [processFlow.id, request, handleValidate]);
+      setNodes((layouted.nodes ?? []).map((node) => ({ ...mergeCanvasNode([], node)[0], selected: false })));
+      setEdges((layouted.edges ?? []).map((edge) => ({ ...mergeCanvasEdge([], edge)[0], selected: false })));
+      await handleValidate();
+    } catch {
+      // request() already records a user-visible error message; swallow to avoid unhandled rejection noise.
+    }
+  }, [handleValidate, processFlow.id, request]);
 
   const handleDeleteFlow = useCallback(async () => {
     await request(

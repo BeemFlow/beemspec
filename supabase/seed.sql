@@ -1,0 +1,5 @@
+-- Deterministic local seed data for Dockerized Supabase lives here.
+--
+-- Keep this file safe to run repeatedly with `supabase db reset --local`.
+-- The next migration step is to add baseline users, teams, story maps, and process flows
+-- for DB-backed integration and Playwright tests.

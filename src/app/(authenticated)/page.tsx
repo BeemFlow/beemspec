@@ -4,8 +4,6 @@ import { ResourceCollectionSection } from '@/components/dashboard/ResourceCollec
 import { CreateProcessFlowButton } from '@/components/process-flow/CreateProcessFlowButton';
 import { CreateStoryMapButton } from '@/components/story-map/CreateStoryMapButton';
 import { Card } from '@/components/ui/card';
-import { getE2ETeamId, listE2EProcessFlows, listE2EStoryMaps } from '@/lib/e2e/test-store';
-import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 import { listTeamsForUser } from '@/lib/teams';
 import { listProcessFlows } from '@/processflow/service';
@@ -20,40 +18,6 @@ function resolveCurrentTeamId(teamIds: string[], cookieTeamId: string | null): s
 }
 
 export default async function Dashboard() {
-  if (env.e2eTestMode()) {
-    const currentTeamId = getE2ETeamId();
-    const storyMaps: StoryMap[] = listE2EStoryMaps(currentTeamId);
-    const processFlows: ProcessFlow[] = listE2EProcessFlows(currentTeamId);
-
-    return (
-      <div className="p-8">
-        <div className="mx-auto max-w-[1120px] space-y-14">
-          <ResourceCollectionSection
-            title="Story Maps"
-            createButton={<CreateStoryMapButton teamId={currentTeamId} />}
-            items={storyMaps}
-            hrefBase="/story-map"
-            emptyTitle="No story maps yet"
-            emptyDescription="Story maps help you plan your product from the user's perspective. Start by mapping out the user journey."
-            emptyCreateButton={<CreateStoryMapButton teamId={currentTeamId} empty />}
-            icon={MapIcon}
-          />
-
-          <ResourceCollectionSection
-            title="Process Flows"
-            createButton={<CreateProcessFlowButton teamId={currentTeamId} />}
-            items={processFlows}
-            hrefBase="/process-flows"
-            emptyTitle="No process flows yet"
-            emptyDescription="Process flows help you map operational reality, document handoffs, and identify automation opportunities before implementation work starts."
-            emptyCreateButton={<CreateProcessFlowButton teamId={currentTeamId} empty />}
-            icon={GitBranch}
-          />
-        </div>
-      </div>
-    );
-  }
-
   const supabase = await createClient();
   const cookieStore = await cookies();
   const {

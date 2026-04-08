@@ -1,19 +1,11 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { validateE2EProcessFlow } from '@/lib/e2e/test-store';
-import { env } from '@/lib/env';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
 import { validateProcessFlowById } from '@/processflow/service';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (env.e2eTestMode()) {
-    const { id } = await params;
-    const validation = validateE2EProcessFlow(id);
-    return validation ? NextResponse.json(validation) : notFoundResponse('Process flow');
-  }
-
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 

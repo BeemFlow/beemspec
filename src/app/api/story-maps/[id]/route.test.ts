@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { GET as getStoryMapById, PUT as putStoryMapById } from './route';
+import { DELETE as deleteStoryMapById, GET as getStoryMapById, PUT as putStoryMapById } from './route';
 
 vi.mock('@/lib/auth', () => ({
   requireAuth: vi.fn(),
@@ -95,6 +95,48 @@ describe('story maps [id] route', () => {
     expect(createClient).not.toHaveBeenCalled();
   });
 
+  it('returns 404 when the story map is missing', async () => {
+    const missingClient = {
+      from: vi.fn((table: string) => {
+        if (table === 'story_maps') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi
+                .fn()
+                .mockReturnValue({ single: vi.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } }) }),
+            }),
+          };
+        }
+        if (table === 'activities') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockReturnValue({
+                  order: vi.fn().mockReturnValue({ order: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'releases' || table === 'personas') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({ order: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+            }),
+          };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+    vi.mocked(createClient).mockResolvedValue(missingClient as never);
+
+    const response = await getStoryMapById(new Request('http://localhost/api/story-maps/id'), {
+      params: Promise.resolve({ id: VALID_ID }),
+    });
+
+    expect(response.status).toBe(404);
+  });
+
   it('updates story map context markdown', async () => {
     const single = vi.fn().mockResolvedValue({
       data: { id: VALID_ID, name: 'Map A', context_markdown: '## Updated' },
@@ -120,5 +162,24 @@ describe('story maps [id] route', () => {
 
     expect(response.status).toBe(200);
     expect(update).toHaveBeenCalledWith({ context_markdown: '## Updated' });
+  });
+
+  it('deletes a story map and returns the deleted payload', async () => {
+    const single = vi.fn().mockResolvedValue({ data: { id: VALID_ID }, error: null });
+    const select = vi.fn().mockReturnValue({ single });
+    const eq = vi.fn().mockReturnValue({ select });
+    const remove = vi.fn().mockReturnValue({ eq });
+    const from = vi.fn((table: string) => {
+      if (table === 'story_maps') return { delete: remove };
+      throw new Error(`Unexpected table: ${table}`);
+    });
+    vi.mocked(createClient).mockResolvedValue({ from } as never);
+
+    const response = await deleteStoryMapById(new Request('http://localhost/api/story-maps/id', { method: 'DELETE' }), {
+      params: Promise.resolve({ id: VALID_ID }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true, deleted: { id: VALID_ID } });
   });
 });

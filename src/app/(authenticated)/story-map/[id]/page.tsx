@@ -1,7 +1,5 @@
 import { notFound } from 'next/navigation';
 import { StoryMap } from '@/components/story-map/StoryMap';
-import { getE2EStoryMap } from '@/lib/e2e/test-store';
-import { env } from '@/lib/env';
 import { DbErrorCode } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { getStoryMapGraph } from '@/storymap/service';
@@ -9,12 +7,6 @@ import type { StoryMapFull } from '@/types';
 
 export default async function StoryMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-
-  if (env.e2eTestMode()) {
-    const storyMap = getE2EStoryMap(id);
-    if (!storyMap) notFound();
-    return <StoryMap initialStoryMap={storyMap} />;
-  }
 
   const supabase = await createClient();
   const { mapResult, activitiesResult, releasesResult, personasResult } = await getStoryMapGraph(supabase, id, {

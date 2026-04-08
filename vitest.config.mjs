@@ -15,6 +15,22 @@ export default {
     },
   },
   test: {
-    exclude: ['e2e/**', 'node_modules/**', 'dist/**', '.next/**'],
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**', '.next/**', '**/*.integration.test.*'],
+    coverage: {
+      provider: 'v8',
+      exclude: [
+        'e2e/**',
+        'node_modules/**',
+        'dist/**',
+        '.next/**',
+        '**/*.integration.test.*',
+        '**/*.test.*',
+        '**/*.spec.*',
+        'next.config.ts',
+        'playwright.config.ts',
+        'postcss.config.mjs',
+        'vitest.config.mjs',
+      ],
+    },
   },
 };

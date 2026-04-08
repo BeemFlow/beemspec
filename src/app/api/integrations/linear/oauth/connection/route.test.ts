@@ -48,6 +48,24 @@ describe('linear oauth connection route', () => {
     });
   });
 
+  it('rejects requests without a valid team id', async () => {
+    const response = await GET(new Request('http://localhost/api/test?team_id=bad-id'));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Valid team_id is required' });
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-owners on GET', async () => {
+    vi.mocked(isTeamOwnerForRequest).mockResolvedValue(false);
+
+    const response = await GET(new Request(`http://localhost/api/test?team_id=${TEAM_ID}`));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: 'Only team owners can view Linear connection' });
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
   it('cleans up Linear state atomically on DELETE', async () => {
     const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
     vi.mocked(createAdminClient).mockReturnValue({ rpc } as never);
@@ -57,5 +75,25 @@ describe('linear oauth connection route', () => {
     expect(rpc).toHaveBeenCalledWith('disconnect_linear_for_team', { p_team_id: TEAM_ID });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ success: true, team_id: TEAM_ID, connected: false });
+  });
+
+  it('rejects non-owners on DELETE', async () => {
+    vi.mocked(isTeamOwnerForRequest).mockResolvedValue(false);
+
+    const response = await DELETE(new Request(`http://localhost/api/test?team_id=${TEAM_ID}`, { method: 'DELETE' }));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: 'Only team owners can disconnect Linear' });
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it('returns a server error when disconnect fails', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: 'rpc failed' } });
+    vi.mocked(createAdminClient).mockReturnValue({ rpc } as never);
+
+    const response = await DELETE(new Request(`http://localhost/api/test?team_id=${TEAM_ID}`, { method: 'DELETE' }));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: 'Failed to disconnect Linear' });
   });
 });
