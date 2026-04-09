@@ -143,13 +143,33 @@ export function getStartNodeId(nodes: ProcessFlowCanvasNode[], edges: ProcessFlo
   const candidates = nodes.filter((node) => !incomingTargets.has(node.id));
   const pool = candidates.length > 0 ? candidates : nodes;
 
-  return (
-    [...pool].sort((left, right) => {
-      if (left.position.x !== right.position.x) return left.position.x - right.position.x;
-      if (left.position.y !== right.position.y) return left.position.y - right.position.y;
-      return left.id.localeCompare(right.id);
-    })[0]?.id ?? null
-  );
+  let best = pool[0] ?? null;
+  for (const node of pool.slice(1)) {
+    if (!best) {
+      best = node;
+      continue;
+    }
+
+    if (node.position.x < best.position.x) {
+      best = node;
+      continue;
+    }
+
+    if (node.position.x === best.position.x && node.position.y < best.position.y) {
+      best = node;
+      continue;
+    }
+
+    if (
+      node.position.x === best.position.x &&
+      node.position.y === best.position.y &&
+      node.id.localeCompare(best.id) < 0
+    ) {
+      best = node;
+    }
+  }
+
+  return best?.id ?? null;
 }
 
 export function mergeCanvasNode(nodes: ProcessFlowCanvasNode[], node: ProcessFlowNode) {

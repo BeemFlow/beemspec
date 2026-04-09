@@ -25,10 +25,7 @@ import { processFlowNodeTypes } from './ProcessFlowNode';
 
 const DEFAULT_START_NODE_ZOOM = 0.64;
 const START_NODE_VIEW_PADDING = {
-  // top: '18%',
   right: '80%',
-  // bottom: '18%',
-  // left: '10%',
 } as const;
 
 interface ProcessFlowCanvasProps {
