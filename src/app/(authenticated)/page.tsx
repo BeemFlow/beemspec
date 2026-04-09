@@ -1,39 +1,20 @@
 import { GitBranch, Map as MapIcon } from 'lucide-react';
-import { cookies } from 'next/headers';
 import { ResourceCollectionSection } from '@/components/dashboard/ResourceCollectionSection';
 import { CreateProcessFlowButton } from '@/components/process-flow/CreateProcessFlowButton';
 import { CreateStoryMapButton } from '@/components/story-map/CreateStoryMapButton';
 import { Card } from '@/components/ui/card';
-import { createClient } from '@/lib/supabase/server';
-import { listTeamsForUser } from '@/lib/teams';
+import { getAppContext } from '@/lib/app-context';
 import { listProcessFlows } from '@/processflow/service';
 import { listStoryMaps } from '@/storymap/service';
 import type { ProcessFlow, StoryMap } from '@/types';
 
-const TEAM_COOKIE_KEY = 'beemspec_current_team_id';
-
-function resolveCurrentTeamId(teamIds: string[], cookieTeamId: string | null): string | null {
-  if (cookieTeamId && teamIds.includes(cookieTeamId)) return cookieTeamId;
-  return teamIds[0] ?? null;
-}
-
 export default async function Dashboard() {
-  const supabase = await createClient();
-  const cookieStore = await cookies();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const teamsResult = user ? await listTeamsForUser(supabase, user.id) : { data: [], error: null };
-  const teams = teamsResult.data ?? [];
-  const currentTeamId = resolveCurrentTeamId(
-    teams.map((team) => team.team_id),
-    cookieStore.get(TEAM_COOKIE_KEY)?.value ?? null,
-  );
-  const storyMaps: StoryMap[] = currentTeamId ? ((await listStoryMaps(supabase, currentTeamId)).data ?? []) : [];
-  const processFlows: ProcessFlow[] = currentTeamId
-    ? ((await listProcessFlows(supabase, currentTeamId)).data ?? [])
-    : [];
+  const { supabase, currentTeamId } = await getAppContext();
+  const [storyMapsResult, processFlowsResult] = currentTeamId
+    ? await Promise.all([listStoryMaps(supabase, currentTeamId), listProcessFlows(supabase, currentTeamId)])
+    : [{ data: [] }, { data: [] }];
+  const storyMaps: StoryMap[] = storyMapsResult.data ?? [];
+  const processFlows: ProcessFlow[] = processFlowsResult.data ?? [];
 
   const showNoTeamState = !currentTeamId;
 

@@ -3,19 +3,13 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { cookiesMock, createClientMock, listTeamsForUserMock, listStoryMapsMock, listProcessFlowsMock } = vi.hoisted(
-  () => ({
-    cookiesMock: vi.fn(),
-    createClientMock: vi.fn(),
-    listTeamsForUserMock: vi.fn(),
-    listStoryMapsMock: vi.fn(),
-    listProcessFlowsMock: vi.fn(),
-  }),
-);
+const { getAppContextMock, listStoryMapsMock, listProcessFlowsMock } = vi.hoisted(() => ({
+  getAppContextMock: vi.fn(),
+  listStoryMapsMock: vi.fn(),
+  listProcessFlowsMock: vi.fn(),
+}));
 
-vi.mock('next/headers', () => ({ cookies: cookiesMock }));
-vi.mock('@/lib/supabase/server', () => ({ createClient: createClientMock }));
-vi.mock('@/lib/teams', () => ({ listTeamsForUser: listTeamsForUserMock }));
+vi.mock('@/lib/app-context', () => ({ getAppContext: getAppContextMock }));
 vi.mock('@/storymap/service', () => ({ listStoryMaps: listStoryMapsMock }));
 vi.mock('@/processflow/service', () => ({ listProcessFlows: listProcessFlowsMock }));
 vi.mock('@/components/dashboard/ResourceCollectionSection', () => ({
@@ -44,11 +38,12 @@ describe('authenticated dashboard page', () => {
   });
 
   it('shows a no-team empty state when no accessible team is selected', async () => {
-    cookiesMock.mockResolvedValue({ get: vi.fn().mockReturnValue(null) });
-    createClientMock.mockResolvedValue({
-      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
+    getAppContextMock.mockResolvedValue({
+      supabase: {},
+      user: { id: 'user-1' },
+      teams: [],
+      currentTeamId: null,
     });
-    listTeamsForUserMock.mockResolvedValue({ data: [], error: null });
 
     render(await Dashboard());
 
@@ -56,11 +51,15 @@ describe('authenticated dashboard page', () => {
   });
 
   it('renders story map and process flow collections for the resolved current team', async () => {
-    cookiesMock.mockResolvedValue({ get: vi.fn().mockReturnValue({ value: 'team-2' }) });
-    createClientMock.mockResolvedValue({
-      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
+    getAppContextMock.mockResolvedValue({
+      supabase: { tag: 'supabase' },
+      user: { id: 'user-1' },
+      teams: [
+        { id: 'team-1', role: 'owner' },
+        { id: 'team-2', role: 'member' },
+      ],
+      currentTeamId: 'team-2',
     });
-    listTeamsForUserMock.mockResolvedValue({ data: [{ team_id: 'team-1' }, { team_id: 'team-2' }], error: null });
     listStoryMapsMock.mockResolvedValue({ data: [{ id: 'map-1', name: 'Platform Core' }], error: null });
     listProcessFlowsMock.mockResolvedValue({ data: [{ id: 'flow-1', name: 'Accounts Payable' }], error: null });
 
@@ -70,7 +69,7 @@ describe('authenticated dashboard page', () => {
     expect(screen.getByRole('heading', { name: 'Process Flows' })).toBeTruthy();
     expect(screen.getByText('Platform Core')).toBeTruthy();
     expect(screen.getByText('Accounts Payable')).toBeTruthy();
-    expect(listStoryMapsMock).toHaveBeenCalledWith(expect.anything(), 'team-2');
-    expect(listProcessFlowsMock).toHaveBeenCalledWith(expect.anything(), 'team-2');
+    expect(listStoryMapsMock).toHaveBeenCalledWith({ tag: 'supabase' }, 'team-2');
+    expect(listProcessFlowsMock).toHaveBeenCalledWith({ tag: 'supabase' }, 'team-2');
   });
 });
