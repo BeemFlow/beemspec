@@ -136,6 +136,22 @@ export function toCanvasFlow(flow: ProcessFlowFull) {
   };
 }
 
+export function getStartNodeId(nodes: ProcessFlowCanvasNode[], edges: ProcessFlowCanvasEdge[]): string | null {
+  if (nodes.length === 0) return null;
+
+  const incomingTargets = new Set(edges.map((edge) => edge.target));
+  const candidates = nodes.filter((node) => !incomingTargets.has(node.id));
+  const pool = candidates.length > 0 ? candidates : nodes;
+
+  return (
+    [...pool].sort((left, right) => {
+      if (left.position.x !== right.position.x) return left.position.x - right.position.x;
+      if (left.position.y !== right.position.y) return left.position.y - right.position.y;
+      return left.id.localeCompare(right.id);
+    })[0]?.id ?? null
+  );
+}
+
 export function mergeCanvasNode(nodes: ProcessFlowCanvasNode[], node: ProcessFlowNode) {
   const next = toCanvasNode(node);
   const existingIndex = nodes.findIndex((item) => item.id === node.id);

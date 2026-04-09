@@ -19,8 +19,17 @@ import {
 } from '@xyflow/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { getStartNodeId } from './adapters';
 import type { ProcessFlowCanvasEdge, ProcessFlowCanvasNode } from './adapters';
 import { processFlowNodeTypes } from './ProcessFlowNode';
+
+const DEFAULT_START_NODE_ZOOM = 0.64;
+const START_NODE_VIEW_PADDING = {
+  // top: '18%',
+  right: '80%',
+  // bottom: '18%',
+  // left: '10%',
+} as const;
 
 interface ProcessFlowCanvasProps {
   nodes: ProcessFlowCanvasNode[];
@@ -29,6 +38,7 @@ interface ProcessFlowCanvasProps {
   framed?: boolean;
   showMiniMap?: boolean;
   showControls?: boolean;
+  startNodeZoom?: number;
   onNodesChange?: (changes: NodeChange<ProcessFlowCanvasNode>[]) => void;
   onEdgesChange?: (changes: EdgeChange<ProcessFlowCanvasEdge>[]) => void;
   onNodeDragStop?: OnNodeDrag<ProcessFlowCanvasNode>;
@@ -63,6 +73,15 @@ export function ProcessFlowCanvas(props: ProcessFlowCanvasProps) {
   const [internalEdges, setInternalEdges] = useState(props.edges);
   const nodes = props.onNodesChange ? props.nodes : internalNodes;
   const edges = props.onEdgesChange ? props.edges : internalEdges;
+  const startNodeId = useMemo(() => getStartNodeId(nodes, edges), [nodes, edges]);
+  const fitViewOptions = useMemo(
+    () => ({
+      padding: START_NODE_VIEW_PADDING,
+      maxZoom: props.startNodeZoom ?? DEFAULT_START_NODE_ZOOM,
+      ...(startNodeId ? { nodes: [{ id: startNodeId }] } : {}),
+    }),
+    [props.startNodeZoom, startNodeId],
+  );
 
   useEffect(() => {
     if (!props.onNodesChange) {
@@ -110,6 +129,7 @@ export function ProcessFlowCanvas(props: ProcessFlowCanvasProps) {
         onPaneClick={props.onPaneClick}
         nodeTypes={processFlowNodeTypes}
         fitView
+        fitViewOptions={fitViewOptions}
         deleteKeyCode={isViewer ? null : ['Backspace', 'Delete']}
         nodesDraggable={!isViewer}
         nodesConnectable={!isViewer}

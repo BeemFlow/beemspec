@@ -103,6 +103,16 @@ describe('ProcessFlowCanvas', () => {
       type: 'smoothstep',
       markerEnd: { type: 'arrowclosed' },
     });
+    expect(props.fitViewOptions).toEqual({
+      padding: {
+        top: '18%',
+        right: '48%',
+        bottom: '18%',
+        left: '10%',
+      },
+      maxZoom: 0.64,
+      nodes: [{ id: 'node-1' }],
+    });
     expect(container.textContent).toContain('MiniMap:#92400e');
 
     props.onNodesChange?.(['node-change']);
@@ -150,5 +160,34 @@ describe('ProcessFlowCanvas', () => {
     render(<ProcessFlowCanvas mode="viewer" showControls nodes={[]} edges={[]} />);
 
     expect(screen.getByText('Controls')).toBeTruthy();
+  });
+
+  it('allows the start-node zoom cap to be adjusted', () => {
+    render(
+      <ProcessFlowCanvas
+        nodes={[
+          {
+            id: 'node-1',
+            type: 'step',
+            position: { x: 10, y: 20 },
+            data: { label: 'Start', nodeType: 'step' },
+          } as never,
+        ]}
+        edges={[]}
+        startNodeZoom={0.65}
+      />,
+    );
+
+    const props = reactFlowProps.current as Record<string, any>;
+    expect(props.fitViewOptions).toEqual({
+      padding: {
+        top: '18%',
+        right: '48%',
+        bottom: '18%',
+        left: '10%',
+      },
+      maxZoom: 0.65,
+      nodes: [{ id: 'node-1' }],
+    });
   });
 });

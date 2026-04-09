@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toCanvasEdge, toCanvasNode } from './adapters';
+import { getStartNodeId, toCanvasEdge, toCanvasNode } from './adapters';
 
 describe('process flow adapters', () => {
   it('normalizes malformed node data into safe canvas nodes', () => {
@@ -73,5 +73,31 @@ describe('process flow adapters', () => {
         style: expect.objectContaining({ strokeDasharray: '3 5', strokeWidth: 1.5 }),
       }),
     );
+  });
+
+  it('prefers root nodes and then left-to-right top-to-bottom ordering for the start node', () => {
+    const nodes = [
+      { id: 'node-3', position: { x: 400, y: 80 } },
+      { id: 'node-2', position: { x: 100, y: 200 } },
+      { id: 'node-1', position: { x: 100, y: 40 } },
+    ] as any;
+    const edges = [{ id: 'edge-1', source: 'node-1', target: 'node-3' }] as any;
+
+    expect(getStartNodeId(nodes, edges)).toBe('node-1');
+  });
+
+  it('falls back to the left-most top-most node when every node has an incoming edge', () => {
+    const nodes = [
+      { id: 'node-1', position: { x: 200, y: 80 } },
+      { id: 'node-2', position: { x: 100, y: 120 } },
+      { id: 'node-3', position: { x: 100, y: 40 } },
+    ] as any;
+    const edges = [
+      { id: 'edge-1', source: 'node-1', target: 'node-2' },
+      { id: 'edge-2', source: 'node-2', target: 'node-3' },
+      { id: 'edge-3', source: 'node-3', target: 'node-1' },
+    ] as any;
+
+    expect(getStartNodeId(nodes, edges)).toBe('node-3');
   });
 });
