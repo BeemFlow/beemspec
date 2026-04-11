@@ -10,6 +10,7 @@ import { ProcessFlowToolbar } from '@/components/process-flow/ProcessFlowToolbar
 import { ProcessFlowValidationPanel } from '@/components/process-flow/ProcessFlowValidationPanel';
 import { ContextMarkdownDialog } from '@/components/story-map/ContextMarkdownDialog';
 import { McpSetupDialog } from '@/components/story-map/McpSetupDialog';
+import { useRouteRefresh } from '@/components/use-route-refresh';
 import { fetchJson } from '@/lib/http';
 import type { ProcessFlow, ProcessFlowFull, ProcessFlowValidationResult } from '@/types';
 import {
@@ -32,6 +33,7 @@ const initialSelection: Selection = { kind: 'flow' };
 
 export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: ProcessFlowFull }) {
   const router = useRouter();
+  const refreshProcessFlow = useRouteRefresh();
   const [processFlow, setProcessFlow] = useState(initialProcessFlow);
   const [nodes, setNodes] = useState<ProcessFlowCanvasNode[]>(() => toCanvasFlow(initialProcessFlow).nodes);
   const [edges, setEdges] = useState<ProcessFlowCanvasEdge[]>(() => toCanvasFlow(initialProcessFlow).edges);
@@ -315,6 +317,7 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
         onToggleValidation={handleToggleValidation}
         onOpenContext={() => setContextOpen(true)}
         onOpenMcpSetup={() => setMcpSetupOpen(true)}
+        onRefresh={refreshProcessFlow}
         onOpenSettings={() => setSettingsOpen(true)}
       />
 

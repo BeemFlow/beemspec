@@ -2,8 +2,9 @@
 
 import { Bot, FileText, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EditorHeader } from '@/components/EditorHeader';
+import { RouteRefreshButton } from '@/components/RouteRefreshButton';
 import { ActivityDialog } from '@/components/story-map/ActivityDialog';
 import { ContextMarkdownDialog } from '@/components/story-map/ContextMarkdownDialog';
 import { McpSetupDialog } from '@/components/story-map/McpSetupDialog';
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { PromptDialog } from '@/components/ui/prompt-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useRouteRefresh } from '@/components/use-route-refresh';
 import { errorMessage } from '@/lib/errors';
 import { fetchJson } from '@/lib/http';
 import type { Activity, Story, StoryMapFull, Task } from '@/types';
@@ -52,9 +54,7 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
     setStoryMap(initialStoryMap);
   }, [initialStoryMap]);
 
-  const refreshStoryMap = useCallback(() => {
-    router.refresh();
-  }, [router]);
+  const refreshStoryMap = useRouteRefresh({ auto: true, pollMs: 15000 });
 
   async function request(input: RequestInfo | URL, init: RequestInit | undefined, fallback: string) {
     await fetchJson(input, init, fallback);
@@ -425,6 +425,12 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="left">Connect MCP Client</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <RouteRefreshButton onRefresh={refreshStoryMap} label="Refresh story map" />
+              </TooltipTrigger>
+              <TooltipContent side="left">Refresh story map</TooltipContent>
             </Tooltip>
             <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} aria-label="Story map settings">
               <Settings className="h-4 w-4" />

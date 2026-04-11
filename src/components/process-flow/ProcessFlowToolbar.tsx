@@ -2,6 +2,7 @@
 
 import { Bot, FileText, GitBranch, Network, Plus, RefreshCw, ScanSearch, Settings, Sparkles, User } from 'lucide-react';
 import { EditorHeader } from '@/components/EditorHeader';
+import { RouteRefreshButton } from '@/components/RouteRefreshButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -14,6 +15,7 @@ interface ProcessFlowToolbarProps {
   onToggleValidation: () => void;
   onOpenContext: () => void;
   onOpenMcpSetup: () => void;
+  onRefresh: () => void;
   onOpenSettings: () => void;
 }
 
@@ -68,6 +70,7 @@ export function ProcessFlowToolbar(props: ProcessFlowToolbarProps) {
           <Button variant="ghost" size="icon" onClick={props.onOpenMcpSetup} aria-label="Connect MCP Client">
             <Bot className="size-4" />
           </Button>
+          <RouteRefreshButton onRefresh={props.onRefresh} label="Refresh process flow" />
           <Button variant="ghost" size="icon" onClick={props.onOpenSettings} aria-label="Process flow settings">
             <Settings className="size-4" />
           </Button>
