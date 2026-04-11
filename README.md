@@ -36,6 +36,10 @@ One common pattern looks like this:
 
 This works well because the team does not have to manually translate every conversation into fully formed stories up front. The map becomes the shared planning structure, and agents can keep working from that same structure later.
 
+![Example story map](docs/images/story-map.png)
+
+> "This example story map shows how raw workshop input becomes clear, release-ready implementation slices."
+
 ### Process flows and workflow automation
 
 Another common pattern looks like this:
@@ -47,6 +51,10 @@ Another common pattern looks like this:
 5. Use the process flow as the basis for designing and deploying workflow automations.
 
 This is where process modeling becomes more than documentation. The map can help teams spot bottlenecks, clarify ownership, and hand a much better representation of the workflow to automation tools and coding agents.
+
+![Example process flow](docs/images/process-flow.png)
+
+> "This example process flow turns operational complexity into an automation-ready model with clear handoffs and constraints."
 
 ## What BeemSpec does
 
