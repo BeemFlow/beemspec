@@ -28,12 +28,19 @@ function createInvitesPostClient(options?: {
   existingInvite?: { id: string } | null;
   inviteInsertError?: { message: string } | null;
   memberInsertError?: { message: string } | null;
+  registeredUser?: boolean;
+  registeredUserError?: { message: string } | null;
 }) {
   const getMembersRpc = vi.fn().mockResolvedValue({ data: options?.members ?? [], error: null });
   const acceptInviteRpc = vi.fn().mockResolvedValue({ data: null, error: options?.memberInsertError ?? null });
-  const rpc = vi.fn((fn: string) => {
-    if (fn === 'get_team_members') return getMembersRpc();
-    if (fn === 'accept_team_invite_member') return acceptInviteRpc();
+  const addRegisteredUserRpc = vi.fn().mockResolvedValue({
+    data: options?.registeredUser ?? false,
+    error: options?.registeredUserError ?? null,
+  });
+  const rpc = vi.fn((fn: string, args?: unknown) => {
+    if (fn === 'get_team_members') return getMembersRpc(args);
+    if (fn === 'accept_team_invite_member') return acceptInviteRpc(args);
+    if (fn === 'add_registered_user_to_team') return addRegisteredUserRpc(args);
     throw new Error(`Unexpected rpc: ${fn}`);
   });
 
@@ -57,7 +64,7 @@ function createInvitesPostClient(options?: {
     throw new Error(`Unexpected table: ${table}`);
   });
 
-  return { client: { rpc, from }, stubs: { acceptInviteRpc, remove } };
+  return { client: { rpc, from }, stubs: { acceptInviteRpc, addRegisteredUserRpc, remove } };
 }
 
 function createTeamsPostClient(options?: {
@@ -141,12 +148,13 @@ describe('teams routes', () => {
   });
 
   it('adds existing auth user directly to team', async () => {
-    const { client, stubs } = createInvitesPostClient({ members: [] });
+    const { client, stubs } = createInvitesPostClient({ members: [], registeredUser: true });
+    const inviteUserByEmail = vi.fn();
     vi.mocked(createClient).mockResolvedValue(client as never);
     vi.mocked(createAdminClient).mockReturnValue({
       auth: {
         admin: {
-          inviteUserByEmail: vi.fn().mockResolvedValue({ data: { user: { id: 'u-2', identities: [] } }, error: null }),
+          inviteUserByEmail,
         },
       },
     } as never);
@@ -154,7 +162,64 @@ describe('teams routes', () => {
     const response = await postInvite(jsonRequest({ email: 'person@example.com' }), {
       params: Promise.resolve({ id: VALID_ID }),
     });
-    expect(stubs.acceptInviteRpc).toHaveBeenCalled();
+    expect(stubs.addRegisteredUserRpc).toHaveBeenCalledWith({
+      p_invite_id: 'invite-1',
+      p_team_id: VALID_ID,
+    });
+    expect(inviteUserByEmail).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ status: 'added', message: 'User added to team' });
+  });
+
+  it('adds a user who registers while their invitation is being sent', async () => {
+    const { client, stubs } = createInvitesPostClient({ members: [] });
+    stubs.addRegisteredUserRpc
+      .mockResolvedValueOnce({ data: false, error: null })
+      .mockResolvedValueOnce({ data: true, error: null });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    vi.mocked(createAdminClient).mockReturnValue({
+      auth: {
+        admin: {
+          inviteUserByEmail: vi.fn().mockResolvedValue({
+            data: { user: null },
+            error: { message: 'A user with this email address has already been registered' },
+          }),
+        },
+      },
+    } as never);
+
+    const response = await postInvite(jsonRequest({ email: 'person@example.com' }), {
+      params: Promise.resolve({ id: VALID_ID }),
+    });
+
+    expect(stubs.addRegisteredUserRpc).toHaveBeenCalledTimes(2);
+    expect(stubs.remove).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+  });
+
+  it('supports the legacy Supabase response for an existing user', async () => {
+    const { client, stubs } = createInvitesPostClient({ members: [] });
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    vi.mocked(createAdminClient).mockReturnValue({
+      auth: {
+        admin: {
+          inviteUserByEmail: vi.fn().mockResolvedValue({
+            data: { user: { id: 'u-2', identities: [] } },
+            error: null,
+          }),
+        },
+      },
+    } as never);
+
+    const response = await postInvite(jsonRequest({ email: 'person@example.com' }), {
+      params: Promise.resolve({ id: VALID_ID }),
+    });
+
+    expect(stubs.acceptInviteRpc).toHaveBeenCalledWith({
+      p_invite_id: 'invite-1',
+      p_team_id: VALID_ID,
+      p_user_id: 'u-2',
+    });
     expect(response.status).toBe(201);
   });
 

@@ -7,6 +7,14 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 
+function isAlreadyRegisteredError(error: { code?: string; message?: string }): boolean {
+  return (
+    error.code === 'email_exists' ||
+    error.code === 'user_already_exists' ||
+    error.message?.toLowerCase().includes('already been registered') === true
+  );
+}
+
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
@@ -72,6 +80,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return serverErrorResponse('Failed to create invite', inviteError);
   }
 
+  // Existing auth users can join immediately; no account invitation is needed.
+  const { data: addedRegisteredUser, error: registeredUserError } = await supabase.rpc('add_registered_user_to_team', {
+    p_invite_id: invite.id,
+    p_team_id: teamId,
+  });
+
+  if (registeredUserError) {
+    await supabase.from('team_invites').delete().eq('id', invite.id);
+    return serverErrorResponse('Failed to check registered user', registeredUserError);
+  }
+
+  if (addedRegisteredUser) {
+    return NextResponse.json({ status: 'added', message: 'User added to team' }, { status: 201 });
+  }
+
   const origin = resolveRequestOrigin(request);
 
   const inviteRedirectUrl = new URL('/invite/accept', origin);
@@ -84,6 +107,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   });
 
   if (authError) {
+    // Handle a registration racing the database check above.
+    if (isAlreadyRegisteredError(authError)) {
+      const { data: addedAfterRace, error: raceError } = await supabase.rpc('add_registered_user_to_team', {
+        p_invite_id: invite.id,
+        p_team_id: teamId,
+      });
+
+      if (!raceError && addedAfterRace) {
+        return NextResponse.json({ status: 'added', message: 'User added to team' }, { status: 201 });
+      }
+
+      await supabase.from('team_invites').delete().eq('id', invite.id);
+      return serverErrorResponse('Failed to add registered user', raceError ?? authError);
+    }
+
     // Rollback invite record
     await supabase.from('team_invites').delete().eq('id', invite.id);
     return serverErrorResponse('Failed to send invite', authError);
@@ -99,6 +137,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
 
     if (memberError) {
+      await supabase.from('team_invites').delete().eq('id', invite.id);
       return serverErrorResponse('Failed to add member', memberError);
     }
 

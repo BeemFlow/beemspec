@@ -85,4 +85,48 @@ describe.sequential('team membership integration', () => {
     expect(inviteLookup.error).toBeNull();
     expect(inviteLookup.data?.accepted_at).not.toBeNull();
   });
+
+  it('lets an owner add an already-registered user by invite email', async () => {
+    const admin = createAdminClient();
+    const owner = await findUserByEmail(admin, E2E_OWNER_EMAIL);
+    if (!owner) {
+      throw new Error('Expected seeded owner auth user to exist');
+    }
+
+    const invitee = await ensureLocalAuthUser(admin, {
+      email: E2E_INVITEE_EMAIL,
+      password: E2E_INVITEE_PASSWORD,
+      fullName: 'Invitee Example',
+    });
+
+    const inviteInsert = await admin
+      .from('team_invites')
+      .insert({ team_id: E2E_TEAM_ID, email: E2E_INVITEE_EMAIL, invited_by: owner.id })
+      .select('id')
+      .single();
+    expect(inviteInsert.error).toBeNull();
+
+    const ownerClient = createPublicClient();
+    const signIn = await ownerClient.auth.signInWithPassword({
+      email: E2E_OWNER_EMAIL,
+      password: E2E_OWNER_PASSWORD,
+    });
+    expect(signIn.error).toBeNull();
+
+    const addMember = await ownerClient.rpc('add_registered_user_to_team', {
+      p_invite_id: inviteInsert.data?.id,
+      p_team_id: E2E_TEAM_ID,
+    });
+    expect(addMember.error).toBeNull();
+    expect(addMember.data).toBe(true);
+
+    const memberLookup = await admin
+      .from('team_members')
+      .select('role')
+      .eq('team_id', E2E_TEAM_ID)
+      .eq('user_id', invitee.id)
+      .single();
+    expect(memberLookup.error).toBeNull();
+    expect(memberLookup.data?.role).toBe('member');
+  });
 });
