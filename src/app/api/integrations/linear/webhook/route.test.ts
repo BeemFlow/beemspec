@@ -40,6 +40,7 @@ function createWebhookAdminClient(
     existingLink?: { story_id: string; linear_issue_id: string; linear_issue_identifier: string | null } | null;
     duplicateReceipt?: boolean;
     duplicateProcessed?: boolean;
+    writebackConflict?: boolean;
     localStoryUpdatedAt?: string;
   } = {},
 ) {
@@ -100,9 +101,14 @@ function createWebhookAdminClient(
   const storyDeleteEq = vi.fn().mockResolvedValue({ error: null });
   const storyDelete = vi.fn().mockReturnValue({ eq: storyDeleteEq });
 
-  const applyWritebackSingle = vi
-    .fn()
-    .mockResolvedValue({ data: { duplicate: options.duplicateProcessed ?? false }, error: null });
+  const applyWritebackSingle = vi.fn().mockResolvedValue({
+    data: {
+      duplicate: options.duplicateProcessed ?? false,
+      applied: !(options.duplicateProcessed || options.writebackConflict),
+      conflict: options.writebackConflict ?? false,
+    },
+    error: null,
+  });
   const removeWithReceiptSingle = vi
     .fn()
     .mockResolvedValue({ data: { duplicate: options.duplicateProcessed ?? false }, error: null });
@@ -156,7 +162,7 @@ describe('linear webhook route', () => {
       createLinearWebhookSignatureVerifier({ secret: 'webhook_secret' }),
     );
     vi.mocked(findStoryMapImportCandidate).mockResolvedValue(null);
-    vi.mocked(importLinearIssueIntoStoryMap).mockResolvedValue({ storyId: 'story_imported_1' });
+    vi.mocked(importLinearIssueIntoStoryMap).mockResolvedValue({ storyId: 'story_imported_1', duplicate: false });
     vi.mocked(getLinearIssueLabelNames).mockReturnValue([]);
     vi.mocked(getLinearIssueProjectIdFromPayload).mockReturnValue(null);
     vi.mocked(getLinearIssueTeamIdFromPayload).mockReturnValue(null);
@@ -187,6 +193,36 @@ describe('linear webhook route', () => {
     );
 
     expect(response.status).toBe(401);
+  });
+
+  it('uses webhook delivery time rather than action time for replay protection', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(createWebhookAdminClient().client as never);
+
+    const rawBody = JSON.stringify({
+      action: 'update',
+      type: 'Issue',
+      createdAt: '2020-01-01T00:00:00.000Z',
+      webhookTimestamp: Date.now(),
+      data: {
+        id: 'lin_1',
+        title: 'Delayed action delivery',
+        updatedAt: '2026-02-14T11:00:00.000Z',
+      },
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/integrations/linear/webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Linear-Signature': sign(rawBody, 'webhook_secret'),
+          'Linear-Delivery': 'delivery_delayed_action',
+        },
+        body: rawBody,
+      }),
+    );
+
+    expect(response.status).toBe(200);
   });
 
   it('applies supported issue writeback and records receipt', async () => {
@@ -226,10 +262,44 @@ describe('linear webhook route', () => {
       expect.objectContaining({
         p_story_id: 'story_1',
         p_linear_issue_id: 'lin_1',
+        p_expected_story_updated_at: '2026-02-14T10:00:00.000Z',
       }),
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ success: true, applied: true });
+  });
+
+  it('does not overwrite a local edit that lands during webhook processing', async () => {
+    const admin = createWebhookAdminClient({ writebackConflict: true });
+    vi.mocked(createAdminClient).mockReturnValue(admin.client as never);
+
+    const now = new Date().toISOString();
+    const rawBody = JSON.stringify({
+      action: 'update',
+      type: 'Issue',
+      createdAt: now,
+      webhookTimestamp: now,
+      data: {
+        id: 'lin_1',
+        title: 'Remote edit',
+        updatedAt: '2026-02-14T11:00:00.000Z',
+      },
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/integrations/linear/webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Linear-Signature': sign(rawBody, 'webhook_secret'),
+          'Linear-Delivery': 'delivery_concurrent_edit',
+        },
+        body: rawBody,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true, ignored: true });
   });
 
   it('handles duplicate delivery idempotently', async () => {
@@ -273,7 +343,7 @@ describe('linear webhook route', () => {
     vi.mocked(findStoryMapImportCandidate).mockResolvedValue({
       storyMapId: 'map_1',
     });
-    vi.mocked(importLinearIssueIntoStoryMap).mockResolvedValue({ storyId: 'story_imported_1' });
+    vi.mocked(importLinearIssueIntoStoryMap).mockResolvedValue({ storyId: 'story_imported_1', duplicate: false });
 
     const createdAt = new Date().toISOString();
     const rawBody = JSON.stringify({
@@ -319,7 +389,10 @@ describe('linear webhook route', () => {
     vi.mocked(findStoryMapImportCandidate).mockResolvedValue({
       storyMapId: 'map_1',
     });
-    vi.mocked(importLinearIssueIntoStoryMap).mockResolvedValue({ storyId: 'story_imported_restore_1' });
+    vi.mocked(importLinearIssueIntoStoryMap).mockResolvedValue({
+      storyId: 'story_imported_restore_1',
+      duplicate: false,
+    });
 
     const createdAt = new Date().toISOString();
     const rawBody = JSON.stringify({

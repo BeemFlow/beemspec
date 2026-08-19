@@ -4,7 +4,8 @@ import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
-import { deleteStory, getStory, updateStory } from '@/storymap/service';
+import { getStory } from '@/storymap/service';
+import { deleteStory, updateStory } from '@/storymap/use-cases';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();

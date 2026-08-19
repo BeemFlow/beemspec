@@ -31,7 +31,7 @@ async function must<T>(resultPromise: Promise<{ data: T | null; error: unknown }
   return result.data;
 }
 
-async function mustSucceed(resultPromise: Promise<{ error: unknown }>, message: string) {
+async function mustSucceed(resultPromise: PromiseLike<{ error: unknown }>, message: string) {
   const result = await resultPromise;
   if (result.error) {
     throw new Error(`${message}: ${JSON.stringify(result.error)}`);
@@ -71,6 +71,10 @@ describe.sequential('storymap service integration', () => {
       createTask(supabase as never, { activity_id: intake.id, name: 'Triage exception' }),
       'Failed to create triage task',
     );
+    const routeTask = await must(
+      createTask(supabase as never, { activity_id: intake.id, name: 'Route exception' }),
+      'Failed to create route task',
+    );
     const approveTask = await must(
       createTask(supabase as never, { activity_id: review.id, name: 'Approve payment' }),
       'Failed to create approve task',
@@ -78,6 +82,7 @@ describe.sequential('storymap service integration', () => {
 
     expect(captureTask.sort_order).toBe(0);
     expect(triageTask.sort_order).toBe(1);
+    expect(routeTask.sort_order).toBe(2);
     expect(approveTask.sort_order).toBe(0);
 
     await mustSucceed(
@@ -91,11 +96,12 @@ describe.sequential('storymap service integration', () => {
     const movedTasks = await supabase
       .from('tasks')
       .select('id, activity_id, sort_order')
-      .in('id', [captureTask.id, triageTask.id, approveTask.id])
+      .in('id', [captureTask.id, triageTask.id, routeTask.id, approveTask.id])
       .order('sort_order');
     const tasksById = new Map((movedTasks.data ?? []).map((task) => [task.id, task]));
 
     expect(tasksById.get(captureTask.id)).toMatchObject({ activity_id: intake.id, sort_order: 0 });
+    expect(tasksById.get(routeTask.id)).toMatchObject({ activity_id: intake.id, sort_order: 1 });
     expect(tasksById.get(triageTask.id)).toMatchObject({ activity_id: review.id, sort_order: 0 });
     expect(tasksById.get(approveTask.id)).toMatchObject({ activity_id: review.id, sort_order: 1 });
 
@@ -116,6 +122,19 @@ describe.sequential('storymap service integration', () => {
       }),
       'Failed to create backlog story',
     );
+    const remainingBacklogStory = await must(
+      createStory(supabase as never, {
+        task_id: captureTask.id,
+        title: 'Validate invoice data',
+        status: 'backlog',
+        content: {
+          _version: 1,
+          user_story: 'As an AP clerk, I can validate invoice data.',
+          acceptance_criteria: '- [ ] Invalid fields are identified',
+        },
+      }),
+      'Failed to create remaining backlog story',
+    );
     const releaseStory = await must(
       createStory(supabase as never, {
         task_id: approveTask.id,
@@ -132,6 +151,7 @@ describe.sequential('storymap service integration', () => {
     );
 
     expect(backlogStory.sort_order).toBe(0);
+    expect(remainingBacklogStory.sort_order).toBe(1);
     expect(releaseStory.sort_order).toBe(0);
 
     await mustSucceed(
@@ -157,6 +177,14 @@ describe.sequential('storymap service integration', () => {
       release_id: release.id,
       sort_order: 1,
     });
+
+    const sourceStories = await supabase
+      .from('stories')
+      .select('id, sort_order')
+      .eq('task_id', captureTask.id)
+      .is('release_id', null)
+      .order('sort_order');
+    expect(sourceStories.data).toEqual([{ id: remainingBacklogStory.id, sort_order: 0 }]);
   }, 15_000);
 
   it('enforces real cross-map parent consistency in the database', async () => {
@@ -199,5 +227,131 @@ describe.sequential('storymap service integration', () => {
 
     expect(result.data).toBeNull();
     expect(JSON.stringify(result.error)).toContain('Story task and release must belong to the same story map');
+  });
+
+  it('imports the same Linear delivery exactly once and creates a leading Untriaged lane', async () => {
+    const team = await createTeam(`Import Team ${crypto.randomUUID()}`);
+    const storyMap = await must(
+      createStoryMap(supabase as never, { team_id: team.id, name: 'Import Map' }),
+      'Failed to create import map',
+    );
+    await must(
+      createActivity(supabase as never, { story_map_id: storyMap.id, name: 'Existing activity' }),
+      'Failed to create existing activity',
+    );
+
+    const issueId = `linear-${crypto.randomUUID()}`;
+    const deliveryId = `delivery-${crypto.randomUUID()}`;
+    const importedAt = new Date().toISOString();
+    const args = {
+      p_story_map_id: storyMap.id,
+      p_linear_issue_id: issueId,
+      p_linear_issue_identifier: 'BEE-101',
+      p_story_title: 'Imported once',
+      p_story_status: 'backlog',
+      p_story_content: { _version: 1, user_story: '', acceptance_criteria: '' },
+      p_story_updated_at: importedAt,
+      p_idempotency_key: deliveryId,
+      p_event_type: 'Issue',
+      p_event_action: 'create',
+      p_payload: { id: issueId },
+    };
+
+    const [first, second] = await Promise.all([
+      supabase
+        .rpc('import_linear_issue_into_story_map', args)
+        .single<{ duplicate: boolean; story_id: string | null }>(),
+      supabase
+        .rpc('import_linear_issue_into_story_map', args)
+        .single<{ duplicate: boolean; story_id: string | null }>(),
+    ]);
+
+    expect(first.error).toBeNull();
+    expect(second.error).toBeNull();
+    expect([first.data?.duplicate, second.data?.duplicate].sort()).toEqual([false, true]);
+    expect(first.data?.story_id).toBe(second.data?.story_id);
+
+    const stories = await supabase.from('stories').select('id').eq('title', 'Imported once');
+    const links = await supabase.from('story_linear_links').select('story_id').eq('linear_issue_id', issueId);
+    const activities = await supabase
+      .from('activities')
+      .select('name, sort_order')
+      .eq('story_map_id', storyMap.id)
+      .order('sort_order');
+
+    expect(stories.error).toBeNull();
+    expect(stories.data).toHaveLength(1);
+    expect(links.error).toBeNull();
+    expect(links.data).toEqual([{ story_id: stories.data?.[0]?.id }]);
+    expect(activities.data?.map(({ name, sort_order }) => ({ name, sort_order }))).toEqual([
+      { name: 'Untriaged', sort_order: 0 },
+      { name: 'Existing activity', sort_order: 1 },
+    ]);
+  });
+
+  it('rejects a Linear writeback when a local edit wins the compare-and-swap race', async () => {
+    const team = await createTeam(`Conflict Team ${crypto.randomUUID()}`);
+    const storyMap = await must(
+      createStoryMap(supabase as never, { team_id: team.id, name: 'Conflict Map' }),
+      'Failed to create conflict map',
+    );
+    const activity = await must(
+      createActivity(supabase as never, { story_map_id: storyMap.id, name: 'Activity' }),
+      'Failed to create activity',
+    );
+    const task = await must(
+      createTask(supabase as never, { activity_id: activity.id, name: 'Task' }),
+      'Failed to create task',
+    );
+    const story = await must(
+      createStory(supabase as never, {
+        task_id: task.id,
+        title: 'Original title',
+        status: 'backlog',
+        content: { _version: 1, user_story: '', acceptance_criteria: '' },
+      }),
+      'Failed to create story',
+    );
+
+    const staleVersion = story.updated_at;
+    await mustSucceed(
+      supabase.from('stories').update({ title: 'Local edit wins' }).eq('id', story.id),
+      'Failed to create concurrent local edit',
+    );
+
+    const deliveryId = `delivery-${crypto.randomUUID()}`;
+    const result = await supabase
+      .rpc('apply_linear_issue_writeback_with_receipt', {
+        p_story_id: story.id,
+        p_linear_issue_id: `linear-${crypto.randomUUID()}`,
+        p_linear_issue_identifier: 'BEE-102',
+        p_expected_story_updated_at: staleVersion,
+        p_last_linear_updated_at: new Date().toISOString(),
+        p_story_title: 'Remote overwrite',
+        p_story_status: 'done',
+        p_story_content: null,
+        p_idempotency_key: deliveryId,
+        p_event_type: 'Issue',
+        p_event_action: 'update',
+        p_payload: { title: 'Remote overwrite' },
+      })
+      .single();
+
+    expect(result.error).toBeNull();
+    expect(result.data).toMatchObject({ duplicate: false, applied: false, conflict: true });
+
+    const reloadedStory = await supabase.from('stories').select('title, status').eq('id', story.id).single();
+    const receipt = await supabase
+      .from('integration_webhook_receipts')
+      .select('status, error')
+      .eq('provider', 'linear')
+      .eq('idempotency_key', deliveryId)
+      .single();
+
+    expect(reloadedStory.data).toMatchObject({ title: 'Local edit wins', status: 'backlog' });
+    expect(receipt.data).toMatchObject({
+      status: 'ignored',
+      error: 'Concurrent local update won conflict resolution',
+    });
   });
 });

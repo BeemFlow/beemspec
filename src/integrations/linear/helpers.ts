@@ -1,5 +1,5 @@
 import { createLinearWebhookIngest, createLinearWebhookSignatureVerifier } from '@beemspec/linear';
-import type { WebhookIngest, WebhookSignatureVerifier } from '@/integrations/sync';
+import type { WebhookIngest, WebhookSignatureVerifier } from '@beemspec/sync';
 import { env } from '@/lib/env';
 
 /**

@@ -1,4 +1,4 @@
-import { listLinearProjectIssuesForImport } from '@beemspec/linear';
+import { listLinearProjectIssuesForImport, manualLinearSyncResponseSchema } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
 import { resolveLinearAuthTokenForTeam } from '@/integrations/linear/auth';
 import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
@@ -253,26 +253,28 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     });
   }
 
-  return NextResponse.json({
-    success: true,
-    stories: {
-      considered: summary.considered,
-      processed: summary.succeeded + summary.failed,
-      succeeded: summary.succeeded,
-      failed: summary.failed,
-      ignored: summary.ignored,
-      created_in_linear: summary.createdRemote,
-      synced_to_linear: summary.localToRemote,
-      synced_from_linear: summary.remoteToLocal,
-    },
-    imports: {
-      considered: importSummary.considered,
-      imported: importSummary.imported,
-      skipped: importSummary.skipped,
-      skipped_already_linked: importSummary.skippedAlreadyLinked,
-      skipped_no_candidate: importSummary.skippedNoCandidate,
-    },
-    story_results: storyResults,
-    import_results: importSummary.results,
-  });
+  return NextResponse.json(
+    manualLinearSyncResponseSchema.parse({
+      success: true,
+      stories: {
+        considered: summary.considered,
+        processed: summary.succeeded + summary.failed,
+        succeeded: summary.succeeded,
+        failed: summary.failed,
+        ignored: summary.ignored,
+        created_in_linear: summary.createdRemote,
+        synced_to_linear: summary.localToRemote,
+        synced_from_linear: summary.remoteToLocal,
+      },
+      imports: {
+        considered: importSummary.considered,
+        imported: importSummary.imported,
+        skipped: importSummary.skipped,
+        skipped_already_linked: importSummary.skippedAlreadyLinked,
+        skipped_no_candidate: importSummary.skippedNoCandidate,
+      },
+      story_results: storyResults,
+      import_results: importSummary.results,
+    }),
+  );
 }

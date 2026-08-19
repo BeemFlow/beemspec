@@ -1,4 +1,10 @@
 import { buildStoryPatchFromLinearIssue, mapLinearStateToStoryStatus } from '@beemspec/linear';
+import {
+  buildDbUpdateFromPatch,
+  hasMutableStoryFields,
+  shouldApplyRemoteUpdate,
+  type WebhookEvent,
+} from '@beemspec/sync';
 import { NextResponse } from 'next/server';
 import { getLinearWebhookIngest, getLinearWebhookSignatureVerifier } from '@/integrations/linear/helpers';
 import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
@@ -9,8 +15,6 @@ import {
 } from '@/integrations/linear/label-sync';
 import { getSyncTargetForStory } from '@/integrations/linear/settings';
 import { getStoryLinearLinkByLinearIssueId, upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import type { WebhookEvent } from '@/integrations/sync';
-import { buildDbUpdateFromPatch, hasMutableStoryFields, shouldApplyRemoteUpdate } from '@/integrations/sync';
 import { serverErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -114,7 +118,7 @@ function parseAndVerifyEvent(request: Request, rawBody: string): WebhookEvent | 
   }
 
   const signature = request.headers.get('Linear-Signature') ?? '';
-  const verified = verifier.verify({ rawBody, signature, timestamp: event.createdAt });
+  const verified = verifier.verify({ rawBody, signature, timestamp: event.deliveredAt });
   if (!verified) throw new Error('Invalid signature');
   return event;
 }
@@ -221,15 +225,13 @@ async function processIssueEvent(
       title: getString(payload?.title),
       description: getString(payload?.description),
       stateName: getString(asRecord(payload?.state)?.name),
-      updatedAt: getString(payload?.updatedAt) ?? event.createdAt,
-    });
-
-    const receipt = await insertWebhookReceipt(supabase, {
-      idempotencyKey: event.idempotencyKey,
-      type: event.type,
-      action: event.action,
-      payload: event.payload,
-      status: 'processed',
+      updatedAt: getString(payload?.updatedAt) ?? event.occurredAt,
+      receipt: {
+        idempotencyKey: event.idempotencyKey,
+        type: event.type,
+        action: event.action,
+        payload: event.payload,
+      },
     });
 
     logLinearWebhook('info', 'imported_unlinked_issue', {
@@ -239,7 +241,7 @@ async function processIssueEvent(
       story_map_id: candidate.storyMapId,
     });
 
-    return successResponse({ duplicate: receipt.duplicate, applied: true, storyId: imported.storyId });
+    return successResponse({ duplicate: imported.duplicate, applied: true, storyId: imported.storyId });
   }
 
   const { data: story, error: storyError } = await supabase
@@ -251,7 +253,7 @@ async function processIssueEvent(
     throw storyError ?? new Error('Story not found for linked issue');
   }
 
-  const remoteUpdatedAt = getString(payload?.updatedAt) ?? event.createdAt;
+  const remoteUpdatedAt = getString(payload?.updatedAt) ?? event.occurredAt;
   const localUpdatedAt = getString((story as Record<string, unknown>).updated_at);
   if (!shouldApplyRemoteUpdate(remoteUpdatedAt, localUpdatedAt)) {
     await upsertStoryLinearLink(supabase, {
@@ -308,9 +310,8 @@ async function processIssueEvent(
       p_story_id: link.storyId,
       p_linear_issue_id: linearIssueId,
       p_linear_issue_identifier: getString(payload?.identifier) ?? link.linearIssueIdentifier,
-      p_last_local_updated_at: remoteUpdatedAt,
+      p_expected_story_updated_at: localUpdatedAt,
       p_last_linear_updated_at: remoteUpdatedAt,
-      p_story_updated_at: String(dbUpdate.updated_at),
       p_story_title: typeof dbUpdate.title === 'string' ? dbUpdate.title : null,
       p_story_status: typeof dbUpdate.status === 'string' ? dbUpdate.status : null,
       p_story_content:
@@ -320,15 +321,28 @@ async function processIssueEvent(
       p_event_action: event.action,
       p_payload: event.payload,
     })
-    .single<{ duplicate: boolean }>();
+    .single<{ duplicate: boolean; applied: boolean; conflict: boolean }>();
   if (writebackError) throw writebackError;
+
+  if (writebackResult?.conflict) {
+    logLinearWebhook('info', 'ignored_concurrent_local_update', {
+      delivery_id: event.idempotencyKey,
+      issue_id: linearIssueId,
+      story_id: link.storyId,
+    });
+    return successResponse({ ignored: true });
+  }
 
   logLinearWebhook('info', 'applied_issue_writeback', {
     delivery_id: event.idempotencyKey,
     issue_id: linearIssueId,
     story_id: link.storyId,
   });
-  return successResponse({ duplicate: writebackResult?.duplicate ?? false, applied: true, storyId: link.storyId });
+  return successResponse({
+    duplicate: writebackResult?.duplicate ?? false,
+    applied: writebackResult?.applied ?? false,
+    storyId: link.storyId,
+  });
 }
 
 export async function POST(request: Request) {

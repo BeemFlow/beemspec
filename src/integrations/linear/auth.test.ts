@@ -46,6 +46,7 @@ vi.mock('./settings', () => ({
 import {
   isLinearSyncAvailableForStoryMap,
   resolveLinearAuthTokenForTeam,
+  resolveLinearAuthTokenForTeamResult,
   resolveLinearSyncContextForStory,
   resolveLinearSyncContextForStoryMap,
 } from './auth';
@@ -112,6 +113,7 @@ describe('linear auth', () => {
     createLinearClientMock.mockReturnValue(syncClient);
 
     await expect(resolveLinearSyncContextForStoryMap({} as never, { storyMapId: 'map-1' })).resolves.toEqual({
+      status: 'ready',
       teamId: 'team-1',
       target: { projectId: 'project-1' },
       targetConfigured: true,
@@ -119,15 +121,28 @@ describe('linear auth', () => {
     });
   });
 
-  it('returns a safe default story sync context when target lookup fails', async () => {
-    getSyncTargetForStoryMock.mockRejectedValue(new Error('boom'));
+  it('distinguishes a failed context lookup from an unconfigured integration', async () => {
+    const error = new Error('boom');
+    getSyncTargetForStoryMock.mockRejectedValue(error);
 
     await expect(resolveLinearSyncContextForStory({} as never, { storyId: 'story-1' })).resolves.toEqual({
+      status: 'error',
       teamId: null,
       target: null,
       targetConfigured: false,
       linearIssueSync: null,
+      error,
     });
+  });
+
+  it('reports token infrastructure failures separately from a missing connection', async () => {
+    const error = new Error('database unavailable');
+    getLinearOAuthConnectionForTeamMock.mockRejectedValue(error);
+
+    await expect(resolveLinearAuthTokenForTeamResult('team-1')).resolves.toEqual({ status: 'error', error });
+
+    getLinearOAuthConnectionForTeamMock.mockResolvedValue(null);
+    await expect(resolveLinearAuthTokenForTeamResult('team-1')).resolves.toEqual({ status: 'not_connected' });
   });
 
   it('checks team availability before reporting story map sync availability', async () => {

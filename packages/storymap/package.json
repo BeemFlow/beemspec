@@ -9,12 +9,6 @@
     ".": "./src/index.ts"
   },
   "peerDependencies": {
-    "react": ">=18",
     "zod": ">=3"
-  },
-  "peerDependenciesMeta": {
-    "react": {
-      "optional": true
-    }
   }
 }

@@ -20,6 +20,8 @@ export {
   resolveLinearStateIdForStoryStatus,
   selectLinearStateIdForStoryStatus,
 } from './client';
+export type { ManualLinearSyncResponse, StoryMapLinearSettingsResponse } from './contracts';
+export { manualLinearSyncResponseSchema, storyMapLinearSettingsResponseSchema } from './contracts';
 export type { ParsedLinearStoryFields } from './description';
 // Description serialize/parse
 export { buildLinearDescription, mapStoryToLinearIssueInput, parseLinearDescriptionToStoryFields } from './description';

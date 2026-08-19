@@ -112,6 +112,7 @@ describe('story map domain routes', () => {
     vi.mocked(isLinearSyncAvailableForStoryMap).mockResolvedValue(false);
     vi.mocked(processStoryLinearSyncById).mockResolvedValue({ id: 'lin_1', identifier: 'ENG-1' } as never);
     vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
+      status: 'not_connected',
       teamId: 'team_1',
       targetConfigured: true,
       target: { teamId: 'linear_team_1' },
@@ -240,6 +241,7 @@ describe('story map domain routes', () => {
     vi.mocked(createClient).mockResolvedValue(client as never);
     const deleteIssue = vi.fn().mockResolvedValue(undefined);
     vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
+      status: 'ready',
       teamId: 'team_1',
       targetConfigured: true,
       target: { teamId: 'linear_team_1' },

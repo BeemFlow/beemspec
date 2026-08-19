@@ -18,9 +18,6 @@ import type {
   UpdateStoryMap,
   UpdateTask,
 } from '@beemspec/storymap';
-import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
-import { getStoryLinearLink } from '@/integrations/linear/story-links';
-import { maybeSyncStoryToLinear } from '@/integrations/linear/sync';
 import type { Supabase } from '@/lib/supabase/types';
 import { pickDefined } from '@/lib/validations';
 
@@ -244,7 +241,7 @@ export async function getStory(supabase: Supabase, storyId: string) {
 }
 
 export async function createStory(supabase: Supabase, input: CreateStory) {
-  const created = await supabase
+  return supabase
     .from('stories')
     .insert({
       task_id: input.task_id,
@@ -255,93 +252,13 @@ export async function createStory(supabase: Supabase, input: CreateStory) {
     })
     .select()
     .single();
-
-  if (created.error || !created.data) {
-    return { data: created.data, error: created.error };
-  }
-
-  try {
-    const linearIssue = await maybeSyncStoryToLinear(supabase, created.data.id);
-    if (!linearIssue) return created;
-
-    return {
-      data: {
-        ...created.data,
-        linear_sync: {
-          status: 'synced',
-          linear_issue_id: linearIssue.id,
-          linear_issue_identifier: linearIssue.identifier,
-        },
-      },
-      error: null,
-    };
-  } catch (syncError) {
-    // biome-ignore lint/suspicious/noConsole: best-effort outbound sync
-    console.error('Failed to sync story to Linear', syncError);
-    return created;
-  }
 }
 
 export async function updateStory(supabase: Supabase, storyId: string, changes: UpdateStory) {
-  const updated = await supabase.from('stories').update(pickDefined(changes)).eq('id', storyId).select().single();
-
-  if (updated.error || !updated.data) {
-    return { data: updated.data, error: updated.error };
-  }
-
-  try {
-    const linearIssue = await maybeSyncStoryToLinear(supabase, updated.data.id);
-    if (!linearIssue) return updated;
-
-    return {
-      data: {
-        ...updated.data,
-        linear_sync: {
-          status: 'synced',
-          linear_issue_id: linearIssue.id,
-          linear_issue_identifier: linearIssue.identifier,
-        },
-      },
-      error: null,
-    };
-  } catch (syncError) {
-    // biome-ignore lint/suspicious/noConsole: best-effort outbound sync
-    console.error('Failed to sync story to Linear', syncError);
-    return updated;
-  }
+  return supabase.from('stories').update(pickDefined(changes)).eq('id', storyId).select().single();
 }
 
 export async function deleteStory(supabase: Supabase, storyId: string) {
-  try {
-    const link = await getStoryLinearLink(supabase, storyId);
-    if (link) {
-      const context = await resolveLinearSyncContextForStory(supabase, {
-        storyId,
-      });
-      const issueSync = context.linearIssueSync;
-
-      if (!issueSync) {
-        // Proceed with local delete when remote sync is unavailable.
-        return supabase.from('stories').delete().eq('id', storyId).select().single();
-      }
-
-      try {
-        await issueSync.deleteIssue(link.linearIssueId);
-      } catch (error) {
-        const status = typeof error === 'object' && error && 'status' in error ? Number(error.status) : null;
-        if (status !== 404) {
-          // best-effort remote delete; local story delete proceeds
-          // biome-ignore lint/suspicious/noConsole: operational visibility for remote delete failures
-          console.warn('Failed to delete linked Linear issue; proceeding with local delete', error);
-        }
-      }
-    }
-  } catch (error) {
-    // best-effort link lookup; local story delete proceeds
-    // biome-ignore lint/suspicious/noConsole: operational visibility for lookup failures
-    console.warn('Failed to load linked Linear issue for deletion; proceeding with local delete', error);
-  }
-
   return supabase.from('stories').delete().eq('id', storyId).select().single();
 }
 

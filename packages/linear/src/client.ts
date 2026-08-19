@@ -1,4 +1,5 @@
 import type { StoryStatus } from '@beemspec/storymap';
+import type { IssueSnapshot, IssueSync, IssueUpsertInput } from '@beemspec/sync';
 import {
   type Issue,
   type IssuePayload,
@@ -7,7 +8,6 @@ import {
   NetworkLinearError,
   RatelimitedLinearError,
 } from '@linear/sdk';
-import type { IssueSnapshot, IssueSync, IssueUpsertInput } from '@/integrations/sync';
 
 const DEFAULT_MAX_RETRIES = 2;
 const BASE_BACKOFF_MS = 250;

@@ -1,5 +1,5 @@
 import type { StoryStatus } from '@beemspec/storymap';
-import type { SyncTarget } from '@/integrations/sync';
+import type { SyncTarget } from '@beemspec/sync';
 import { normalize } from '@/lib/strings';
 import type { SupabaseLike } from '@/lib/supabase/types';
 
@@ -144,20 +144,16 @@ async function getStoryMapLinearOverrides(
   supabase: SupabaseLike,
   storyMapId: string,
 ): Promise<StoryMapIntegrationSettingsRow | null> {
-  try {
-    const table = supabase.from('story_map_integration_settings') as StoryMapIntegrationSettingsTable;
-    const { data, error } = await table
-      .select(
-        'linear_project_id, use_team_status_mapping, linear_status_mapping, auto_import_labeled_issues, import_label_name',
-      )
-      .eq('story_map_id', storyMapId)
-      .maybeSingle();
+  const table = supabase.from('story_map_integration_settings') as StoryMapIntegrationSettingsTable;
+  const { data, error } = await table
+    .select(
+      'linear_project_id, use_team_status_mapping, linear_status_mapping, auto_import_labeled_issues, import_label_name',
+    )
+    .eq('story_map_id', storyMapId)
+    .maybeSingle();
 
-    if (error) throw error;
-    return data;
-  } catch {
-    return null;
-  }
+  if (error) throw error;
+  return data;
 }
 
 export function toStoryMapLinearImportSettings(
@@ -192,14 +188,10 @@ async function getSettingsForTeamId(supabase: SupabaseLike, teamId: string): Pro
 }
 
 async function getTeamIdForStoryMapInternal(supabase: SupabaseLike, storyMapId: string): Promise<TeamIdResult> {
-  try {
-    const storyMapsTable = supabase.from('story_maps') as StoryMapsTable;
-    const { data, error } = await storyMapsTable.select('team_id').eq('id', storyMapId).single();
-    if (error) throw error;
-    return { teamId: data?.team_id ?? null };
-  } catch {
-    return { teamId: null };
-  }
+  const storyMapsTable = supabase.from('story_maps') as StoryMapsTable;
+  const { data, error } = await storyMapsTable.select('team_id').eq('id', storyMapId).single();
+  if (error) throw error;
+  return { teamId: data?.team_id ?? null };
 }
 
 export async function getTeamIdForStoryMap(supabase: SupabaseLike, storyMapId: string): Promise<string | null> {
@@ -221,42 +213,34 @@ export async function getSyncTargetForStoryMap(supabase: SupabaseLike, storyMapI
 }
 
 export async function getSyncTargetForStory(supabase: SupabaseLike, storyId: string): Promise<SyncTarget | null> {
-  try {
-    const storiesTable = supabase.from('stories') as StoriesTable;
-    const { data, error } = await storiesTable
-      .select('tasks!inner(activities!inner(story_maps!inner(id, team_id)))')
-      .eq('id', storyId)
-      .single();
-    if (error) throw error;
+  const storiesTable = supabase.from('stories') as StoriesTable;
+  const { data, error } = await storiesTable
+    .select('tasks!inner(activities!inner(story_maps!inner(id, team_id)))')
+    .eq('id', storyId)
+    .single();
+  if (error) throw error;
 
-    const storyMap = data?.tasks?.activities?.story_maps;
-    const teamId = storyMap?.team_id;
-    if (!teamId) return null;
+  const storyMap = data?.tasks?.activities?.story_maps;
+  const teamId = storyMap?.team_id;
+  if (!teamId) return null;
 
-    const [teamTarget, storyMapOverrides] = await Promise.all([
-      getSettingsForTeamId(supabase, teamId),
-      storyMap?.id ? getStoryMapLinearOverrides(supabase, storyMap.id) : Promise.resolve(null),
-    ]);
+  const [teamTarget, storyMapOverrides] = await Promise.all([
+    getSettingsForTeamId(supabase, teamId),
+    storyMap?.id ? getStoryMapLinearOverrides(supabase, storyMap.id) : Promise.resolve(null),
+  ]);
 
-    if (!teamTarget) return null;
+  if (!teamTarget) return null;
 
-    return applyStoryMapOverrides(teamTarget, storyMapOverrides);
-  } catch {
-    return null;
-  }
+  return applyStoryMapOverrides(teamTarget, storyMapOverrides);
 }
 
 export async function getTeamIdForStory(supabase: SupabaseLike, storyId: string): Promise<string | null> {
-  try {
-    const storiesTable = supabase.from('stories') as StoriesTable;
-    const { data, error } = await storiesTable
-      .select('tasks!inner(activities!inner(story_maps!inner(team_id)))')
-      .eq('id', storyId)
-      .single();
-    if (error) throw error;
+  const storiesTable = supabase.from('stories') as StoriesTable;
+  const { data, error } = await storiesTable
+    .select('tasks!inner(activities!inner(story_maps!inner(team_id)))')
+    .eq('id', storyId)
+    .single();
+  if (error) throw error;
 
-    return data?.tasks?.activities?.story_maps?.team_id ?? null;
-  } catch {
-    return null;
-  }
+  return data?.tasks?.activities?.story_maps?.team_id ?? null;
 }

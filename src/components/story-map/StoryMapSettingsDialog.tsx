@@ -1,5 +1,6 @@
 'use client';
 
+import { manualLinearSyncResponseSchema, storyMapLinearSettingsResponseSchema } from '@beemspec/linear';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -20,31 +21,24 @@ import { fetchJson } from '@/lib/http';
 // ---------------------------------------------------------------------------
 
 type StoryMapSettingsTab = 'general' | 'integrations' | 'danger';
+type StoryStatusKey = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done';
+type StatusMapping = Partial<Record<StoryStatusKey, string>>;
 
-interface StoryMapLinearSettingsResponse {
-  story_map_id: string;
-  team_id: string;
-  can_edit: boolean;
-  team_settings: {
-    linear_connected: boolean;
-    linear_team_id: string | null;
-    linear_status_mapping: Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>;
-  };
-  story_map_settings: {
-    linear_project_id: string | null;
-    use_team_status_mapping: boolean;
-    linear_status_mapping: Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>;
-    auto_import_labeled_issues: boolean;
-    import_label_name: string;
-    updated_at: string | null;
-  };
-  effective_settings: {
-    linear_project_id: string | null;
-    linear_status_mapping: Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>;
-    auto_import_labeled_issues: boolean;
-    import_label_name: string;
-  };
+interface LinearSettingsDraft {
+  projectId: string;
+  useTeamStatusMapping: boolean;
+  statusMapping: StatusMapping;
+  autoImportLabeledIssues: boolean;
+  importLabelName: string;
 }
+
+const EMPTY_LINEAR_SETTINGS: LinearSettingsDraft = {
+  projectId: '',
+  useTeamStatusMapping: true,
+  statusMapping: {},
+  autoImportLabeledIssues: true,
+  importLabelName: 'Story',
+};
 
 interface LinearOptionsResponse {
   connected: boolean;
@@ -162,8 +156,8 @@ function IntegrationsTab({
   onProjectIdChange: (value: string) => void;
   useTeamStatusMapping: boolean;
   onUseTeamStatusMappingChange: (value: boolean) => void;
-  statusMapping: Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>;
-  onStatusMappingChange: (key: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', value: string | null) => void;
+  statusMapping: StatusMapping;
+  onStatusMappingChange: (key: StoryStatusKey, value: string | null) => void;
   autoImportLabeledIssues: boolean;
   onAutoImportLabeledIssuesChange: (value: boolean) => void;
   importLabelName: string;
@@ -413,20 +407,8 @@ export function StoryMapSettingsDialog({
   const [teamLinearConnected, setTeamLinearConnected] = useState(false);
   const [teamLinearTeamId, setTeamLinearTeamId] = useState<string | null>(null);
   const [canEdit, setCanEdit] = useState(false);
-  const [projectId, setProjectId] = useState('');
-  const [useTeamStatusMapping, setUseTeamStatusMapping] = useState(true);
-  const [statusMapping, setStatusMapping] = useState<
-    Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>
-  >({});
-  const [autoImportLabeledIssues, setAutoImportLabeledIssues] = useState(true);
-  const [importLabelName, setImportLabelName] = useState('Story');
-  const [savedProjectId, setSavedProjectId] = useState('');
-  const [savedAutoImportLabeledIssues, setSavedAutoImportLabeledIssues] = useState(true);
-  const [savedImportLabelName, setSavedImportLabelName] = useState('Story');
-  const [savedUseTeamStatusMapping, setSavedUseTeamStatusMapping] = useState(true);
-  const [savedStatusMapping, setSavedStatusMapping] = useState<
-    Partial<Record<'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done', string>>
-  >({});
+  const [integrationDraft, setIntegrationDraft] = useState<LinearSettingsDraft>(EMPTY_LINEAR_SETTINGS);
+  const [savedIntegrationDraft, setSavedIntegrationDraft] = useState<LinearSettingsDraft>(EMPTY_LINEAR_SETTINGS);
   const [effectiveProjectId, setEffectiveProjectId] = useState<string | null>(null);
   const [projectOptions, setProjectOptions] = useState<Array<{ id: string; name: string; teamIds: string[] }>>([]);
   const [stateOptions, setStateOptions] = useState<
@@ -446,27 +428,27 @@ export function StoryMapSettingsDialog({
     setIntegrationsNotice(null);
 
     try {
-      const data = await fetchJson<StoryMapLinearSettingsResponse>(
-        `/api/story-maps/${storyMapId}/integrations/linear`,
-        undefined,
-        'Failed to load story map Linear settings',
+      const data = storyMapLinearSettingsResponseSchema.parse(
+        await fetchJson<unknown>(
+          `/api/story-maps/${storyMapId}/integrations/linear`,
+          undefined,
+          'Failed to load story map Linear settings',
+        ),
       );
 
       setTeamId(data.team_id);
       setCanEdit(data.can_edit);
       setTeamLinearConnected(data.team_settings.linear_connected);
       setTeamLinearTeamId(data.team_settings.linear_team_id);
-      const nextProjectId = asInputValue(data.story_map_settings.linear_project_id);
-      setProjectId(nextProjectId);
-      setSavedProjectId(nextProjectId);
-      setUseTeamStatusMapping(data.story_map_settings.use_team_status_mapping);
-      setSavedUseTeamStatusMapping(data.story_map_settings.use_team_status_mapping);
-      setStatusMapping(data.story_map_settings.linear_status_mapping ?? {});
-      setSavedStatusMapping(data.story_map_settings.linear_status_mapping ?? {});
-      setAutoImportLabeledIssues(data.story_map_settings.auto_import_labeled_issues);
-      setSavedAutoImportLabeledIssues(data.story_map_settings.auto_import_labeled_issues);
-      setImportLabelName(data.story_map_settings.import_label_name);
-      setSavedImportLabelName(data.story_map_settings.import_label_name);
+      const nextDraft: LinearSettingsDraft = {
+        projectId: asInputValue(data.story_map_settings.linear_project_id),
+        useTeamStatusMapping: data.story_map_settings.use_team_status_mapping,
+        statusMapping: data.story_map_settings.linear_status_mapping ?? {},
+        autoImportLabeledIssues: data.story_map_settings.auto_import_labeled_issues,
+        importLabelName: data.story_map_settings.import_label_name,
+      };
+      setIntegrationDraft(nextDraft);
+      setSavedIntegrationDraft(nextDraft);
       setEffectiveProjectId(data.effective_settings.linear_project_id ?? null);
       if (!data.team_settings.linear_connected || !data.team_settings.linear_team_id) {
         setProjectOptions([]);
@@ -538,15 +520,16 @@ export function StoryMapSettingsDialog({
   );
 
   const teamLinearAvailable = teamLinearConnected && Boolean(teamLinearTeamId);
+  const { projectId, useTeamStatusMapping, statusMapping, autoImportLabeledIssues, importLabelName } = integrationDraft;
 
   const hasGeneralChanges = editName !== storyMapName || asNullable(editDescription) !== (storyMapDescription ?? null);
 
   const hasIntegrationsChanges =
-    asNullable(projectId) !== asNullable(savedProjectId) ||
-    useTeamStatusMapping !== savedUseTeamStatusMapping ||
-    JSON.stringify(statusMapping) !== JSON.stringify(savedStatusMapping) ||
-    autoImportLabeledIssues !== savedAutoImportLabeledIssues ||
-    importLabelName.trim() !== savedImportLabelName.trim();
+    asNullable(projectId) !== asNullable(savedIntegrationDraft.projectId) ||
+    useTeamStatusMapping !== savedIntegrationDraft.useTeamStatusMapping ||
+    JSON.stringify(statusMapping) !== JSON.stringify(savedIntegrationDraft.statusMapping) ||
+    autoImportLabeledIssues !== savedIntegrationDraft.autoImportLabeledIssues ||
+    importLabelName.trim() !== savedIntegrationDraft.importLabelName.trim();
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -621,28 +604,12 @@ export function StoryMapSettingsDialog({
     setIntegrationsNotice(null);
 
     try {
-      const result = await fetchJson<{
-        stories: {
-          considered: number;
-          processed: number;
-          succeeded: number;
-          failed: number;
-          ignored: number;
-          created_in_linear: number;
-          synced_to_linear: number;
-          synced_from_linear: number;
-        };
-        imports: {
-          considered: number;
-          imported: number;
-          skipped: number;
-          skipped_already_linked: number;
-          skipped_no_candidate: number;
-        };
-      }>(
-        `/api/story-maps/${storyMapId}/integrations/linear/sync`,
-        { method: 'POST' },
-        'Failed to sync story map with Linear',
+      const result = manualLinearSyncResponseSchema.parse(
+        await fetchJson<unknown>(
+          `/api/story-maps/${storyMapId}/integrations/linear/sync`,
+          { method: 'POST' },
+          'Failed to sync story map with Linear',
+        ),
       );
 
       const storySummary = [
@@ -669,15 +636,16 @@ export function StoryMapSettingsDialog({
     }
   }
 
-  function handleStatusMappingChange(
-    key: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done',
-    value: string | null,
-  ) {
-    setStatusMapping((current) => {
-      const next = { ...current };
+  function updateIntegrationDraft(changes: Partial<LinearSettingsDraft>) {
+    setIntegrationDraft((current) => ({ ...current, ...changes }));
+  }
+
+  function handleStatusMappingChange(key: StoryStatusKey, value: string | null) {
+    setIntegrationDraft((current) => {
+      const next = { ...current.statusMapping };
       if (value === null) delete next[key];
       else next[key] = value;
-      return next;
+      return { ...current, statusMapping: next };
     });
   }
 
@@ -730,15 +698,15 @@ export function StoryMapSettingsDialog({
           filteredStateOptions={filteredStateOptions}
           optionsLoading={optionsLoading}
           projectId={projectId}
-          onProjectIdChange={setProjectId}
+          onProjectIdChange={(value) => updateIntegrationDraft({ projectId: value })}
           useTeamStatusMapping={useTeamStatusMapping}
-          onUseTeamStatusMappingChange={setUseTeamStatusMapping}
+          onUseTeamStatusMappingChange={(value) => updateIntegrationDraft({ useTeamStatusMapping: value })}
           statusMapping={statusMapping}
           onStatusMappingChange={handleStatusMappingChange}
           autoImportLabeledIssues={autoImportLabeledIssues}
-          onAutoImportLabeledIssuesChange={setAutoImportLabeledIssues}
+          onAutoImportLabeledIssuesChange={(value) => updateIntegrationDraft({ autoImportLabeledIssues: value })}
           importLabelName={importLabelName}
-          onImportLabelNameChange={setImportLabelName}
+          onImportLabelNameChange={(value) => updateIntegrationDraft({ importLabelName: value })}
           saving={saving}
           syncing={syncing}
           hasUnsavedChanges={hasIntegrationsChanges}

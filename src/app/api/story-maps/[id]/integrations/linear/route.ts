@@ -1,4 +1,4 @@
-import { updateStoryMapLinearSettingsSchema } from '@beemspec/linear';
+import { storyMapLinearSettingsResponseSchema, updateStoryMapLinearSettingsSchema } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
 import { getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/connections';
 import { DEFAULT_AUTO_IMPORT_LABELED_ISSUES, DEFAULT_LINEAR_IMPORT_LABEL } from '@/integrations/linear/settings';
@@ -89,33 +89,35 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const teamSettings = teamSettingsResult.data;
   const storyMapSettings = storyMapSettingsResult.data;
-  return NextResponse.json({
-    story_map_id: storyMapId,
-    team_id: storyMap.team_id,
-    can_edit: canEdit,
-    team_settings: {
-      linear_connected: Boolean(connection),
-      linear_team_id: teamSettings?.linear_team_id ?? null,
-      linear_status_mapping: teamSettings?.linear_status_mapping ?? {},
-    },
-    story_map_settings: {
-      linear_project_id: storyMapSettings?.linear_project_id ?? null,
-      use_team_status_mapping: storyMapSettings?.use_team_status_mapping ?? true,
-      linear_status_mapping: storyMapSettings?.linear_status_mapping ?? {},
-      auto_import_labeled_issues: storyMapSettings?.auto_import_labeled_issues ?? DEFAULT_AUTO_IMPORT_LABELED_ISSUES,
-      import_label_name: toNullable(storyMapSettings?.import_label_name) ?? DEFAULT_IMPORT_LABEL_NAME,
-      updated_at: storyMapSettings?.updated_at ?? null,
-    },
-    effective_settings: {
-      linear_project_id: toNullable(storyMapSettings?.linear_project_id),
-      linear_status_mapping:
-        storyMapSettings?.use_team_status_mapping === false
-          ? (storyMapSettings?.linear_status_mapping ?? {})
-          : { ...(teamSettings?.linear_status_mapping ?? {}), ...(storyMapSettings?.linear_status_mapping ?? {}) },
-      auto_import_labeled_issues: storyMapSettings?.auto_import_labeled_issues ?? DEFAULT_AUTO_IMPORT_LABELED_ISSUES,
-      import_label_name: toNullable(storyMapSettings?.import_label_name) ?? DEFAULT_IMPORT_LABEL_NAME,
-    },
-  });
+  return NextResponse.json(
+    storyMapLinearSettingsResponseSchema.parse({
+      story_map_id: storyMapId,
+      team_id: storyMap.team_id,
+      can_edit: canEdit,
+      team_settings: {
+        linear_connected: Boolean(connection),
+        linear_team_id: teamSettings?.linear_team_id ?? null,
+        linear_status_mapping: teamSettings?.linear_status_mapping ?? {},
+      },
+      story_map_settings: {
+        linear_project_id: storyMapSettings?.linear_project_id ?? null,
+        use_team_status_mapping: storyMapSettings?.use_team_status_mapping ?? true,
+        linear_status_mapping: storyMapSettings?.linear_status_mapping ?? {},
+        auto_import_labeled_issues: storyMapSettings?.auto_import_labeled_issues ?? DEFAULT_AUTO_IMPORT_LABELED_ISSUES,
+        import_label_name: toNullable(storyMapSettings?.import_label_name) ?? DEFAULT_IMPORT_LABEL_NAME,
+        updated_at: storyMapSettings?.updated_at ?? null,
+      },
+      effective_settings: {
+        linear_project_id: toNullable(storyMapSettings?.linear_project_id),
+        linear_status_mapping:
+          storyMapSettings?.use_team_status_mapping === false
+            ? (storyMapSettings?.linear_status_mapping ?? {})
+            : { ...(teamSettings?.linear_status_mapping ?? {}), ...(storyMapSettings?.linear_status_mapping ?? {}) },
+        auto_import_labeled_issues: storyMapSettings?.auto_import_labeled_issues ?? DEFAULT_AUTO_IMPORT_LABELED_ISSUES,
+        import_label_name: toNullable(storyMapSettings?.import_label_name) ?? DEFAULT_IMPORT_LABEL_NAME,
+      },
+    }),
+  );
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {

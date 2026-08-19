@@ -1,14 +1,14 @@
 import { buildStoryPatchFromLinearIssue, mapStoryToLinearIssueInput } from '@beemspec/linear';
-import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
-import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import { maybeSyncStoryToLinear } from '@/integrations/linear/sync';
 import {
   buildDbUpdateFromPatch,
   type IssueSync,
   SYNC_DIRECTION,
   shouldApplyRemoteUpdate,
   syncStoryToRemote,
-} from '@/integrations/sync';
+} from '@beemspec/sync';
+import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
+import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
+import { maybeSyncStoryToLinear } from '@/integrations/linear/sync';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import type { Supabase } from '@/lib/supabase/types';
 
@@ -124,12 +124,19 @@ export async function syncStoryById(input: { supabase: Supabase; storyId: string
   const linearSyncContext = await resolveLinearSyncContextForStory(input.supabase, {
     storyId: input.storyId,
   });
+  if (linearSyncContext.status === 'error') {
+    return serverErrorResponse('Failed to resolve Linear sync context', linearSyncContext.error);
+  }
   if (!linearSyncContext.targetConfigured || !linearSyncContext.target) {
     return ignored('no linear target configured for story team');
   }
 
   if (!linearSyncContext.linearIssueSync) {
-    return ignored('Linear integration is not enabled');
+    return ignored(
+      linearSyncContext.status === 'auth_unavailable'
+        ? 'Linear authorization is unavailable or expired'
+        : 'Linear integration is not connected',
+    );
   }
 
   const link = await getStoryLinearLink(input.supabase, story.id);
@@ -169,7 +176,32 @@ export async function syncStoriesByIdList(input: { supabase: Supabase; storyIds:
   remoteToLocal: number;
   responses: Array<{ storyId: string; response: Response }>;
 }> {
-  const responses: Array<{ storyId: string; response: Response }> = [];
+  const concurrency = Math.min(4, Math.max(1, input.storyIds.length));
+  const nextIndex = { value: 0 };
+  const responses = new Array<{ storyId: string; response: Response }>(input.storyIds.length);
+
+  async function worker() {
+    while (nextIndex.value < input.storyIds.length) {
+      const index = nextIndex.value;
+      nextIndex.value += 1;
+      const storyId = input.storyIds[index];
+
+      try {
+        responses[index] = {
+          storyId,
+          response: await syncStoryById({ supabase: input.supabase, storyId }),
+        };
+      } catch (error) {
+        responses[index] = {
+          storyId,
+          response: serverErrorResponse('Failed to sync story', error),
+        };
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+
   let succeeded = 0;
   let failed = 0;
   let ignored = 0;
@@ -177,30 +209,16 @@ export async function syncStoriesByIdList(input: { supabase: Supabase; storyIds:
   let localToRemote = 0;
   let remoteToLocal = 0;
 
-  for (const storyId of input.storyIds) {
-    try {
-      const response = await syncStoryById({
-        supabase: input.supabase,
-        storyId,
-      });
-      responses.push({ storyId, response });
-
-      if (isSuccessResponseStatus(response.status)) {
-        succeeded += 1;
-        const payload = await readSyncResponsePayload(response);
-        if (payload?.ignored) ignored += 1;
-        if (payload?.action === 'created_remote') createdRemote += 1;
-        if (payload?.action === 'local_to_remote') localToRemote += 1;
-        if (payload?.action === 'remote_to_local') remoteToLocal += 1;
-      } else {
-        failed += 1;
-      }
-    } catch (error) {
+  for (const { response } of responses) {
+    if (isSuccessResponseStatus(response.status)) {
+      succeeded += 1;
+      const payload = await readSyncResponsePayload(response);
+      if (payload?.ignored) ignored += 1;
+      if (payload?.action === 'created_remote') createdRemote += 1;
+      if (payload?.action === 'local_to_remote') localToRemote += 1;
+      if (payload?.action === 'remote_to_local') remoteToLocal += 1;
+    } else {
       failed += 1;
-      responses.push({
-        storyId,
-        response: serverErrorResponse('Failed to sync story', error),
-      });
     }
   }
 
