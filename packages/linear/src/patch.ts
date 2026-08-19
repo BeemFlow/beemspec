@@ -1,5 +1,5 @@
 import type { StoryContent } from '@beemspec/storymap';
-import type { StoryPatchFromRemote } from '@/integrations/sync';
+import type { StoryPatchFromRemote } from '@beemspec/sync';
 import { parseLinearDescriptionToStoryFields } from './description';
 import { mapLinearStatusToStoryStatus } from './status-map';
 

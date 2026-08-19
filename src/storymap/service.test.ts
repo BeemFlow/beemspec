@@ -4,8 +4,6 @@ import { getStoryLinearLink } from '@/integrations/linear/story-links';
 import { maybeSyncStoryToLinear } from '@/integrations/linear/sync';
 import { DbErrorCode } from '@/lib/errors';
 import {
-  createStory,
-  deleteStory,
   getReleaseMcpContext,
   getStory,
   getStoryMapGraph,
@@ -18,8 +16,8 @@ import {
   reorderReleases,
   reorderStories,
   reorderTasks,
-  updateStory,
 } from './service';
+import { createStory, deleteStory, updateStory } from './use-cases';
 
 vi.mock('@/integrations/linear/auth', () => ({ resolveLinearSyncContextForStory: vi.fn() }));
 vi.mock('@/integrations/linear/story-links', () => ({ getStoryLinearLink: vi.fn() }));

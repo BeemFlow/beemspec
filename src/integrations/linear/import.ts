@@ -1,9 +1,7 @@
 import { buildStoryPatchFromLinearIssue } from '@beemspec/linear';
 import { emptyContent } from '@beemspec/storymap';
+import { buildDbUpdateFromPatch, type StoryStatus } from '@beemspec/sync';
 import { toStoryMapLinearImportSettings } from '@/integrations/linear/settings';
-import { upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import type { StoryStatus } from '@/integrations/sync';
-import { buildDbUpdateFromPatch } from '@/integrations/sync';
 import { normalize } from '@/lib/strings';
 import type { Supabase, SupabaseLike } from '@/lib/supabase/types';
 
@@ -41,23 +39,6 @@ interface StoryMapsTable {
     eq(column: string, value: string): Promise<{ data: StoryMapRow[] | null; error: unknown }>;
     in(column: string, values: string[]): Promise<{ data: StoryMapRow[] | null; error: unknown }>;
   };
-}
-
-interface ActivityRow {
-  id: string;
-  name: string;
-  sort_order: number;
-}
-
-interface TaskRow {
-  id: string;
-  name: string;
-  sort_order: number;
-}
-
-interface StoryInsertRow {
-  id: string;
-  updated_at: string;
 }
 
 function sameName(a: string | null | undefined, b: string): boolean {
@@ -126,68 +107,6 @@ export async function findStoryMapImportCandidate(
   return candidates[0] ?? null;
 }
 
-export async function ensureUntriagedTaskId(supabase: Supabase, storyMapId: string): Promise<string> {
-  const untriagedName = 'Untriaged';
-  const { data: activitiesData, error: activitiesError } = await supabase
-    .from('activities')
-    .select('id, name, sort_order')
-    .eq('story_map_id', storyMapId)
-    .order('sort_order');
-
-  if (activitiesError) throw activitiesError;
-
-  const activities = (activitiesData ?? []) as ActivityRow[];
-  let untriagedActivity = activities.find((activity) => sameName(activity.name, untriagedName));
-
-  if (!untriagedActivity) {
-    const { data: createdActivity, error: createActivityError } = await supabase
-      .from('activities')
-      .insert({ story_map_id: storyMapId, name: untriagedName, description: 'Imported from Linear for triage' })
-      .select('id, name, sort_order')
-      .single<ActivityRow>();
-
-    if (createActivityError || !createdActivity) {
-      throw createActivityError ?? new Error('Failed to create Untriaged activity');
-    }
-
-    const reordered = [createdActivity.id, ...activities.map((activity) => activity.id)];
-    const { error: reorderError } = await supabase.rpc('reorder_activities', {
-      p_story_map_id: storyMapId,
-      p_order: reordered,
-    });
-    if (reorderError) throw reorderError;
-
-    untriagedActivity = createdActivity;
-  }
-
-  if (!untriagedActivity) {
-    throw new Error('Failed to resolve Untriaged activity');
-  }
-
-  const { data: tasksData, error: tasksError } = await supabase
-    .from('tasks')
-    .select('id, name, sort_order')
-    .eq('activity_id', untriagedActivity.id)
-    .order('sort_order');
-  if (tasksError) throw tasksError;
-
-  const tasks = (tasksData ?? []) as TaskRow[];
-  const existingTask = tasks.find((task) => sameName(task.name, untriagedName));
-  if (existingTask) return existingTask.id;
-
-  const { data: createdTask, error: createTaskError } = await supabase
-    .from('tasks')
-    .insert({ activity_id: untriagedActivity.id, name: untriagedName, description: 'Imported Linear issues' })
-    .select('id, name, sort_order')
-    .single<TaskRow>();
-
-  if (createTaskError || !createdTask) {
-    throw createTaskError ?? new Error('Failed to create Untriaged task');
-  }
-
-  return createdTask.id;
-}
-
 export async function importLinearIssueIntoStoryMap(input: {
   supabase: Supabase;
   storyMapId: string;
@@ -197,9 +116,13 @@ export async function importLinearIssueIntoStoryMap(input: {
   description: string | null;
   stateName: string | null;
   updatedAt: string;
-}): Promise<{ storyId: string }> {
-  const taskId = await ensureUntriagedTaskId(input.supabase, input.storyMapId);
-
+  receipt?: {
+    idempotencyKey: string;
+    type: string;
+    action: string;
+    payload: unknown;
+  };
+}): Promise<{ storyId: string; duplicate: boolean }> {
   const patch = buildStoryPatchFromLinearIssue({
     title: input.title,
     description: input.description,
@@ -212,30 +135,25 @@ export async function importLinearIssueIntoStoryMap(input: {
   const status = (patch.status ?? 'backlog') as StoryStatus;
   const content = (dbUpdate.content as Record<string, unknown> | null) ?? emptyContent();
 
-  const { data: createdStory, error: createStoryError } = await input.supabase
-    .from('stories')
-    .insert({
-      task_id: taskId,
-      release_id: null,
-      title,
-      status,
-      content,
-      updated_at: input.updatedAt,
+  const { data, error } = await input.supabase
+    .rpc('import_linear_issue_into_story_map', {
+      p_story_map_id: input.storyMapId,
+      p_linear_issue_id: input.linearIssueId,
+      p_linear_issue_identifier: input.linearIssueIdentifier,
+      p_story_title: title,
+      p_story_status: status,
+      p_story_content: content,
+      p_story_updated_at: input.updatedAt,
+      p_idempotency_key: input.receipt?.idempotencyKey ?? null,
+      p_event_type: input.receipt?.type ?? null,
+      p_event_action: input.receipt?.action ?? null,
+      p_payload: input.receipt?.payload ?? null,
     })
-    .select('id, updated_at')
-    .single<StoryInsertRow>();
+    .single<{ duplicate: boolean; story_id: string | null }>();
 
-  if (createStoryError || !createdStory) {
-    throw createStoryError ?? new Error('Failed to import Linear issue into story map');
+  if (error || !data?.story_id) {
+    throw error ?? new Error('Failed to import Linear issue into story map');
   }
 
-  await upsertStoryLinearLink(input.supabase, {
-    storyId: createdStory.id,
-    linearIssueId: input.linearIssueId,
-    linearIssueIdentifier: input.linearIssueIdentifier,
-    lastLocalUpdatedAt: input.updatedAt,
-    lastLinearUpdatedAt: input.updatedAt,
-  });
-
-  return { storyId: createdStory.id };
+  return { storyId: data.story_id, duplicate: data.duplicate };
 }

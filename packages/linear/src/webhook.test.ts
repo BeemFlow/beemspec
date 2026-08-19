@@ -55,7 +55,8 @@ describe('linear webhook ingest contracts', () => {
       idempotencyKey: 'delivery-123',
       type: 'Issue',
       action: 'update',
-      createdAt: '2026-02-13T00:00:00.000Z',
+      occurredAt: '2026-02-13T00:00:00.000Z',
+      deliveredAt: '1770000000000',
       payload: { id: 'issue-1', title: 'Story title' },
     });
   });

@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import type { WebhookEvent, WebhookIngest, WebhookSignatureVerifier } from '@/integrations/sync';
+import type { WebhookEvent, WebhookIngest, WebhookSignatureVerifier } from '@beemspec/sync';
 
 const DEFAULT_MAX_DRIFT_MS = 5 * 60 * 1000;
 
@@ -76,18 +76,19 @@ export function parseLinearWebhookEvent(rawBody: string, headers: Headers): Webh
   const record = body as Record<string, unknown>;
   const type = getString(record.type, 'type');
   const action = getString(record.action, 'action');
-  const createdAt = getString(record.createdAt, 'createdAt');
-  const webhookTimestamp = getWebhookTimestamp(record.webhookTimestamp);
+  const occurredAt = getString(record.createdAt, 'createdAt');
+  const deliveredAt = getWebhookTimestamp(record.webhookTimestamp);
 
   const deliveryId = headers.get('Linear-Delivery');
   const webhookId = typeof record.webhookId === 'string' ? record.webhookId : null;
-  const idempotencyKey = deliveryId ?? webhookId ?? `${type}:${action}:${webhookTimestamp}`;
+  const idempotencyKey = deliveryId ?? webhookId ?? `${type}:${action}:${deliveredAt}`;
 
   return {
     idempotencyKey,
     type,
     action,
-    createdAt,
+    occurredAt,
+    deliveredAt,
     payload: record.data ?? record,
   };
 }

@@ -11,11 +11,9 @@ import {
 } from './settings';
 
 describe('linear settings target resolution', () => {
-  it('returns null when settings unavailable', async () => {
+  it('surfaces settings infrastructure failures', async () => {
     const from = vi.fn().mockReturnValue({});
-    const target = await getSyncTargetForStory({ from }, 'story_1');
-
-    expect(target).toBeNull();
+    await expect(getSyncTargetForStory({ from }, 'story_1')).rejects.toThrow();
   });
 
   it('resolves target for story map id', async () => {

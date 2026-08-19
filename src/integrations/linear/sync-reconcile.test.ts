@@ -36,7 +36,7 @@ vi.mock('@/integrations/linear/story-links', () => ({
 vi.mock('@/integrations/linear/sync', () => ({
   maybeSyncStoryToLinear: maybeSyncStoryToLinearMock,
 }));
-vi.mock('@/integrations/sync', () => ({
+vi.mock('@beemspec/sync', () => ({
   buildDbUpdateFromPatch: buildDbUpdateFromPatchMock,
   SYNC_DIRECTION: { localToRemote: 'local_to_remote', remoteToLocal: 'remote_to_local' },
   shouldApplyRemoteUpdate: shouldApplyRemoteUpdateMock,

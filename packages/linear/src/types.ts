@@ -14,7 +14,7 @@ export type {
   WebhookEvent,
   WebhookIngest,
   WebhookSignatureVerifier,
-} from '@/integrations/sync';
+} from '@beemspec/sync';
 
 // Linear-specific branded type aliases for clarity at call sites
 export type LinearIssueId = string;

@@ -9,9 +9,13 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@linear/sdk": "^90.0.0"
+    "@linear/sdk": "^90.0.0",
+    "mdast-util-to-string": "^4.0.0",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5"
   },
   "peerDependencies": {
+    "@beemspec/sync": ">=0.1.0",
     "@beemspec/storymap": ">=0.1.0",
     "zod": "^4.0.0"
   },

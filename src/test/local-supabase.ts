@@ -8,8 +8,17 @@ function requiredEnv(name: 'NEXT_PUBLIC_SUPABASE_URL' | 'SUPABASE_SECRET_KEY') {
   return value;
 }
 
+function requireLocalSupabaseUrl(): string {
+  const value = requiredEnv('NEXT_PUBLIC_SUPABASE_URL');
+  const hostname = new URL(value).hostname;
+  if (!['127.0.0.1', 'localhost', '::1'].includes(hostname)) {
+    throw new Error(`Integration tests refuse to use non-local Supabase URL: ${hostname}`);
+  }
+  return value;
+}
+
 export function createLocalSupabaseAdminClient() {
-  return createClient(requiredEnv('NEXT_PUBLIC_SUPABASE_URL'), requiredEnv('SUPABASE_SECRET_KEY'), {
+  return createClient(requireLocalSupabaseUrl(), requiredEnv('SUPABASE_SECRET_KEY'), {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

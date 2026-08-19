@@ -20,7 +20,7 @@ vi.mock('@/integrations/linear/story-links', () => ({
   upsertStoryLinearLink: vi.fn(),
 }));
 
-vi.mock('@/integrations/sync', () => ({
+vi.mock('@beemspec/sync', () => ({
   syncStoryToRemote: vi.fn(),
 }));
 
@@ -33,11 +33,11 @@ vi.mock('@/integrations/linear/label-sync', () => ({
 }));
 
 import { mapStoryToLinearIssueInput, resolveLinearStateIdForStoryStatus } from '@beemspec/linear';
+import { syncStoryToRemote } from '@beemspec/sync';
 import { resolveLinearAuthTokenForTeam, resolveLinearSyncContextForStoryMap } from '@/integrations/linear/auth';
 import { ensureLinearIssueHasLabel } from '@/integrations/linear/label-sync';
 import { getStoryMapLinearImportSettings } from '@/integrations/linear/settings';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import { syncStoryToRemote } from '@/integrations/sync';
 import { loadStoryWithStoryMap } from '@/storymap/story-context';
 
 describe('processStoryLinearSyncById', () => {
@@ -58,6 +58,7 @@ describe('processStoryLinearSyncById', () => {
     } as never);
 
     vi.mocked(resolveLinearSyncContextForStoryMap).mockResolvedValue({
+      status: 'ready',
       teamId: 'team_1',
       targetConfigured: true,
       target: { teamId: 'linear_team_1', statusMapping: { todo: 'mapped_state_todo' } },
@@ -124,6 +125,7 @@ describe('processStoryLinearSyncById', () => {
   it('preserves unknown remote markdown sections when updating an existing linked issue', async () => {
     vi.mocked(getStoryLinearLink).mockResolvedValue({ linearIssueId: 'lin_existing' } as never);
     vi.mocked(resolveLinearSyncContextForStoryMap).mockResolvedValue({
+      status: 'ready',
       teamId: 'team_1',
       targetConfigured: true,
       target: { teamId: 'linear_team_1', statusMapping: { todo: 'mapped_state_todo' } },

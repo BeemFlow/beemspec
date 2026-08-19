@@ -1,7 +1,7 @@
+import type { IssueUpsertInput, StoryForSync, SyncTarget } from '@beemspec/sync';
 import { toString as mdastToString } from 'mdast-util-to-string';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
-import type { IssueUpsertInput, StoryForSync, SyncTarget } from '@/integrations/sync';
 
 type ParsedFieldKey = keyof ParsedLinearStoryFields;
 

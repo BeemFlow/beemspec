@@ -5,7 +5,11 @@ import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 import { deleteStoryMap, getStoryMapGraph, updateStoryMap } from '@/storymap/service';
-import type { StoryMapFull } from '@/types';
+import type { Persona, StoryMapFull } from '@/types';
+
+interface StoryMapResponse extends StoryMapFull {
+  personas: Persona[];
+}
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
@@ -38,7 +42,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   if (personasResult.error) {
     return serverErrorResponse('Failed to load personas', personasResult.error);
   }
-  const fullMap: StoryMapFull = {
+  const fullMap: StoryMapResponse = {
     ...mapResult.data,
     activities: activitiesResult.data,
     releases: releasesResult.data,

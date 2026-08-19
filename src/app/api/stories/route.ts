@@ -4,7 +4,8 @@ import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { validateRequest } from '@/lib/validations';
-import { createStory, reorderStories } from '@/storymap/service';
+import { reorderStories } from '@/storymap/service';
+import { createStory } from '@/storymap/use-cases';
 
 export async function PUT(request: Request) {
   const auth = await requireAuth();

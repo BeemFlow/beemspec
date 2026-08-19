@@ -1,10 +1,10 @@
 import { mapStoryToLinearIssueInput, resolveLinearStateIdForStoryStatus } from '@beemspec/linear';
 import type { StoryStatus } from '@beemspec/storymap';
+import { syncStoryToRemote } from '@beemspec/sync';
 import { resolveLinearAuthTokenForTeam, resolveLinearSyncContextForStoryMap } from '@/integrations/linear/auth';
 import { ensureLinearIssueHasLabel } from '@/integrations/linear/label-sync';
 import { getStoryMapLinearImportSettings } from '@/integrations/linear/settings';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
-import { syncStoryToRemote } from '@/integrations/sync';
 import type { Supabase } from '@/lib/supabase/types';
 import { loadStoryWithStoryMap } from '@/storymap/story-context';
 
@@ -21,12 +21,20 @@ export async function processStoryLinearSyncById(
     storyMapId: context.data.storyMapId,
   });
 
+  if (linearSyncContext.status === 'error') {
+    throw new Error('Failed to resolve Linear sync context', { cause: linearSyncContext.error });
+  }
+
   if (!linearSyncContext.target || !linearSyncContext.targetConfigured) {
     throw new Error('No linear target configured for story map team');
   }
 
   if (!linearSyncContext.linearIssueSync) {
-    throw new Error('Linear integration is not enabled');
+    throw new Error(
+      linearSyncContext.status === 'auth_unavailable'
+        ? 'Linear authorization is unavailable or expired'
+        : 'Linear integration is not connected',
+    );
   }
 
   const { story } = context.data;

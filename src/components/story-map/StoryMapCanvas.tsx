@@ -20,83 +20,29 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, FileText, Pencil, Plus } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { AddButton } from '@/components/story-map/AddButton';
 import { AgentKickoffButton, buildReleaseKickoffPrompt } from '@/components/story-map/AgentKickoffButton';
 import { ADD_BUTTON_WIDTH, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, GROUP_GAP } from '@/components/story-map/constants';
 import { MapCard } from '@/components/story-map/MapCard';
+import {
+  buildStoryMapIndex,
+  type DragId,
+  encodeDragId,
+  moveStoryInStoryMap,
+  moveTaskInStoryMap,
+  parseDragId,
+  reorderActivitiesInStoryMap,
+} from '@/components/story-map/model';
 import { STATUS_CLASS, STATUS_LABELS, STATUS_VARIANTS } from '@/components/story-map/story-status';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DeleteButton } from '@/components/ui/delete-button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { assertNever, errorMessage } from '@/lib/errors';
+import { errorMessage } from '@/lib/errors';
 import { fetchJson } from '@/lib/http';
 import type { Activity, Story, StoryMapFull, Task, TaskWithStories } from '@/types';
-
-/**
- * Type-safe drag ID system using discriminated unions
- * Replaces error-prone string parsing with proper types
- */
-type DragId =
-  | { type: 'activity'; id: string }
-  | { type: 'activity-end'; afterActivityId: string }
-  | { type: 'task'; id: string }
-  | { type: 'story'; id: string }
-  | { type: 'task-end'; activityId: string }
-  | { type: 'story-end'; taskId: string; releaseId: string | null };
-
-const BACKLOG_MARKER = 'backlog' as const;
-
-function encodeDragId(dragId: DragId): string {
-  switch (dragId.type) {
-    case 'activity':
-      return `activity:${dragId.id}`;
-    case 'activity-end':
-      return `activity-end:${dragId.afterActivityId}`;
-    case 'task':
-      return `task:${dragId.id}`;
-    case 'story':
-      return `story:${dragId.id}`;
-    case 'task-end':
-      return `task-end:${dragId.activityId}`;
-    case 'story-end':
-      return `story-end:${dragId.taskId}:${dragId.releaseId ?? BACKLOG_MARKER}`;
-    default:
-      assertNever(dragId);
-  }
-}
-
-function parseDragId(encoded: string): DragId | null {
-  const parts = encoded.split(':');
-  const type = parts[0];
-
-  switch (type) {
-    case 'activity':
-      return parts[1] ? { type: 'activity', id: parts[1] } : null;
-    case 'activity-end':
-      return parts[1] ? { type: 'activity-end', afterActivityId: parts[1] } : null;
-    case 'task':
-      return parts[1] ? { type: 'task', id: parts[1] } : null;
-    case 'story':
-      return parts[1] ? { type: 'story', id: parts[1] } : null;
-    case 'task-end':
-      return parts[1] ? { type: 'task-end', activityId: parts[1] } : null;
-    case 'story-end': {
-      const taskId = parts[1];
-      const releaseMarker = parts[2];
-      if (!taskId || !releaseMarker) return null;
-      return {
-        type: 'story-end',
-        taskId,
-        releaseId: releaseMarker === BACKLOG_MARKER ? null : releaseMarker,
-      };
-    }
-    default:
-      return null;
-  }
-}
 
 interface Props {
   storyMap: StoryMapFull;
@@ -114,142 +60,6 @@ interface Props {
   onEditReleaseContext?: (releaseId: string) => void;
   onError?: (message: string) => void;
   onStoryMapChange: React.Dispatch<React.SetStateAction<StoryMapFull | null>>;
-}
-
-function matchesReleaseId(story: Story, releaseId: string | null): boolean {
-  return releaseId ? story.release_id === releaseId : !story.release_id;
-}
-
-function reorderActivitiesInStoryMap(storyMap: StoryMapFull, orderedIds: string[]): StoryMapFull {
-  const activitiesById = new Map(storyMap.activities.map((activity) => [activity.id, activity]));
-
-  return {
-    ...storyMap,
-    activities: orderedIds
-      .map((activityId, index) => {
-        const activity = activitiesById.get(activityId);
-        return activity ? { ...activity, sort_order: index } : null;
-      })
-      .filter((activity): activity is StoryMapFull['activities'][number] => activity !== null),
-  };
-}
-
-function moveTaskInStoryMap(
-  storyMap: StoryMapFull,
-  taskId: string,
-  targetActivityId: string,
-  orderedIds: string[],
-): StoryMapFull {
-  const activities = storyMap.activities.map((activity) => ({
-    ...activity,
-    tasks: [...activity.tasks],
-  }));
-
-  const sourceActivity = activities.find((activity) => activity.tasks.some((task) => task.id === taskId));
-  const targetActivity = activities.find((activity) => activity.id === targetActivityId);
-  if (!sourceActivity || !targetActivity) return storyMap;
-
-  const sourceIndex = sourceActivity.tasks.findIndex((task) => task.id === taskId);
-  if (sourceIndex === -1) return storyMap;
-
-  const [movedTask] = sourceActivity.tasks.splice(sourceIndex, 1);
-  if (!movedTask) return storyMap;
-
-  const nextMovedTask = { ...movedTask, activity_id: targetActivityId };
-  const targetTasks = [...targetActivity.tasks, nextMovedTask];
-  const targetTasksById = new Map(targetTasks.map((task) => [task.id, task]));
-
-  targetActivity.tasks = orderedIds
-    .map((orderedId) => targetTasksById.get(orderedId))
-    .filter((task): task is (typeof targetTasks)[number] => Boolean(task))
-    .map((task, index) => ({ ...task, sort_order: index }));
-
-  sourceActivity.tasks = sourceActivity.tasks.map((task, index) => ({ ...task, sort_order: index }));
-
-  return {
-    ...storyMap,
-    activities,
-  };
-}
-
-function reorderStoriesForCell(
-  stories: Story[],
-  releaseId: string | null,
-  orderedIds: string[],
-  insertedStory?: Story,
-): Story[] {
-  const otherStories = stories.filter((story) => !matchesReleaseId(story, releaseId));
-  const cellStories = stories.filter((story) => matchesReleaseId(story, releaseId));
-  const cellStoriesById = new Map(cellStories.map((story) => [story.id, story]));
-
-  if (insertedStory) {
-    cellStoriesById.set(insertedStory.id, insertedStory);
-  }
-
-  const reorderedCellStories = orderedIds
-    .map((storyId) => cellStoriesById.get(storyId))
-    .filter((story): story is Story => Boolean(story))
-    .map((story, index) => ({ ...story, sort_order: index }));
-
-  return [...otherStories, ...reorderedCellStories];
-}
-
-function moveStoryInStoryMap(
-  storyMap: StoryMapFull,
-  storyId: string,
-  targetTaskId: string,
-  targetReleaseId: string | null,
-  orderedIds: string[],
-): StoryMapFull {
-  const activities = storyMap.activities.map((activity) => ({
-    ...activity,
-    tasks: activity.tasks.map((task) => ({
-      ...task,
-      stories: [...task.stories],
-    })),
-  }));
-
-  let sourceTask: (typeof activities)[number]['tasks'][number] | undefined;
-  let movedStory: Story | undefined;
-
-  for (const activity of activities) {
-    const task = activity.tasks.find((candidate) => candidate.stories.some((story) => story.id === storyId));
-    if (!task) continue;
-    const sourceIndex = task.stories.findIndex((story) => story.id === storyId);
-    if (sourceIndex === -1) break;
-    sourceTask = task;
-    const [removedStory] = task.stories.splice(sourceIndex, 1);
-    movedStory = removedStory;
-    break;
-  }
-
-  if (!sourceTask || !movedStory) return storyMap;
-
-  const sourceReleaseId = movedStory.release_id ?? null;
-  const targetTask = activities.flatMap((activity) => activity.tasks).find((task) => task.id === targetTaskId);
-  if (!targetTask) return storyMap;
-
-  const nextMovedStory = {
-    ...movedStory,
-    task_id: targetTaskId,
-    release_id: targetReleaseId,
-  };
-
-  if (sourceTask.id === targetTask.id && sourceReleaseId === targetReleaseId) {
-    sourceTask.stories = reorderStoriesForCell(sourceTask.stories, targetReleaseId, orderedIds, nextMovedStory);
-  } else {
-    sourceTask.stories = reorderStoriesForCell(
-      sourceTask.stories,
-      sourceReleaseId,
-      sourceTask.stories.filter((story) => matchesReleaseId(story, sourceReleaseId)).map((story) => story.id),
-    );
-    targetTask.stories = reorderStoriesForCell(targetTask.stories, targetReleaseId, orderedIds, nextMovedStory);
-  }
-
-  return {
-    ...storyMap,
-    activities,
-  };
 }
 
 function getGroupWidth(taskCount: number): number {
@@ -281,7 +91,7 @@ export function StoryMapCanvas({
   onError,
   onStoryMapChange,
 }: Props) {
-  const { activities, releases } = storyMap;
+  const { releases } = storyMap;
   const [activeDrag, setActiveDrag] = useState<DragId | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [dragError, setDragError] = useState<string | null>(null);
@@ -302,28 +112,10 @@ export function StoryMapCanvas({
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  const sortedActivities = [...activities].sort((a, b) => a.sort_order - b.sort_order);
-
-  const allTasksOrdered: (TaskWithStories & { activityId: string })[] = [];
-  for (const activity of sortedActivities) {
-    const tasks = [...(activity.tasks || [])].sort((a, b) => a.sort_order - b.sort_order);
-    for (const task of tasks) {
-      allTasksOrdered.push({ ...task, activityId: activity.id });
-    }
-  }
-
-  const allStories = allTasksOrdered.flatMap((t) => t.stories);
-  const sortedStories = [...allStories].sort((a, b) => a.sort_order - b.sort_order);
-
-  function getTasksForActivity(activityId: string) {
-    return allTasksOrdered.filter((t) => t.activityId === activityId);
-  }
-
-  function getStoriesForCell(taskId: string, releaseId: string | null): Story[] {
-    return sortedStories.filter(
-      (s) => s.task_id === taskId && (releaseId ? s.release_id === releaseId : !s.release_id),
-    );
-  }
+  const { sortedActivities, allTasksOrdered, sortedStories, getTasksForActivity, getStoriesForCell } = useMemo(
+    () => buildStoryMapIndex(storyMap),
+    [storyMap],
+  );
 
   function handleDragStart(event: DragStartEvent) {
     const parsed = parseDragId(String(event.active.id));
@@ -483,9 +275,10 @@ export function StoryMapCanvas({
   }
 
   // Derive dragged item from state - no string parsing needed
-  const draggedActivity = activeDrag?.type === 'activity' ? activities.find((a) => a.id === activeDrag.id) : null;
+  const draggedActivity =
+    activeDrag?.type === 'activity' ? sortedActivities.find((activity) => activity.id === activeDrag.id) : null;
   const draggedTask = activeDrag?.type === 'task' ? allTasksOrdered.find((t) => t.id === activeDrag.id) : null;
-  const draggedStory = activeDrag?.type === 'story' ? allStories.find((s) => s.id === activeDrag.id) : null;
+  const draggedStory = activeDrag?.type === 'story' ? sortedStories.find((story) => story.id === activeDrag.id) : null;
 
   function isDropTarget(itemId: string): boolean {
     return dropTargetId === itemId;
@@ -501,7 +294,7 @@ export function StoryMapCanvas({
       onDragEnd={handleDragEnd}
     >
       <div className="inline-flex min-w-full flex-col px-4">
-        {activities.length === 0 && (
+        {sortedActivities.length === 0 && (
           <div className="mb-6 flex flex-col items-center justify-center py-12 text-muted-foreground">
             <p className="mb-4">Add an activity to get started.</p>
             <Button variant="outline" onClick={onAddActivity}>
@@ -588,7 +381,7 @@ export function StoryMapCanvas({
           </SortableContext>
         </div>
 
-        {activities.length > 0 && (
+        {sortedActivities.length > 0 && (
           <SortableContext
             items={sortedStories.map((s) => encodeDragId({ type: 'story', id: s.id }))}
             strategy={verticalListSortingStrategy}

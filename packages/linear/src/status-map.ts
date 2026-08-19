@@ -1,4 +1,4 @@
-import type { StoryStatus } from '@/integrations/sync';
+import type { StoryStatus } from '@beemspec/sync';
 
 function normalizeStatusCandidate(value: string): string {
   return value.trim().toLowerCase().replaceAll(/\s+/g, '_');

@@ -23,6 +23,7 @@
       "@/*": ["./src/*"],
       "@beemspec/processflow": ["./packages/processflow/src/index.ts"],
       "@beemspec/storymap": ["./packages/storymap/src/index.ts"],
+      "@beemspec/sync": ["./packages/sync/src/index.ts"],
       "@beemspec/linear": ["./packages/linear/src/index.ts"]
     }
   },

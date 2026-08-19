@@ -1,0 +1,14 @@
+{
+  "name": "@beemspec/sync",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Provider-neutral issue synchronization contracts and conflict helpers",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "@beemspec/storymap": ">=0.1.0"
+  }
+}
