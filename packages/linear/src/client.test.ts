@@ -1,6 +1,11 @@
 import { type Issue, type IssuePayload, type LinearClient, RatelimitedLinearError } from '@linear/sdk';
 import { describe, expect, it, vi } from 'vitest';
-import { createLinearClient, listLinearProjectIssuesForImport, selectLinearStateIdForStoryStatus } from './client';
+import {
+  createLinearClient,
+  getLinearWorkspaceOptions,
+  listLinearProjectIssuesForImport,
+  selectLinearStateIdForStoryStatus,
+} from './client';
 
 function makeIssue(overrides: Partial<Issue> = {}): Issue {
   return {
@@ -248,6 +253,53 @@ describe('listLinearProjectIssuesForImport', () => {
 
     const results = await listLinearProjectIssuesForImport('token', 'project_1', { client: client as never });
     expect(results).toEqual([]);
+  });
+});
+
+describe('getLinearWorkspaceOptions', () => {
+  it('paginates teams, projects, and workflow states', async () => {
+    const projectsPage2 = {
+      nodes: [{ id: 'project_2', name: 'Project Two' }],
+      pageInfo: { hasNextPage: false },
+    };
+    const statesPage2 = {
+      nodes: [{ id: 'state_2', name: 'Done', type: 'completed' }],
+      pageInfo: { hasNextPage: false },
+    };
+    const team = {
+      id: 'team_1',
+      name: 'Engineering',
+      key: 'ENG',
+      projects: vi.fn(async () => ({
+        nodes: [{ id: 'project_1', name: 'Project One' }],
+        pageInfo: { hasNextPage: true },
+        fetchNext: vi.fn(async () => projectsPage2),
+      })),
+      states: vi.fn(async () => ({
+        nodes: [{ id: 'state_1', name: 'Todo', type: 'unstarted' }],
+        pageInfo: { hasNextPage: true },
+        fetchNext: vi.fn(async () => statesPage2),
+      })),
+    };
+    const teamsPage2 = { nodes: [team], pageInfo: { hasNextPage: false } };
+    const client = {
+      viewer: Promise.resolve({
+        organization: Promise.resolve({ id: 'org_1', name: 'Acme' }),
+      }),
+      teams: vi.fn(async () => ({
+        nodes: [],
+        pageInfo: { hasNextPage: true },
+        fetchNext: vi.fn(async () => teamsPage2),
+      })),
+    };
+
+    const result = await getLinearWorkspaceOptions('token', { client: client as never });
+
+    expect(result.teams).toEqual([{ id: 'team_1', name: 'Engineering', key: 'ENG' }]);
+    expect(result.projects.map((project) => project.id)).toEqual(['project_1', 'project_2']);
+    expect(result.states.map((state) => state.id)).toEqual(['state_2', 'state_1']);
+    expect(team.projects).toHaveBeenCalledWith({ first: 100 });
+    expect(team.states).toHaveBeenCalledWith({ first: 100 });
   });
 });
 

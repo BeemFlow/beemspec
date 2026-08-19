@@ -57,7 +57,6 @@ export function StoryDialog({
   const [releaseId, setReleaseId] = useState<string>(NO_RELEASE);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: open is intentionally included to reset form when dialog opens
   useEffect(() => {
     if (story) {
       setTitle(story.title);
@@ -157,7 +156,7 @@ export function StoryDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="acceptance">Acceptance Criteria * (How do we know it's done?)</Label>
+            <Label htmlFor="acceptance">Acceptance Criteria * (How do we know it is done?)</Label>
             <Textarea
               id="acceptance"
               value={acceptanceCriteria}

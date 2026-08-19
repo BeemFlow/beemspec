@@ -13,7 +13,7 @@ export function resolveRequestOrigin(request: Request): string {
 }
 
 export function resolveSafeRedirectPath(value: string | null | undefined, fallback = '/'): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) {
+  if (!value?.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
     return fallback;
   }
 

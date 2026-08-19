@@ -16,6 +16,11 @@ export async function syncStoryToRemote(
     return issueSync.createIssue(input);
   }
 
-  const { teamId: _teamId, ...updateInput } = input;
+  const updateInput: Partial<IssueUpsertInput> = {
+    title: input.title,
+    description: input.description,
+    projectId: input.projectId,
+    stateId: input.stateId,
+  };
   return issueSync.updateIssue(existingIssueId, updateInput);
 }

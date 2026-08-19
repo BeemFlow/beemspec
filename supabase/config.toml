@@ -96,7 +96,7 @@ openai_api_key = "env(OPENAI_API_KEY)"
 
 # Email testing server. Emails sent with the local dev setup are not actually sent - rather, they
 # are monitored, and you can view the emails that would have been sent from the web interface.
-[inbucket]
+[local_smtp]
 enabled = true
 # Port to use for the email testing server web interface.
 port = 55324
@@ -158,6 +158,14 @@ additional_redirect_urls = [
   "http://127.0.0.1:3000/auth/callback",
   "http://localhost:3000/auth/login",
   "http://127.0.0.1:3000/auth/login",
+  "http://localhost:3000/invite/accept",
+  "http://127.0.0.1:3000/invite/accept",
+  "http://localhost:3101/auth/callback",
+  "http://127.0.0.1:3101/auth/callback",
+  "http://localhost:3101/auth/login",
+  "http://127.0.0.1:3101/auth/login",
+  "http://localhost:3101/invite/accept",
+  "http://127.0.0.1:3101/invite/accept",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600

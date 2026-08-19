@@ -26,6 +26,7 @@ describe('ProcessFlowToolbar', () => {
     const onToggleValidation = vi.fn();
     const onOpenContext = vi.fn();
     const onOpenMcpSetup = vi.fn();
+    const onRefresh = vi.fn();
     const onOpenSettings = vi.fn();
 
     render(
@@ -38,6 +39,7 @@ describe('ProcessFlowToolbar', () => {
         onToggleValidation={onToggleValidation}
         onOpenContext={onOpenContext}
         onOpenMcpSetup={onOpenMcpSetup}
+        onRefresh={onRefresh}
         onOpenSettings={onOpenSettings}
       />,
     );
@@ -54,6 +56,7 @@ describe('ProcessFlowToolbar', () => {
     await user.click(screen.getByRole('button', { name: 'Validate' }));
     await user.click(screen.getByRole('button', { name: 'Process flow context' }));
     await user.click(screen.getByRole('button', { name: 'Connect MCP Client' }));
+    await user.click(screen.getByRole('button', { name: 'Refresh process flow' }));
     await user.click(screen.getByRole('button', { name: 'Process flow settings' }));
 
     expect(onCreateNode.mock.calls).toEqual([['step'], ['decision'], ['actor'], ['system'], ['note']]);
@@ -61,6 +64,7 @@ describe('ProcessFlowToolbar', () => {
     expect(onToggleValidation).toHaveBeenCalledTimes(1);
     expect(onOpenContext).toHaveBeenCalledTimes(1);
     expect(onOpenMcpSetup).toHaveBeenCalledTimes(1);
+    expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
   });
 
@@ -75,6 +79,7 @@ describe('ProcessFlowToolbar', () => {
         onToggleValidation={vi.fn()}
         onOpenContext={vi.fn()}
         onOpenMcpSetup={vi.fn()}
+        onRefresh={vi.fn()}
         onOpenSettings={vi.fn()}
       />,
     );

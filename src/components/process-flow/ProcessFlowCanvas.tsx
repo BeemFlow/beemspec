@@ -19,8 +19,8 @@ import {
 } from '@xyflow/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { getStartNodeId } from './adapters';
 import type { ProcessFlowCanvasEdge, ProcessFlowCanvasNode } from './adapters';
+import { getStartNodeId } from './adapters';
 import { processFlowNodeTypes } from './ProcessFlowNode';
 
 const DEFAULT_START_NODE_ZOOM = 0.64;

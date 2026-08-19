@@ -1,3 +1,5 @@
+import { resolveSafeRedirectPath } from '@/lib/request-url';
+
 /** Cookie name used to persist OAuth state during the Linear OAuth flow. */
 export const OAUTH_STATE_COOKIE = 'beemspec_linear_oauth_state';
 
@@ -25,7 +27,7 @@ export function parseStateCookie(value: string | undefined): OAuthStateCookie | 
       state: parsed.state,
       teamId: parsed.teamId,
       userId: parsed.userId,
-      returnTo: parsed.returnTo?.startsWith('/') ? parsed.returnTo : '/',
+      returnTo: resolveSafeRedirectPath(parsed.returnTo),
     };
   } catch {
     return null;

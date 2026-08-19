@@ -1,7 +1,17 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
   "files": {
-    "includes": ["**", "!!.next", "!!.vercel", "!!out", "!!build", "!**/*.d.ts"]
+    "includes": [
+      "**",
+      "!!.next",
+      "!!.vercel",
+      "!!out",
+      "!!build",
+      "!!coverage",
+      "!!test-results",
+      "!!playwright-report",
+      "!**/*.d.ts"
+    ]
   },
   "css": {
     "parser": {
@@ -40,5 +50,20 @@
         "useDefaultSwitchClause": "warn"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.test.ts", "**/*.test.tsx"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "off"
+          },
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    }
+  ]
 }

@@ -38,5 +38,22 @@ describe('linear oauth state cookie helpers', () => {
       userId: 'user-1',
       returnTo: '/',
     });
+    expect(
+      parseStateCookie(
+        Buffer.from(
+          JSON.stringify({
+            state: 'state-1',
+            teamId: 'team-1',
+            userId: 'user-1',
+            returnTo: '/\\evil.example.com',
+          }),
+        ).toString('base64url'),
+      ),
+    ).toEqual({
+      state: 'state-1',
+      teamId: 'team-1',
+      userId: 'user-1',
+      returnTo: '/',
+    });
   });
 });

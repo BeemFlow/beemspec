@@ -6,13 +6,14 @@ export const E2E_OWNER_EMAIL = 'e2e-owner@example.com';
 export const E2E_OWNER_PASSWORD = 'password123';
 export const E2E_INVITEE_EMAIL = 'invitee@example.com';
 export const E2E_INVITEE_PASSWORD = 'password123';
+export const MAILPIT_BASE_URL = process.env.MAILPIT_URL?.trim() || 'http://127.0.0.1:55324';
 
 export const E2E_TEAM_ID = '00000000-0000-4000-8000-000000000001';
 export const E2E_STORY_MAP_ID = '10000000-0000-4000-8000-000000000001';
-export const E2E_ACTIVITY_ID = '10000000-0000-4000-8000-000000000011';
-export const E2E_TASK_ID = '10000000-0000-4000-8000-000000000021';
-export const E2E_RELEASE_ID = '10000000-0000-4000-8000-000000000031';
-export const E2E_STORY_ID = '10000000-0000-4000-8000-000000000041';
+const E2E_ACTIVITY_ID = '10000000-0000-4000-8000-000000000011';
+const E2E_TASK_ID = '10000000-0000-4000-8000-000000000021';
+const E2E_RELEASE_ID = '10000000-0000-4000-8000-000000000031';
+const E2E_STORY_ID = '10000000-0000-4000-8000-000000000041';
 
 export const E2E_PROCESS_FLOW_ID = '20000000-0000-4000-8000-000000000001';
 export const E2E_NODE_RECEIVE_ID = '20000000-0000-4000-8000-000000000011';
@@ -117,7 +118,7 @@ async function deleteUserByEmail(admin: SupabaseClient, email: string) {
 }
 
 async function clearMailpitInbox() {
-  const response = await fetch('http://127.0.0.1:54324/api/v1/messages', { method: 'DELETE' });
+  const response = await fetch(`${MAILPIT_BASE_URL}/api/v1/messages`, { method: 'DELETE' });
   if (!response.ok) {
     throw new Error(`Failed to clear Mailpit inbox: ${response.status}`);
   }

@@ -41,5 +41,5 @@ const MapCard = React.forwardRef<HTMLDivElement, MapCardProps>(
 
 MapCard.displayName = 'MapCard';
 
-export { MapCard };
 export type { MapCardVariant };
+export { MapCard };

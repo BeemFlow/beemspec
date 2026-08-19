@@ -71,7 +71,7 @@ export async function proxy(request: NextRequest) {
       return response;
     }
 
-    url.searchParams.set('next', request.nextUrl.pathname);
+    url.searchParams.set('next', `${request.nextUrl.pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(url);
   }
 

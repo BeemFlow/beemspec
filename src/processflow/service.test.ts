@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 const { elkLayout } = vi.hoisted(() => ({ elkLayout: vi.fn() }));
 
 vi.mock('elkjs/lib/elk.bundled.js', () => ({
-  default: vi.fn(() => ({ layout: elkLayout })),
+  default: vi.fn(function ElkMock() {
+    return { layout: elkLayout };
+  }),
 }));
 
 import {

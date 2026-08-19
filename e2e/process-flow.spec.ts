@@ -4,7 +4,6 @@ import {
   E2E_NODE_APPROVED_ID,
   E2E_NODE_RECEIVE_ID,
   E2E_PROCESS_FLOW_ID,
-  expectProcessFlowWarningCount,
   loginAsOwner,
   resetE2EState,
 } from './helpers';
@@ -35,7 +34,7 @@ test('can create, open, and edit a process flow through the UI', async ({ page }
 
   await page.getByRole('link', { name: /Vendor Intake/i }).click();
   await expect(page).toHaveURL(/\/process-flows\/[0-9a-f-]+$/);
-  await expect(page.getByText('Vendor Intake')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Vendor Intake' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Process flow settings' }).click();
   await page.getByLabel('Name').fill('Vendor Intake Ops');

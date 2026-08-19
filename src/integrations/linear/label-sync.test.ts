@@ -45,7 +45,9 @@ describe('linear label sync helpers', () => {
     const issueLabels = vi.fn().mockResolvedValue({ nodes: [{ id: 'label-1', name: 'Story' }] });
     const issue = vi.fn().mockResolvedValue({ id: 'issue-1', labels: issueLabels });
     const updateIssue = vi.fn();
-    LinearClientMock.mockImplementation(() => ({ issue, updateIssue }));
+    LinearClientMock.mockImplementation(function LinearClientMockImplementation() {
+      return { issue, updateIssue };
+    });
 
     await ensureLinearIssueHasLabel({ authToken: 'token', issueId: 'issue-1', teamId: 'team-1', labelName: ' story ' });
 
@@ -59,7 +61,9 @@ describe('linear label sync helpers', () => {
     const team = vi.fn().mockResolvedValue({ id: 'team-1', labels: teamLabels });
     const createIssueLabel = vi.fn().mockResolvedValue({ issueLabel: Promise.resolve({ id: 'label-2' }) });
     const updateIssue = vi.fn().mockResolvedValue(undefined);
-    LinearClientMock.mockImplementation(() => ({ issue, team, createIssueLabel, updateIssue }));
+    LinearClientMock.mockImplementation(function LinearClientMockImplementation() {
+      return { issue, team, createIssueLabel, updateIssue };
+    });
 
     await ensureLinearIssueHasLabel({ authToken: 'token', issueId: 'issue-1', teamId: 'team-1', labelName: 'Story' });
 
@@ -74,7 +78,9 @@ describe('linear label sync helpers', () => {
     const team = vi.fn().mockResolvedValue({ id: 'team-1', labels: teamLabels });
     const createIssueLabel = vi.fn();
     const updateIssue = vi.fn().mockResolvedValue(undefined);
-    LinearClientMock.mockImplementation(() => ({ issue, team, createIssueLabel, updateIssue }));
+    LinearClientMock.mockImplementation(function LinearClientMockImplementation() {
+      return { issue, team, createIssueLabel, updateIssue };
+    });
 
     await ensureLinearIssueHasLabel({ authToken: 'token', issueId: 'issue-1', teamId: 'team-1', labelName: 'Story' });
 

@@ -530,7 +530,11 @@ export function StoryMapCanvas({
                 const tasks = getTasksForActivity(activity.id);
 
                 return (
-                  <div key={activity.id} className="group/actrow flex justify-between" style={{ width: getGroupWidth(tasks.length) }}>
+                  <div
+                    key={activity.id}
+                    className="group/actrow flex justify-between"
+                    style={{ width: getGroupWidth(tasks.length) }}
+                  >
                     <SortableActivity
                       activity={activity}
                       onClick={() => onEditActivity(activity)}
@@ -558,7 +562,11 @@ export function StoryMapCanvas({
                 const tasks = getTasksForActivity(activity.id);
 
                 return (
-                  <div key={activity.id} className="group/taskrow flex" style={{ width: getGroupWidth(tasks.length), gap: CARD_GAP }}>
+                  <div
+                    key={activity.id}
+                    className="group/taskrow flex"
+                    style={{ width: getGroupWidth(tasks.length), gap: CARD_GAP }}
+                  >
                     {tasks.map((task) => (
                       <SortableTask
                         key={task.id}
@@ -650,7 +658,10 @@ export function StoryMapCanvas({
           <MapCard variant="story" className="shadow-lg cursor-grabbing">
             <div className="text-xs leading-4 line-clamp-2">{draggedStory.title}</div>
             {draggedStory.status !== 'backlog' && (
-              <Badge variant={STATUS_VARIANTS[draggedStory.status]} className={`mt-auto text-[10px] self-start ${STATUS_CLASS[draggedStory.status] ?? ''}`}>
+              <Badge
+                variant={STATUS_VARIANTS[draggedStory.status]}
+                className={`mt-auto text-[10px] self-start ${STATUS_CLASS[draggedStory.status] ?? ''}`}
+              >
                 {STATUS_LABELS[draggedStory.status]}
               </Badge>
             )}
@@ -844,6 +855,7 @@ function ReleaseRow({
       <div className="group sticky left-4 w-fit flex items-center gap-2 mb-3">
         {onToggleCollapse && (
           <button
+            type="button"
             onClick={onToggleCollapse}
             className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             aria-label={isCollapsed ? 'Expand release' : 'Collapse release'}
@@ -927,28 +939,28 @@ function ReleaseRow({
         )}
       </div>
       {!isCollapsed && (
-      <div className="flex items-start" style={{ gap: GROUP_GAP }}>
-        {activities.map((activity) => {
-          const tasks = getTasksForActivity(activity.id);
+        <div className="flex items-start" style={{ gap: GROUP_GAP }}>
+          {activities.map((activity) => {
+            const tasks = getTasksForActivity(activity.id);
 
-          return (
-            <div key={activity.id} className="flex" style={{ width: getGroupWidth(tasks.length), gap: CARD_GAP }}>
-              {tasks.map((task) => (
-                <StoryCell
-                  key={task.id}
-                  taskId={task.id}
-                  releaseId={releaseId}
-                  stories={getStoriesForCell(task.id, releaseId)}
-                  onAddStory={onAddStory}
-                  onEditStory={onEditStory}
-                  isDropTarget={isDropTarget}
-                />
-              ))}
-              <div style={{ width: ADD_BUTTON_WIDTH }} />
-            </div>
-          );
-        })}
-      </div>
+            return (
+              <div key={activity.id} className="flex" style={{ width: getGroupWidth(tasks.length), gap: CARD_GAP }}>
+                {tasks.map((task) => (
+                  <StoryCell
+                    key={task.id}
+                    taskId={task.id}
+                    releaseId={releaseId}
+                    stories={getStoriesForCell(task.id, releaseId)}
+                    onAddStory={onAddStory}
+                    onEditStory={onEditStory}
+                    isDropTarget={isDropTarget}
+                  />
+                ))}
+                <div style={{ width: ADD_BUTTON_WIDTH }} />
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -1010,7 +1022,12 @@ function AddStoryDropZone({
   return (
     <div className="flex flex-col gap-1">
       {showIndicator && <DropLine direction="horizontal" />}
-      <AddButton ref={setNodeRef} label="Story" className={`w-full h-8 ${buttonClassName ?? ''}`} onClick={() => onAddStory(taskId, releaseId)} />
+      <AddButton
+        ref={setNodeRef}
+        label="Story"
+        className={`w-full h-8 ${buttonClassName ?? ''}`}
+        onClick={() => onAddStory(taskId, releaseId)}
+      />
     </div>
   );
 }
@@ -1043,7 +1060,10 @@ function SortableStory({
       >
         <div className="text-xs leading-4 line-clamp-2">{story.title}</div>
         {story.status !== 'backlog' && (
-          <Badge variant={STATUS_VARIANTS[story.status]} className={`mt-auto text-[10px] self-start ${STATUS_CLASS[story.status] ?? ''}`}>
+          <Badge
+            variant={STATUS_VARIANTS[story.status]}
+            className={`mt-auto text-[10px] self-start ${STATUS_CLASS[story.status] ?? ''}`}
+          >
             {STATUS_LABELS[story.status]}
           </Badge>
         )}

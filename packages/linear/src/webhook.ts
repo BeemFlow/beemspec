@@ -87,7 +87,7 @@ export function parseLinearWebhookEvent(rawBody: string, headers: Headers): Webh
     idempotencyKey,
     type,
     action,
-    createdAt: webhookTimestamp,
+    createdAt,
     payload: record.data ?? record,
   };
 }

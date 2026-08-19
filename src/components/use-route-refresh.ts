@@ -19,6 +19,10 @@ export function useRouteRefresh(options?: UseRouteRefreshOptions) {
   const lastRefreshAtRef = useRef(0);
 
   const refresh = useCallback(() => {
+    router.refresh();
+  }, [router]);
+
+  const refreshIfDue = useCallback(() => {
     const now = Date.now();
     if (now - lastRefreshAtRef.current < minIntervalMs) {
       return;
@@ -32,12 +36,12 @@ export function useRouteRefresh(options?: UseRouteRefreshOptions) {
     if (!auto) return;
 
     const handleFocus = () => {
-      refresh();
+      refreshIfDue();
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        refresh();
+        refreshIfDue();
       }
     };
 
@@ -48,21 +52,21 @@ export function useRouteRefresh(options?: UseRouteRefreshOptions) {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [auto, refresh]);
+  }, [auto, refreshIfDue]);
 
   useEffect(() => {
     if (!auto || !pollMs) return;
 
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === 'visible') {
-        refresh();
+        refreshIfDue();
       }
     }, pollMs);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [auto, pollMs, refresh]);
+  }, [auto, pollMs, refreshIfDue]);
 
   return refresh;
 }

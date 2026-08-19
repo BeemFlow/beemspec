@@ -22,7 +22,9 @@ describe('request-url', () => {
 
   it('accepts only same-site relative redirect paths', () => {
     expect(resolveSafeRedirectPath('/dashboard')).toBe('/dashboard');
+    expect(resolveSafeRedirectPath('/dashboard?tab=activity')).toBe('/dashboard?tab=activity');
     expect(resolveSafeRedirectPath('//evil.example.com')).toBe('/');
+    expect(resolveSafeRedirectPath('/\\evil.example.com')).toBe('/');
     expect(resolveSafeRedirectPath('https://evil.example.com')).toBe('/');
     expect(resolveSafeRedirectPath(undefined)).toBe('/');
   });

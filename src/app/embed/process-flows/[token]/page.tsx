@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import { ProcessFlowCanvas } from '@/components/process-flow/ProcessFlowCanvas';
 import { toCanvasFlow } from '@/components/process-flow/adapters';
+import { ProcessFlowCanvas } from '@/components/process-flow/ProcessFlowCanvas';
 import { DbErrorCode } from '@/lib/errors';
 import { verifyShareToken } from '@/lib/share-links';
 import { createAdminClient } from '@/lib/supabase/admin';

@@ -27,7 +27,7 @@ describe('invite accept route', () => {
     const select = vi.fn().mockReturnValue({ ilike });
     vi.mocked(createAdminClient).mockReturnValue({ from: vi.fn().mockReturnValue({ select }) } as never);
 
-    const response = await POST(new Request('http://localhost/api/invite/accept', { method: 'POST' }));
+    const response = await POST();
 
     expect(response.status).toBe(200);
     expect(rpc).toHaveBeenCalledWith('accept_team_invite_member', {
@@ -42,7 +42,7 @@ describe('invite accept route', () => {
       auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
     } as never);
 
-    const response = await POST(new Request('http://localhost/api/invite/accept', { method: 'POST' }));
+    const response = await POST();
 
     expect(response.status).toBe(401);
   });
@@ -66,7 +66,7 @@ describe('invite accept route', () => {
     const select = vi.fn().mockReturnValue({ ilike });
     vi.mocked(createAdminClient).mockReturnValue({ from: vi.fn().mockReturnValue({ select }) } as never);
 
-    const response = await POST(new Request('http://localhost/api/invite/accept', { method: 'POST' }));
+    const response = await POST();
 
     expect(response.status).toBe(200);
     expect(rpc).toHaveBeenCalledTimes(2);

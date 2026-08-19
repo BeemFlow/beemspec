@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@linear/sdk": "^75.0.0"
+    "@linear/sdk": "^90.0.0"
   },
   "peerDependencies": {
     "@beemspec/storymap": ">=0.1.0",

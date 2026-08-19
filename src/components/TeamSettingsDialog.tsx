@@ -1,7 +1,6 @@
 'use client';
 
 import { Clock, Loader2, UserPlus } from 'lucide-react';
-import { useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DangerZone } from '@/components/ui/danger-zone';
@@ -464,8 +463,6 @@ export function TeamSettingsDialog({
 }: TeamSettingsDialogProps) {
   const isOwner = team?.role === 'owner';
 
-  const resolveLinearOAuthStatus = useCallback(linearOAuthNoticeToStatus, []);
-
   const {
     activeTab,
     setActiveTab,
@@ -513,7 +510,7 @@ export function TeamSettingsDialog({
     onOpenChange,
     linearOAuthNotice,
     onLinearOAuthNoticeHandled,
-    resolveLinearOAuthStatus,
+    resolveLinearOAuthStatus: linearOAuthNoticeToStatus,
   });
 
   if (!team) return null;

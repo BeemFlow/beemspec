@@ -1,29 +1,18 @@
 import { type APIRequestContext, expect, type Locator, type Page } from '@playwright/test';
 import {
-  E2E_ACTIVITY_ID,
   E2E_INVITEE_EMAIL,
   E2E_NODE_APPROVED_ID,
   E2E_NODE_RECEIVE_ID,
   E2E_OWNER_EMAIL,
   E2E_OWNER_PASSWORD,
   E2E_PROCESS_FLOW_ID,
-  E2E_STORY_ID,
   E2E_STORY_MAP_ID,
   E2E_TEAM_ID,
+  MAILPIT_BASE_URL,
   resetLocalAppState,
 } from './local-fixtures';
 
-const MAILPIT_BASE_URL = process.env.MAILPIT_URL?.trim() || 'http://127.0.0.1:55324';
-
-export {
-  E2E_ACTIVITY_ID,
-  E2E_INVITEE_EMAIL,
-  E2E_NODE_APPROVED_ID,
-  E2E_NODE_RECEIVE_ID,
-  E2E_PROCESS_FLOW_ID,
-  E2E_STORY_ID,
-  E2E_STORY_MAP_ID,
-};
+export { E2E_INVITEE_EMAIL, E2E_NODE_APPROVED_ID, E2E_NODE_RECEIVE_ID, E2E_PROCESS_FLOW_ID, E2E_STORY_MAP_ID };
 
 export async function resetE2EState(scenario: 'default' | 'malformed' = 'default') {
   await resetLocalAppState(scenario);
@@ -70,10 +59,6 @@ export async function openTeamMembersSettings(page: Page) {
   await page.getByRole('button', { name: /E2E Team/i }).click();
   await page.getByRole('menuitem', { name: /Team settings/i }).click();
   await page.getByRole('tab', { name: 'Members' }).click();
-}
-
-export async function expectProcessFlowWarningCount(page: Page, count: number) {
-  await expect(page.getByTestId('processflow-warning-count')).toHaveText(String(count));
 }
 
 function extractFirstUrl(value: string) {

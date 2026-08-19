@@ -80,6 +80,7 @@ describe('TeamControls', () => {
       configurable: true,
     });
     global.fetch = vi.fn();
+    // biome-ignore lint/suspicious/noDocumentCookie: jsdom does not implement the Cookie Store API
     document.cookie = '';
   });
 

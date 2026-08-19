@@ -18,7 +18,7 @@ test('can create and open the story map created from the dashboard', async ({ pa
 
   await page.getByRole('link', { name: /Ops Transformation/i }).click();
   await expect(page).toHaveURL(/\/story-map\/[0-9a-f-]+$/);
-  await expect(page.getByText('Ops Transformation')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ops Transformation' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add Activity' })).toBeVisible();
 });
 
@@ -54,15 +54,16 @@ test('can create activity, task, and story inside a story map', async ({ page })
 test('can edit and delete an existing story in a story map', async ({ page }) => {
   await page.goto(`/story-map/${E2E_STORY_MAP_ID}`);
 
-  await page.getByText('Customer can submit invoice').click();
+  await page.getByRole('button', { name: 'Customer can submit invoice', exact: true }).click();
   await page.getByLabel('Title *').fill('Customer submits invoice online');
   await page.getByRole('button', { name: 'Save Story' }).click();
-  await expect(page.getByText('Customer submits invoice online')).toBeVisible();
+  const renamedStory = page.getByRole('button', { name: 'Customer submits invoice online', exact: true });
+  await expect(renamedStory).toBeVisible();
 
-  await page.getByText('Customer submits invoice online').click();
+  await renamedStory.click();
   await page.getByRole('button', { name: /^Delete$/ }).click();
   await page.getByRole('button', { name: /^Delete$/ }).click();
-  await expect(page.getByText('Customer submits invoice online')).toHaveCount(0);
+  await expect(renamedStory).toHaveCount(0);
 });
 
 test('supports a full story-map journey from creation through persistence and deletion', async ({ page }) => {
@@ -83,7 +84,7 @@ test('supports a full story-map journey from creation through persistence and de
   await page.getByLabel('Description').fill('Claims intake redesign and escalation plan');
   await page.getByRole('button', { name: 'Save' }).click();
   await page.getByRole('button', { name: 'Close' }).click();
-  await expect(page.getByText('Claims Modernization v2')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Claims Modernization v2' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Story map context' }).click();
   await page
@@ -102,7 +103,7 @@ test('supports a full story-map journey from creation through persistence and de
   await page.getByRole('button', { name: 'Release' }).click();
   await page.getByPlaceholder('Release name').fill('MVP');
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByText('MVP')).toBeVisible();
+  await expect(page.getByText('MVP', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /Task/i }).last().click();
   await page.getByLabel('Name').fill('Validate submission');
@@ -114,24 +115,26 @@ test('supports a full story-map journey from creation through persistence and de
   await page.getByLabel(/User Story/).fill('As a claims specialist, I can validate an intake package before review.');
   await page.getByLabel(/Acceptance Criteria/).fill('- [ ] Missing documents are flagged');
   await page.getByRole('button', { name: 'Save Story' }).click();
-  await expect(page.getByText('Claims specialist validates intake')).toBeVisible();
+  const createdStory = page.getByRole('button', { name: 'Claims specialist validates intake', exact: true });
+  await expect(createdStory).toBeVisible();
 
-  await page.getByText('Claims specialist validates intake').click();
+  await createdStory.click();
   await page.getByLabel('Title *').fill('Claims specialist validates intake packet');
   await page.getByRole('button', { name: 'Save Story' }).click();
   await expect(page.getByText('Claims specialist validates intake packet')).toBeVisible();
 
   await page.reload();
-  await expect(page.getByText('Claims Modernization v2')).toBeVisible();
-  await expect(page.getByText('MVP')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Claims Modernization v2' })).toBeVisible();
+  await expect(page.getByText('MVP', { exact: true })).toBeVisible();
   await expect(page.getByText('Claim Intake')).toBeVisible();
   await expect(page.getByText('Validate submission')).toBeVisible();
   await expect(page.getByText('Claims specialist validates intake packet')).toBeVisible();
 
-  await page.getByText('Claims specialist validates intake packet').click();
+  const editedStory = page.getByRole('button', { name: 'Claims specialist validates intake packet', exact: true });
+  await editedStory.click();
   await page.getByRole('button', { name: /^Delete$/ }).click();
   await page.getByRole('button', { name: /^Delete$/ }).click();
-  await expect(page.getByText('Claims specialist validates intake packet')).toHaveCount(0);
+  await expect(editedStory).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Story map settings' }).click();
   await page.getByRole('tab', { name: 'Danger' }).click();

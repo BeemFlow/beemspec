@@ -184,8 +184,60 @@ interface LinearTeamLike {
   id?: string | null;
   name?: string | null;
   key?: string | null;
-  projects?: () => Promise<LinearConnection<LinearProjectLike>>;
-  states?: () => Promise<LinearConnection<LinearStateLike>>;
+  projects?: (variables?: unknown) => Promise<LinearConnectionPage<LinearProjectLike>>;
+  states?: (variables?: unknown) => Promise<LinearConnectionPage<LinearStateLike>>;
+}
+
+function toTeamOption(team: LinearTeamLike | null): LinearTeamOption | null {
+  const id = typeof team?.id === 'string' ? team.id : null;
+  const name = typeof team?.name === 'string' ? team.name.trim() : '';
+  if (!id || !name) return null;
+
+  return {
+    id,
+    name,
+    key: typeof team?.key === 'string' && team.key.trim().length > 0 ? team.key : null,
+  };
+}
+
+async function collectTeamProjects(
+  team: LinearTeamLike,
+  teamId: string,
+  projectsById: Map<string, LinearProjectOption>,
+) {
+  const connection = team.projects ? await team.projects({ first: 100 }) : { nodes: [] };
+  const projects = await fetchAllConnectionNodes(connection);
+
+  for (const project of projects) {
+    const id = typeof project?.id === 'string' ? project.id : null;
+    const name = typeof project?.name === 'string' ? project.name.trim() : '';
+    if (!id || !name) continue;
+
+    const existing = projectsById.get(id);
+    if (existing) {
+      if (!existing.teamIds.includes(teamId)) existing.teamIds.push(teamId);
+    } else {
+      projectsById.set(id, { id, name, teamIds: [teamId] });
+    }
+  }
+}
+
+async function collectTeamStates(team: LinearTeamLike, teamId: string, statesById: Map<string, LinearStateOption>) {
+  const connection = team.states ? await team.states({ first: 100 }) : { nodes: [] };
+  const states = await fetchAllConnectionNodes(connection);
+
+  for (const state of states) {
+    const id = typeof state?.id === 'string' ? state.id : null;
+    const name = typeof state?.name === 'string' ? state.name.trim() : '';
+    if (!id || !name || statesById.has(id)) continue;
+
+    statesById.set(id, {
+      id,
+      name,
+      teamId,
+      type: typeof state?.type === 'string' && state.type.trim().length > 0 ? state.type : null,
+    });
+  }
 }
 
 interface LinearStateForResolution {
@@ -292,66 +344,28 @@ export async function getLinearViewerInfo(accessToken: string): Promise<LinearVi
   return { organizationId: organization?.id, organizationName: organization?.name ?? undefined };
 }
 
-export async function getLinearWorkspaceOptions(accessToken: string): Promise<LinearWorkspaceOptions> {
-  const client = new LinearClient({ accessToken });
+export async function getLinearWorkspaceOptions(
+  accessToken: string,
+  options: { client?: LinearClient } = {},
+): Promise<LinearWorkspaceOptions> {
+  const client = options.client ?? new LinearClient({ accessToken });
   const viewer = await client.viewer;
   const organization = await viewer.organization;
 
-  const teamsConnection = (await client.teams()) as unknown as LinearConnection<LinearTeamLike>;
-  const teamNodes = teamsConnection.nodes ?? [];
+  const teamsConnection = (await client.teams({ first: 100 })) as unknown as LinearConnectionPage<LinearTeamLike>;
+  const teamNodes = await fetchAllConnectionNodes(teamsConnection);
 
   const teams: LinearTeamOption[] = [];
   const projectsById = new Map<string, LinearProjectOption>();
   const statesById = new Map<string, LinearStateOption>();
 
-  for (const node of teamNodes) {
-    const team = node as LinearTeamLike | null;
-    const teamId = typeof team?.id === 'string' ? team.id : null;
-    const teamName = typeof team?.name === 'string' ? team.name.trim() : '';
-    if (!teamId || !teamName) continue;
+  for (const team of teamNodes) {
+    const option = toTeamOption(team);
+    if (!option) continue;
 
-    teams.push({
-      id: teamId,
-      name: teamName,
-      key: typeof team?.key === 'string' && team.key.trim().length > 0 ? team.key : null,
-    });
-
-    const projectsConnection = team?.projects ? await team.projects() : { nodes: [] };
-    for (const projectNode of projectsConnection.nodes ?? []) {
-      const projectId = typeof projectNode?.id === 'string' ? projectNode.id : null;
-      const projectName = typeof projectNode?.name === 'string' ? projectNode.name.trim() : '';
-      if (!projectId || !projectName) continue;
-
-      const existing = projectsById.get(projectId);
-      if (existing) {
-        if (!existing.teamIds.includes(teamId)) {
-          existing.teamIds.push(teamId);
-        }
-        continue;
-      }
-
-      projectsById.set(projectId, {
-        id: projectId,
-        name: projectName,
-        teamIds: [teamId],
-      });
-    }
-
-    const statesConnection = team?.states ? await team.states() : { nodes: [] };
-    for (const stateNode of statesConnection.nodes ?? []) {
-      const stateId = typeof stateNode?.id === 'string' ? stateNode.id : null;
-      const stateName = typeof stateNode?.name === 'string' ? stateNode.name.trim() : '';
-      if (!stateId || !stateName) continue;
-
-      if (!statesById.has(stateId)) {
-        statesById.set(stateId, {
-          id: stateId,
-          name: stateName,
-          teamId,
-          type: typeof stateNode?.type === 'string' && stateNode.type.trim().length > 0 ? stateNode.type : null,
-        });
-      }
-    }
+    teams.push(option);
+    await collectTeamProjects(team, option.id, projectsById);
+    await collectTeamStates(team, option.id, statesById);
   }
 
   teams.sort((a, b) => a.name.localeCompare(b.name));
@@ -474,10 +488,11 @@ export function createLinearClient(enabled: boolean, options: LinearClientOption
     },
 
     async deleteIssue(issueId: string): Promise<void> {
-      if (typeof client.deleteIssue !== 'function') {
+      const deleteIssue = client.deleteIssue?.bind(client);
+      if (!deleteIssue) {
         throw new Error('Linear client does not support deleteIssue');
       }
-      await withRetry(() => client.deleteIssue!(issueId), maxRetries, sleep);
+      await withRetry(() => deleteIssue(issueId), maxRetries, sleep);
     },
   };
 }

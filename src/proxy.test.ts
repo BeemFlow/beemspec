@@ -43,6 +43,14 @@ describe('proxy auth redirects', () => {
     expect(response.headers.get('location')).toBe('https://app.example.com/auth/login?next=%2Fstory-map%2F123');
   });
 
+  it('preserves the requested query string through login', async () => {
+    const response = await proxy(makeRequest('/story-map/123?panel=settings&tab=linear'));
+
+    expect(response.headers.get('location')).toBe(
+      'https://app.example.com/auth/login?next=%2Fstory-map%2F123%3Fpanel%3Dsettings%26tab%3Dlinear',
+    );
+  });
+
   it('stores oauth consent resume state in a dedicated cookie', async () => {
     const response = await proxy(makeRequest('/oauth/consent?authorization_id=auth-123'));
 
@@ -80,6 +88,14 @@ describe('proxy auth redirects', () => {
     const response = await proxy(makeRequest('/auth/login?next=https://evil.example.com/phish'));
 
     expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('https://app.example.com/');
+  });
+
+  it('rejects backslash-based cross-origin next targets', async () => {
+    getUserMock.mockResolvedValue({ data: { user: { id: 'user-1' } } });
+
+    const response = await proxy(makeRequest('/auth/login?next=%2F%5Cevil.example.com'));
+
     expect(response.headers.get('location')).toBe('https://app.example.com/');
   });
 });
