@@ -2,11 +2,9 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas';
-import { isLinearSyncAvailableForStoryMap, resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
-import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
+import { scheduleLinearSyncDrain } from '@/integrations/linear/schedule';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { loadStoryWithStoryMap } from '@/storymap/story-context';
 import type { StoryMapFull } from '@/types';
 import { DELETE as deleteActivityById, PUT as putActivityById } from '../activities/[id]/route';
 import { POST as postActivities, PUT as putActivities } from '../activities/route';
@@ -21,12 +19,7 @@ import { POST as postTasks, PUT as putTasks } from '../tasks/route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
-vi.mock('@/storymap/story-context', () => ({ loadStoryWithStoryMap: vi.fn() }));
-vi.mock('@/integrations/linear/sync-story-by-id', () => ({ processStoryLinearSyncById: vi.fn() }));
-vi.mock('@/integrations/linear/auth', () => ({
-  isLinearSyncAvailableForStoryMap: vi.fn(),
-  resolveLinearSyncContextForStory: vi.fn(),
-}));
+vi.mock('@/integrations/linear/schedule', () => ({ scheduleLinearSyncDrain: vi.fn() }));
 
 const VALID_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
@@ -78,7 +71,9 @@ function createDeleteClient(returnData: unknown, linkedLinearIssueId?: string | 
     }
     return { delete: remove };
   });
-  return { client: { from }, remove };
+  const rpcSingle = vi.fn().mockResolvedValue({ data: returnData, error: null });
+  const rpc = vi.fn().mockReturnValue({ single: rpcSingle });
+  return { client: { from, rpc }, remove, rpc };
 }
 
 function buildStoryMapCanvasMarkup(storyMap: StoryMapFull) {
@@ -105,19 +100,6 @@ describe('story map domain routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user' } } as never);
-    vi.mocked(loadStoryWithStoryMap).mockResolvedValue({
-      ok: true,
-      data: { story: { id: VALID_ID }, storyMapId: 'map_1' },
-    } as never);
-    vi.mocked(isLinearSyncAvailableForStoryMap).mockResolvedValue(false);
-    vi.mocked(processStoryLinearSyncById).mockResolvedValue({ id: 'lin_1', identifier: 'ENG-1' } as never);
-    vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
-      status: 'not_connected',
-      teamId: 'team_1',
-      targetConfigured: true,
-      target: { teamId: 'linear_team_1' },
-      linearIssueSync: null,
-    });
   });
 
   it('reorders collections through rpc', async () => {
@@ -217,7 +199,7 @@ describe('story map domain routes', () => {
     expect(response.status).toBe(200);
   });
 
-  it('syncs linear for story create when configured', async () => {
+  it('schedules post-response queue processing for story create', async () => {
     const { client } = createInsertClient({
       id: VALID_ID,
       title: 'Login',
@@ -225,7 +207,6 @@ describe('story map domain routes', () => {
       status: 'backlog',
     });
     vi.mocked(createClient).mockResolvedValue(client as never);
-    vi.mocked(isLinearSyncAvailableForStoryMap).mockResolvedValue(true);
     await postStories(
       jsonRequest({
         task_id: VALID_ID,
@@ -233,20 +214,12 @@ describe('story map domain routes', () => {
         content: { user_story: 'As a user...', acceptance_criteria: '- [ ] Can log in' },
       }),
     );
-    expect(processStoryLinearSyncById).toHaveBeenCalled();
+    expect(scheduleLinearSyncDrain).toHaveBeenCalledOnce();
   });
 
-  it('deletes entities and attempts linked linear deletion first', async () => {
-    const { client, remove } = createDeleteClient({ id: VALID_ID }, 'lin_issue_1');
+  it('deletes stories through the durable sync RPC', async () => {
+    const { client, remove, rpc } = createDeleteClient({ id: VALID_ID }, 'lin_issue_1');
     vi.mocked(createClient).mockResolvedValue(client as never);
-    const deleteIssue = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
-      status: 'ready',
-      teamId: 'team_1',
-      targetConfigured: true,
-      target: { teamId: 'linear_team_1' },
-      linearIssueSync: { getIssueById: vi.fn(), createIssue: vi.fn(), updateIssue: vi.fn(), deleteIssue },
-    });
 
     await deleteActivityById(new Request('http://localhost/api/test'), { params: Promise.resolve({ id: VALID_ID }) });
     await deleteTaskById(new Request('http://localhost/api/test'), { params: Promise.resolve({ id: VALID_ID }) });
@@ -255,8 +228,9 @@ describe('story map domain routes', () => {
       params: Promise.resolve({ id: VALID_ID }),
     });
 
-    expect(deleteIssue).toHaveBeenCalledWith('lin_issue_1');
+    expect(rpc).toHaveBeenCalledWith('delete_story_with_linear_sync', { p_story_id: VALID_ID });
     expect(remove).toHaveBeenCalled();
+    expect(scheduleLinearSyncDrain).toHaveBeenCalledOnce();
     expect(response.status).toBe(200);
   });
 });

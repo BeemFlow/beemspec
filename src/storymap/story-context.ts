@@ -7,7 +7,7 @@ export type StoryWithMapResult =
   | {
       ok: true;
       data: {
-        story: Story;
+        story: Story & { updated_at: string };
         storyMapId: string;
       };
     }
@@ -38,7 +38,7 @@ export async function loadStoryWithStoryMap(supabase: Supabase, storyId: string)
   return {
     ok: true,
     data: {
-      story: story as Story,
+      story: story as Story & { updated_at: string },
       storyMapId: activity.story_map_id as string,
     },
   };

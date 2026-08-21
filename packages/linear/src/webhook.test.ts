@@ -13,7 +13,7 @@ describe('linear webhook verifier', () => {
       now: () => nowMs,
     });
 
-    expect(verifier?.verify({ rawBody: body, signature, timestamp: '2026-02-14T11:58:00.000Z' })).toBe(true);
+    expect(verifier?.verify({ rawBody: body, signature, timestamp: '2026-02-14T11:59:30.000Z' })).toBe(true);
     expect(verifier?.verify({ rawBody: body, signature, timestamp: String(nowMs - 30_000) })).toBe(true);
   });
 

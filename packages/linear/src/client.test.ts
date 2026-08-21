@@ -54,6 +54,7 @@ describe('linear client (issue sync port)', () => {
     });
 
     const created = await sync?.createIssue({
+      id: '10000000-0000-4000-8000-000000000041',
       title: 'Implement release sync',
       description: 'Story mapped from BeemSpec',
       teamId: 'team_1',
@@ -67,9 +68,12 @@ describe('linear client (issue sync port)', () => {
       description: 'Story mapped from BeemSpec',
       updatedAt: '2026-02-13T10:00:00.000Z',
       stateId: 'state_1',
+      stateName: null,
     });
 
-    expect(client.createIssue).toHaveBeenCalledTimes(1);
+    expect(client.createIssue).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '10000000-0000-4000-8000-000000000041' }),
+    );
   });
 
   it('retries once on SDK ratelimited error before succeeding', async () => {

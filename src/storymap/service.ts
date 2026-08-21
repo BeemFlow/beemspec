@@ -259,7 +259,7 @@ export async function updateStory(supabase: Supabase, storyId: string, changes: 
 }
 
 export async function deleteStory(supabase: Supabase, storyId: string) {
-  return supabase.from('stories').delete().eq('id', storyId).select().single();
+  return supabase.rpc('delete_story_with_linear_sync', { p_story_id: storyId }).single();
 }
 
 export async function reorderStories(supabase: Supabase, input: ReorderStories) {

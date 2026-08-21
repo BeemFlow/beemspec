@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
-import { getStoryLinearLink } from '@/integrations/linear/story-links';
-import { maybeSyncStoryToLinear } from '@/integrations/linear/sync';
 import { DbErrorCode } from '@/lib/errors';
 import {
+  createStory,
+  deleteStory,
   getReleaseMcpContext,
   getStory,
   getStoryMapGraph,
@@ -16,12 +15,8 @@ import {
   reorderReleases,
   reorderStories,
   reorderTasks,
+  updateStory,
 } from './service';
-import { createStory, deleteStory, updateStory } from './use-cases';
-
-vi.mock('@/integrations/linear/auth', () => ({ resolveLinearSyncContextForStory: vi.fn() }));
-vi.mock('@/integrations/linear/story-links', () => ({ getStoryLinearLink: vi.fn() }));
-vi.mock('@/integrations/linear/sync', () => ({ maybeSyncStoryToLinear: vi.fn() }));
 
 function createInsertStoriesClient(result: { data: unknown; error: unknown }) {
   const single = vi.fn().mockResolvedValue(result);
@@ -36,14 +31,8 @@ function createInsertStoriesClient(result: { data: unknown; error: unknown }) {
 
 function createDeleteStoriesClient() {
   const single = vi.fn().mockResolvedValue({ data: { id: 'story-1' }, error: null });
-  const select = vi.fn().mockReturnValue({ single });
-  const eq = vi.fn().mockReturnValue({ select });
-  const remove = vi.fn().mockReturnValue({ eq });
-  const from = vi.fn((table: string) => {
-    if (table === 'stories') return { delete: remove };
-    throw new Error(`Unexpected table: ${table}`);
-  });
-  return { supabase: { from } as never, eq, remove };
+  const rpc = vi.fn().mockReturnValue({ single });
+  return { supabase: { rpc } as never, rpc };
 }
 
 function createUpdateStoriesClient(result: { data: unknown; error: unknown }) {
@@ -63,7 +52,7 @@ describe('storymap service', () => {
     vi.clearAllMocks();
   });
 
-  it('adds linear sync metadata when story creation syncs successfully', async () => {
+  it('creates a story without waiting on an external integration', async () => {
     const { supabase, insert } = createInsertStoriesClient({
       data: {
         id: 'story-1',
@@ -79,8 +68,6 @@ describe('storymap service', () => {
       },
       error: null,
     });
-    vi.mocked(maybeSyncStoryToLinear).mockResolvedValue({ id: 'lin_1', identifier: 'ENG-42' } as never);
-
     const result = await createStory(supabase, {
       task_id: 'task-1',
       title: 'Approve invoice',
@@ -103,59 +90,6 @@ describe('storymap service', () => {
       },
       status: 'backlog',
     });
-    expect(vi.mocked(maybeSyncStoryToLinear)).toHaveBeenCalledWith(supabase, 'story-1');
-    expect(result).toEqual({
-      data: {
-        id: 'story-1',
-        task_id: 'task-1',
-        release_id: null,
-        title: 'Approve invoice',
-        content: {
-          _version: 1,
-          user_story: 'As a manager, I can approve an invoice for payment.',
-          acceptance_criteria: '- [ ] Approval updates the invoice status',
-        },
-        status: 'backlog',
-        linear_sync: {
-          status: 'synced',
-          linear_issue_id: 'lin_1',
-          linear_issue_identifier: 'ENG-42',
-        },
-      },
-      error: null,
-    });
-  });
-
-  it('keeps local story creation result when outbound sync fails', async () => {
-    const { supabase } = createInsertStoriesClient({
-      data: {
-        id: 'story-1',
-        task_id: 'task-1',
-        release_id: null,
-        title: 'Approve invoice',
-        content: {
-          _version: 1,
-          user_story: 'As a manager, I can approve an invoice for payment.',
-          acceptance_criteria: '- [ ] Approval updates the invoice status',
-        },
-        status: 'backlog',
-      },
-      error: null,
-    });
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked(maybeSyncStoryToLinear).mockRejectedValue(new Error('linear unavailable'));
-
-    const result = await createStory(supabase, {
-      task_id: 'task-1',
-      title: 'Approve invoice',
-      content: {
-        _version: 1,
-        user_story: 'As a manager, I can approve an invoice for payment.',
-        acceptance_criteria: '- [ ] Approval updates the invoice status',
-      },
-      status: 'backlog',
-    });
-
     expect(result).toEqual({
       data: {
         id: 'story-1',
@@ -171,10 +105,9 @@ describe('storymap service', () => {
       },
       error: null,
     });
-    expect(consoleError).toHaveBeenCalled();
   });
 
-  it('adds linear sync metadata when story updates sync successfully', async () => {
+  it('updates a story without waiting on an external integration', async () => {
     const { supabase, update } = createUpdateStoriesClient({
       data: {
         id: 'story-1',
@@ -190,8 +123,6 @@ describe('storymap service', () => {
       },
       error: null,
     });
-    vi.mocked(maybeSyncStoryToLinear).mockResolvedValue({ id: 'lin_2', identifier: 'ENG-99' } as never);
-
     const result = await updateStory(supabase, 'story-1', {
       title: 'Approve invoice online',
       status: 'in_review',
@@ -210,102 +141,18 @@ describe('storymap service', () => {
           acceptance_criteria: '- [ ] Approval is saved',
         },
         status: 'in_review',
-        linear_sync: {
-          status: 'synced',
-          linear_issue_id: 'lin_2',
-          linear_issue_identifier: 'ENG-99',
-        },
       },
       error: null,
     });
   });
 
-  it('keeps local story update result when sync returns no remote issue', async () => {
-    const { supabase } = createUpdateStoriesClient({
-      data: {
-        id: 'story-1',
-        task_id: 'task-1',
-        release_id: null,
-        title: 'Approve invoice online',
-        content: {
-          _version: 1,
-          user_story: 'As a manager, I can approve an invoice online.',
-          acceptance_criteria: '- [ ] Approval is saved',
-        },
-        status: 'in_review',
-      },
-      error: null,
-    });
-    vi.mocked(maybeSyncStoryToLinear).mockResolvedValue(null);
-
-    const result = await updateStory(supabase, 'story-1', { title: 'Approve invoice online' });
-
-    expect(result).toEqual({
-      data: {
-        id: 'story-1',
-        task_id: 'task-1',
-        release_id: null,
-        title: 'Approve invoice online',
-        content: {
-          _version: 1,
-          user_story: 'As a manager, I can approve an invoice online.',
-          acceptance_criteria: '- [ ] Approval is saved',
-        },
-        status: 'in_review',
-      },
-      error: null,
-    });
-  });
-
-  it('deletes the linked Linear issue before deleting the local story', async () => {
-    const { supabase, eq } = createDeleteStoriesClient();
-    const deleteIssue = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(getStoryLinearLink).mockResolvedValue({ linearIssueId: 'lin_1' } as never);
-    vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
-      linearIssueSync: { deleteIssue },
-    } as never);
+  it('deletes through the atomic durable-sync RPC', async () => {
+    const { supabase, rpc } = createDeleteStoriesClient();
 
     const result = await deleteStory(supabase, 'story-1');
 
-    expect(deleteIssue).toHaveBeenCalledWith('lin_1');
-    expect(eq).toHaveBeenCalledWith('id', 'story-1');
+    expect(rpc).toHaveBeenCalledWith('delete_story_with_linear_sync', { p_story_id: 'story-1' });
     expect(result).toEqual({ data: { id: 'story-1' }, error: null });
-  });
-
-  it('still deletes the local story when Linear already removed the remote issue', async () => {
-    const { supabase, eq } = createDeleteStoriesClient();
-    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const deleteIssue = vi.fn().mockRejectedValue({ status: 404 });
-    vi.mocked(getStoryLinearLink).mockResolvedValue({ linearIssueId: 'lin_1' } as never);
-    vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({
-      linearIssueSync: { deleteIssue },
-    } as never);
-
-    await deleteStory(supabase, 'story-1');
-
-    expect(eq).toHaveBeenCalledWith('id', 'story-1');
-    expect(consoleWarn).not.toHaveBeenCalled();
-  });
-
-  it('still deletes the local story when remote sync is unavailable', async () => {
-    const { supabase, eq } = createDeleteStoriesClient();
-    vi.mocked(getStoryLinearLink).mockResolvedValue({ linearIssueId: 'lin_1' } as never);
-    vi.mocked(resolveLinearSyncContextForStory).mockResolvedValue({ linearIssueSync: null } as never);
-
-    await deleteStory(supabase, 'story-1');
-
-    expect(eq).toHaveBeenCalledWith('id', 'story-1');
-  });
-
-  it('warns and still deletes the local story when linked issue lookup fails', async () => {
-    const { supabase, eq } = createDeleteStoriesClient();
-    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.mocked(getStoryLinearLink).mockRejectedValue(new Error('lookup failed'));
-
-    await deleteStory(supabase, 'story-1');
-
-    expect(eq).toHaveBeenCalledWith('id', 'story-1');
-    expect(consoleWarn).toHaveBeenCalled();
   });
 
   it('short-circuits release MCP context lookup when the release is missing', async () => {

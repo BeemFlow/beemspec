@@ -6,10 +6,12 @@ export interface IssueSnapshot {
   title: string;
   description: string | null;
   stateId: string | null;
+  stateName?: string | null;
   updatedAt: string;
 }
 
 export interface IssueUpsertInput {
+  id?: string;
   title: string;
   description: string;
   teamId: string;

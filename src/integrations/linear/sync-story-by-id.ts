@@ -1,9 +1,10 @@
-import { mapStoryToLinearIssueInput, resolveLinearStateIdForStoryStatus } from '@beemspec/linear';
+import { mapStoryToLinearIssueInput } from '@beemspec/linear';
 import type { StoryStatus } from '@beemspec/storymap';
 import { syncStoryToRemote } from '@beemspec/sync';
 import { resolveLinearAuthTokenForTeam, resolveLinearSyncContextForStoryMap } from '@/integrations/linear/auth';
 import { ensureLinearIssueHasLabel } from '@/integrations/linear/label-sync';
 import { getStoryMapLinearImportSettings } from '@/integrations/linear/settings';
+import { applyStoryStatusToLinearInput } from '@/integrations/linear/state-sync';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import type { Supabase } from '@/lib/supabase/types';
 import { loadStoryWithStoryMap } from '@/storymap/story-context';
@@ -12,6 +13,7 @@ export async function processStoryLinearSyncById(
   supabase: Supabase,
   input: {
     storyId: string;
+    recoverDeterministicCreate?: boolean;
   },
 ) {
   const context = await loadStoryWithStoryMap(supabase, input.storyId);
@@ -39,53 +41,46 @@ export async function processStoryLinearSyncById(
 
   const { story } = context.data;
   const existingLink = await getStoryLinearLink(supabase, input.storyId);
+  let existingIssueId = existingLink?.linearIssueId ?? null;
   let preserveFromDescription: string | null = null;
-  if (existingLink) {
-    try {
-      const remote = await linearSyncContext.linearIssueSync.getIssueById(existingLink.linearIssueId);
-      preserveFromDescription = remote?.description ?? null;
-    } catch {
-      preserveFromDescription = null;
-    }
+  let remote = null;
+
+  if (!existingIssueId && input.recoverDeterministicCreate) {
+    remote = await linearSyncContext.linearIssueSync.getIssueById(story.id);
+    existingIssueId = remote?.id ?? null;
+  }
+
+  if (existingIssueId) {
+    remote ??= await linearSyncContext.linearIssueSync.getIssueById(existingIssueId);
+    if (!remote) throw new Error('Linked Linear issue was not found');
+    preserveFromDescription = remote.description;
   }
 
   const input_ = mapStoryToLinearIssueInput(story, linearSyncContext.target, {
     preserveFromDescription,
   });
-  const mappedStateId = linearSyncContext.target.statusMapping?.[story.status as StoryStatus];
-  if (mappedStateId) input_.stateId = mappedStateId;
+  const authToken =
+    linearSyncContext.accessToken ??
+    (linearSyncContext.teamId ? await resolveLinearAuthTokenForTeam(linearSyncContext.teamId) : null);
+  await applyStoryStatusToLinearInput({
+    issue: input_,
+    storyStatus: story.status as StoryStatus,
+    target: linearSyncContext.target,
+    accessToken: authToken,
+  });
 
-  const authToken = linearSyncContext.teamId ? await resolveLinearAuthTokenForTeam(linearSyncContext.teamId) : null;
-  if (authToken) {
-    try {
-      const resolvedStateId = await resolveLinearStateIdForStoryStatus(
-        authToken,
-        linearSyncContext.target.teamId,
-        story.status as StoryStatus,
-        input_.stateId,
-      );
-      input_.stateId = resolvedStateId ?? undefined;
-    } catch {
-      // Best-effort state mapping; fallback stateId remains unchanged.
-    }
-  }
-
-  const linearIssue = await syncStoryToRemote(
-    linearSyncContext.linearIssueSync,
-    input_,
-    existingLink?.linearIssueId ?? null,
-  );
+  const linearIssue = await syncStoryToRemote(linearSyncContext.linearIssueSync, input_, existingIssueId);
   if (!linearIssue) throw new Error('Linear sync returned no issue snapshot');
 
   await upsertStoryLinearLink(supabase, {
     storyId: input.storyId,
     linearIssueId: linearIssue.id,
     linearIssueIdentifier: linearIssue.identifier,
-    lastLocalUpdatedAt: null,
+    lastLocalUpdatedAt: story.updated_at ?? null,
     lastLinearUpdatedAt: linearIssue.updatedAt,
   });
 
-  if (linearSyncContext.teamId) {
+  if (linearSyncContext.teamId && !existingLink) {
     try {
       const importSettings = await getStoryMapLinearImportSettings(supabase, context.data.storyMapId);
 
