@@ -1,12 +1,15 @@
 import { buildStoryPatchFromLinearIssue, mapStoryToLinearIssueInput } from '@beemspec/linear';
+import type { StoryStatus } from '@beemspec/storymap';
 import {
   buildDbUpdateFromPatch,
   type IssueSync,
   SYNC_DIRECTION,
+  type SyncTarget,
   shouldApplyRemoteUpdate,
   syncStoryToRemote,
 } from '@beemspec/sync';
 import { resolveLinearSyncContextForStory } from '@/integrations/linear/auth';
+import { applyStoryStatusToLinearInput, mapLinearIssueStateToStoryStatus } from '@/integrations/linear/state-sync';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { maybeSyncStoryToLinear } from '@/integrations/linear/sync';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
@@ -42,15 +45,26 @@ async function readSyncResponsePayload(response: Response): Promise<SyncResponse
 
 async function syncRemoteToLocal(
   supabase: Supabase,
-  story: { id: string },
-  remote: { id: string; identifier: string; title: string; description: string | null; updatedAt: string },
+  story: { id: string; updated_at?: string | null },
+  remote: {
+    id: string;
+    identifier: string;
+    title: string;
+    description: string | null;
+    stateId: string | null;
+    stateName?: string | null;
+    updatedAt: string;
+  },
+  target: SyncTarget,
 ): Promise<Response> {
   const patch = buildStoryPatchFromLinearIssue({
     title: remote.title,
     description: remote.description,
-    stateName: null,
+    stateName: remote.stateName ?? null,
     updatedAt: remote.updatedAt,
   });
+  const mappedStatus = mapLinearIssueStateToStoryStatus(remote, target);
+  if (mappedStatus) patch.status = mappedStatus;
 
   let currentContent = null;
   if (patch.content) {
@@ -59,18 +73,24 @@ async function syncRemoteToLocal(
   }
   const dbUpdate = buildDbUpdateFromPatch(patch, currentContent);
 
-  const { error: updateError } = await supabase.from('stories').update(dbUpdate).eq('id', story.id);
-  if (updateError) {
-    return serverErrorResponse('Failed to apply remote sync update', updateError);
-  }
+  const expectedUpdatedAt = story.updated_at ?? null;
+  if (!expectedUpdatedAt) return serverErrorResponse('Failed to apply remote sync update');
 
-  await upsertStoryLinearLink(supabase, {
-    storyId: story.id,
-    linearIssueId: remote.id,
-    linearIssueIdentifier: remote.identifier,
-    lastLocalUpdatedAt: remote.updatedAt,
-    lastLinearUpdatedAt: remote.updatedAt,
-  });
+  const { data: writeback, error: updateError } = await supabase
+    .rpc('apply_linear_issue_writeback', {
+      p_story_id: story.id,
+      p_linear_issue_id: remote.id,
+      p_linear_issue_identifier: remote.identifier,
+      p_expected_story_updated_at: expectedUpdatedAt,
+      p_last_linear_updated_at: remote.updatedAt,
+      p_story_title: typeof dbUpdate.title === 'string' ? dbUpdate.title : null,
+      p_story_status: typeof dbUpdate.status === 'string' ? dbUpdate.status : null,
+      p_story_content:
+        dbUpdate.content && typeof dbUpdate.content === 'object' ? (dbUpdate.content as Record<string, unknown>) : null,
+    })
+    .single<{ applied: boolean; conflict: boolean }>();
+  if (updateError) return serverErrorResponse('Failed to apply remote sync update', updateError);
+  if (writeback?.conflict) return ignored('concurrent local update won conflict resolution');
 
   return Response.json({
     success: true,
@@ -84,12 +104,20 @@ async function syncRemoteToLocal(
 async function syncLocalToRemote(
   supabase: Supabase,
   issueSync: NonNullable<IssueSync>,
-  target: { teamId: string; projectId?: string; stateId?: string },
+  target: SyncTarget,
   story: Record<string, unknown>,
   link: { linearIssueId: string },
-  options: { preserveFromDescription?: string | null } = {},
+  options: { preserveFromDescription?: string | null; accessToken?: string | null } = {},
 ): Promise<Response> {
-  const input = mapStoryToLinearIssueInput(story as never, target, options);
+  const input = mapStoryToLinearIssueInput(story as never, target, {
+    preserveFromDescription: options.preserveFromDescription,
+  });
+  await applyStoryStatusToLinearInput({
+    issue: input,
+    storyStatus: story.status as StoryStatus,
+    target,
+    accessToken: options.accessToken,
+  });
   const synced = await syncStoryToRemote(issueSync, input, link.linearIssueId);
   if (!synced) return ignored('sync did not produce a remote issue snapshot');
 
@@ -158,11 +186,12 @@ export async function syncStoryById(input: { supabase: Supabase; storyId: string
 
   const localUpdatedAt = (story.updated_at as string | null) ?? null;
   if (shouldApplyRemoteUpdate(remote.updatedAt, localUpdatedAt)) {
-    return syncRemoteToLocal(input.supabase, story, remote);
+    return syncRemoteToLocal(input.supabase, story, remote, linearSyncContext.target);
   }
 
   return syncLocalToRemote(input.supabase, linearSyncContext.linearIssueSync, linearSyncContext.target, story, link, {
     preserveFromDescription: remote.description,
+    accessToken: linearSyncContext.accessToken,
   });
 }
 

@@ -53,11 +53,13 @@ import {
   createActivity,
   createPersona,
   createRelease,
+  createStory,
   createStoryMap,
   createTask,
   deleteActivity,
   deletePersona,
   deleteRelease,
+  deleteStory,
   deleteTask,
   getReleaseMcpContext,
   getStory,
@@ -73,10 +75,10 @@ import {
   updateActivity,
   updatePersona,
   updateRelease,
+  updateStory,
   updateStoryMap,
   updateTask,
 } from '@/storymap/service';
-import { createStory, deleteStory, updateStory } from '@/storymap/use-cases';
 import { getStoryContext } from './queries';
 
 function jsonText(value: unknown): string {

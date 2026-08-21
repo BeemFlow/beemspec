@@ -11,6 +11,30 @@ interface LinearIssueLabelSnapshot {
   labels: { nodes: LinearLabelNode[] };
 }
 
+interface LinearLabelPage {
+  nodes?: Array<{ id?: string | null; name?: string | null } | null> | null;
+  pageInfo?: { hasNextPage?: boolean | null } | null;
+  fetchNext?: () => Promise<LinearLabelPage>;
+}
+
+async function collectLinearLabels(initial: LinearLabelPage): Promise<LinearLabelNode[]> {
+  const labels: LinearLabelNode[] = [];
+  let page: LinearLabelPage | null = initial;
+
+  while (page) {
+    for (const label of page.nodes ?? []) {
+      if (typeof label?.id === 'string' && typeof label.name === 'string' && label.id && label.name) {
+        labels.push({ id: label.id, name: label.name });
+      }
+    }
+
+    if (!page.pageInfo?.hasNextPage || !page.fetchNext) break;
+    page = await page.fetchNext();
+  }
+
+  return labels;
+}
+
 function normalizeLabelName(value: string | null | undefined): string | null {
   return normalize(value);
 }
@@ -83,16 +107,11 @@ async function fetchIssueLabels(client: LinearClient, issueId: string): Promise<
   const issue = await client.issue(issueId);
   if (!issue?.id) return null;
 
-  const labels = await issue.labels({ first: 100 } as never);
+  const labels = await collectLinearLabels((await issue.labels({ first: 100 } as never)) as LinearLabelPage);
   return {
     id: issue.id,
     labels: {
-      nodes: (labels.nodes ?? [])
-        .map((label) => ({
-          id: typeof label?.id === 'string' ? label.id : '',
-          name: typeof label?.name === 'string' ? label.name : '',
-        }))
-        .filter((label) => label.id.length > 0 && label.name.length > 0),
+      nodes: labels,
     },
   };
 }
@@ -101,8 +120,8 @@ async function findOrCreateLabelId(client: LinearClient, teamId: string, labelNa
   const team = await client.team(teamId);
   if (!team?.id) throw new Error('Linear team not found');
 
-  const labels = await team.labels({ first: 100 } as never);
-  const existing = (labels.nodes ?? []).find((label) => sameLabelName(label?.name, labelName));
+  const labels = await collectLinearLabels((await team.labels({ first: 100 } as never)) as LinearLabelPage);
+  const existing = labels.find((label) => sameLabelName(label.name, labelName));
   if (typeof existing?.id === 'string') return existing.id;
 
   const created = await client.createIssueLabel({ teamId, name: labelName });

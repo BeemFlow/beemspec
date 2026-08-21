@@ -18,6 +18,7 @@ export interface LinearSyncContext {
   target: SyncTarget | null;
   targetConfigured: boolean;
   linearIssueSync: IssueSync | null;
+  accessToken?: string | null;
   error?: unknown;
 }
 
@@ -65,14 +66,14 @@ export async function resolveLinearAuthTokenForTeam(teamId: string): Promise<str
 async function resolveOAuthIssueSync(
   teamId: string,
 ): Promise<
-  | { status: 'ready'; issueSync: IssueSync }
+  | { status: 'ready'; issueSync: IssueSync; accessToken: string }
   | { status: 'not_connected' | 'auth_unavailable' }
   | { status: 'error'; error: unknown }
 > {
   const result = await resolveLinearAuthTokenForTeamResult(teamId);
   if (result.status !== 'ready') return result;
   const issueSync = createLinearClient(true, { accessToken: result.accessToken });
-  return issueSync ? { status: 'ready', issueSync } : { status: 'auth_unavailable' };
+  return issueSync ? { status: 'ready', issueSync, accessToken: result.accessToken } : { status: 'auth_unavailable' };
 }
 
 async function resolveContextFromStoryMap(supabase: SupabaseLike, storyMapId: string): Promise<LinearSyncContext> {
@@ -88,7 +89,14 @@ async function resolveContextFromStoryMap(supabase: SupabaseLike, storyMapId: st
   if (teamId) {
     const oauthSync = await resolveOAuthIssueSync(teamId);
     if (oauthSync.status === 'ready') {
-      return { status: 'ready', teamId, target, targetConfigured: true, linearIssueSync: oauthSync.issueSync };
+      return {
+        status: 'ready',
+        teamId,
+        target,
+        targetConfigured: true,
+        linearIssueSync: oauthSync.issueSync,
+        accessToken: oauthSync.accessToken,
+      };
     }
     if (oauthSync.status === 'error') {
       return {
@@ -157,6 +165,7 @@ export async function resolveLinearSyncContextForStory(
           target,
           targetConfigured: true,
           linearIssueSync: oauthSync.issueSync,
+          accessToken: oauthSync.accessToken,
         };
       }
       if (oauthSync.status === 'error') {

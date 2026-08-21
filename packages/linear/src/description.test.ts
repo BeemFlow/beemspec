@@ -23,6 +23,7 @@ describe('linear description formatting', () => {
     });
 
     expect(input.title).toBe('Login');
+    expect(input.id).toBe('story_1');
     expect(input.teamId).toBe('team_1');
     expect(input.description).toContain('## User Story');
     expect(input.description).toContain('## Acceptance Criteria');

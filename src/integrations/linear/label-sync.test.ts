@@ -87,4 +87,30 @@ describe('linear label sync helpers', () => {
     expect(createIssueLabel).not.toHaveBeenCalled();
     expect(updateIssue).toHaveBeenCalledWith('issue-1', { labelIds: ['label-9'] });
   });
+
+  it('finds an existing team label on a later page', async () => {
+    const issueLabels = vi.fn().mockResolvedValue({ nodes: [] });
+    const issue = vi.fn().mockResolvedValue({ id: 'issue-1', labels: issueLabels });
+    const fetchNext = vi.fn().mockResolvedValue({
+      nodes: [{ id: 'label-page-2', name: 'Story' }],
+      pageInfo: { hasNextPage: false },
+    });
+    const teamLabels = vi.fn().mockResolvedValue({
+      nodes: [{ id: 'label-page-1', name: 'Other' }],
+      pageInfo: { hasNextPage: true },
+      fetchNext,
+    });
+    const team = vi.fn().mockResolvedValue({ id: 'team-1', labels: teamLabels });
+    const createIssueLabel = vi.fn();
+    const updateIssue = vi.fn().mockResolvedValue(undefined);
+    LinearClientMock.mockImplementation(function LinearClientMockImplementation() {
+      return { issue, team, createIssueLabel, updateIssue };
+    });
+
+    await ensureLinearIssueHasLabel({ authToken: 'token', issueId: 'issue-1', teamId: 'team-1', labelName: 'Story' });
+
+    expect(fetchNext).toHaveBeenCalled();
+    expect(createIssueLabel).not.toHaveBeenCalled();
+    expect(updateIssue).toHaveBeenCalledWith('issue-1', { labelIds: ['label-page-2'] });
+  });
 });

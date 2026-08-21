@@ -141,6 +141,14 @@ Instead of rewriting stories, reshuffling releases, and editing context by hand,
 - Free-form story, release, map, and process context for coding agents
 - Linear integration with OAuth, webhook handling, project/status mapping, sync, and import
 
+Linear outbound sync is queued transactionally in Supabase. Story saves return
+without waiting on Linear, Next.js makes an immediate post-response attempt,
+and `npm run sync:drain` provides a portable recovery command for a scheduled
+job. Configure `INTEGRATION_SYNC_SECRET` in the app and scheduler, plus
+`SYNC_DRAIN_URL` (or `APP_URL`) in the scheduler. A 15-minute DigitalOcean App
+Platform scheduled job is sufficient for recovery; the queue remains durable
+between runs.
+
 ## Tech stack
 
 - Next.js

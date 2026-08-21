@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { WebhookEvent, WebhookIngest, WebhookSignatureVerifier } from '@beemspec/sync';
 
-const DEFAULT_MAX_DRIFT_MS = 5 * 60 * 1000;
+const DEFAULT_MAX_DRIFT_MS = 60 * 1000;
 
 function getString(value: unknown, key: string): string {
   if (typeof value !== 'string' || value.length === 0) {

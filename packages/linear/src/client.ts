@@ -58,13 +58,14 @@ function isRetryable(error: unknown): boolean {
   return false;
 }
 
-function toSnapshot(issue: Issue): IssueSnapshot {
+function toSnapshot(issue: Issue, stateName: string | null = null): IssueSnapshot {
   return {
     id: issue.id,
     identifier: issue.identifier,
     title: issue.title,
     description: issue.description ?? null,
     stateId: issue.stateId ?? null,
+    stateName,
     updatedAt: issue.updatedAt.toISOString(),
   };
 }
@@ -468,7 +469,8 @@ export function createLinearClient(enabled: boolean, options: LinearClientOption
     async getIssueById(issueId: string): Promise<IssueSnapshot | null> {
       const issue = await withRetry(() => client.issue(issueId), maxRetries, sleep);
       if (!issue?.id) return null;
-      return toSnapshot(issue);
+      const state = issue.stateId ? await issue.state : null;
+      return toSnapshot(issue, state?.name ?? null);
     },
 
     async createIssue(input: IssueUpsertInput): Promise<IssueSnapshot> {

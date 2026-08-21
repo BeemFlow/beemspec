@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-function requiredEnv(name: 'NEXT_PUBLIC_SUPABASE_URL' | 'SUPABASE_SECRET_KEY') {
+function requiredEnv(
+  name: 'NEXT_PUBLIC_SUPABASE_URL' | 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY' | 'SUPABASE_SECRET_KEY',
+) {
   const value = process.env[name]?.trim();
   if (!value) {
     throw new Error(`Missing ${name}. Set local Supabase env vars before running integration tests.`);
@@ -19,6 +21,15 @@ function requireLocalSupabaseUrl(): string {
 
 export function createLocalSupabaseAdminClient() {
   return createClient(requireLocalSupabaseUrl(), requiredEnv('SUPABASE_SECRET_KEY'), {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+export function createLocalSupabasePublicClient() {
+  return createClient(requireLocalSupabaseUrl(), requiredEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'), {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

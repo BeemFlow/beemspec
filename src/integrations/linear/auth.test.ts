@@ -118,6 +118,7 @@ describe('linear auth', () => {
       target: { projectId: 'project-1' },
       targetConfigured: true,
       linearIssueSync: syncClient,
+      accessToken: 'access-1',
     });
   });
 

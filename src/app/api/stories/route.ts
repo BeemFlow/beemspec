@@ -1,11 +1,11 @@
 import { createStorySchema, reorderStoriesSchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
+import { scheduleLinearSyncDrain } from '@/integrations/linear/schedule';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { validateRequest } from '@/lib/validations';
-import { reorderStories } from '@/storymap/service';
-import { createStory } from '@/storymap/use-cases';
+import { createStory, reorderStories } from '@/storymap/service';
 
 export async function PUT(request: Request) {
   const auth = await requireAuth();
@@ -36,6 +36,8 @@ export async function POST(request: Request) {
   if (error) {
     return serverErrorResponse('Failed to create story', error);
   }
+
+  scheduleLinearSyncDrain();
 
   return NextResponse.json(data);
 }

@@ -1,11 +1,11 @@
 import { updateStorySchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
+import { scheduleLinearSyncDrain } from '@/integrations/linear/schedule';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
-import { getStory } from '@/storymap/service';
-import { deleteStory, updateStory } from '@/storymap/use-cases';
+import { deleteStory, getStory, updateStory } from '@/storymap/service';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
@@ -46,6 +46,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return serverErrorResponse('Failed to update story', error);
   }
 
+  scheduleLinearSyncDrain();
+
   return NextResponse.json(data);
 }
 
@@ -66,5 +68,6 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     }
     return serverErrorResponse('Failed to delete story', error);
   }
+  scheduleLinearSyncDrain();
   return NextResponse.json({ success: true, deleted: data });
 }

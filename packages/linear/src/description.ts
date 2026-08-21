@@ -176,6 +176,7 @@ export function mapStoryToLinearIssueInput(
   options: { preserveFromDescription?: string | null } = {},
 ): IssueUpsertInput {
   return {
+    id: story.id,
     title: story.title,
     description: buildLinearDescription(story, options),
     teamId: target.teamId,

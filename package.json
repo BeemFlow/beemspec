@@ -20,12 +20,13 @@
     "test:integration": "vitest run --config vitest.integration.config.mjs",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "sync:drain": "node --env-file-if-exists=.env.local scripts/drain-linear-sync.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
-    "@linear/sdk": "^90.0.0",
+    "@linear/sdk": "^91.0.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@radix-ui/react-alert-dialog": "^1.1.23",
     "@radix-ui/react-dialog": "^1.1.23",

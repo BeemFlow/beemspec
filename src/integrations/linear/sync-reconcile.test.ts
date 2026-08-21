@@ -10,6 +10,8 @@ const {
   buildDbUpdateFromPatchMock,
   shouldApplyRemoteUpdateMock,
   syncStoryToRemoteMock,
+  applyStoryStatusToLinearInputMock,
+  mapLinearIssueStateToStoryStatusMock,
 } = vi.hoisted(() => ({
   buildStoryPatchFromLinearIssueMock: vi.fn(),
   mapStoryToLinearIssueInputMock: vi.fn(),
@@ -20,6 +22,8 @@ const {
   buildDbUpdateFromPatchMock: vi.fn(),
   shouldApplyRemoteUpdateMock: vi.fn(),
   syncStoryToRemoteMock: vi.fn(),
+  applyStoryStatusToLinearInputMock: vi.fn(),
+  mapLinearIssueStateToStoryStatusMock: vi.fn(),
 }));
 
 vi.mock('@beemspec/linear', () => ({
@@ -35,6 +39,10 @@ vi.mock('@/integrations/linear/story-links', () => ({
 }));
 vi.mock('@/integrations/linear/sync', () => ({
   maybeSyncStoryToLinear: maybeSyncStoryToLinearMock,
+}));
+vi.mock('@/integrations/linear/state-sync', () => ({
+  applyStoryStatusToLinearInput: applyStoryStatusToLinearInputMock,
+  mapLinearIssueStateToStoryStatus: mapLinearIssueStateToStoryStatusMock,
 }));
 vi.mock('@beemspec/sync', () => ({
   buildDbUpdateFromPatch: buildDbUpdateFromPatchMock,
@@ -56,7 +64,10 @@ function createStoryLookupClient(story: Record<string, unknown>) {
     throw new Error(`Unexpected table: ${table}`);
   });
 
-  return { supabase: { from } as never, updateEq };
+  const rpcSingle = vi.fn().mockResolvedValue({ data: { applied: true, conflict: false }, error: null });
+  const rpc = vi.fn().mockReturnValue({ single: rpcSingle });
+
+  return { supabase: { from, rpc } as never, rpc, updateEq };
 }
 
 describe('linear sync reconcile', () => {
@@ -104,7 +115,7 @@ describe('linear sync reconcile', () => {
   });
 
   it('applies a remote update to the local story when the remote issue is newer', async () => {
-    const { supabase, updateEq } = createStoryLookupClient({
+    const { supabase, rpc } = createStoryLookupClient({
       id: 'story-1',
       updated_at: '2026-03-01T00:00:00Z',
       content: { _version: 1, user_story: 'old', acceptance_criteria: 'old' },
@@ -124,14 +135,14 @@ describe('linear sync reconcile', () => {
     });
     shouldApplyRemoteUpdateMock.mockReturnValue(true);
     buildStoryPatchFromLinearIssueMock.mockReturnValue({ title: 'Remote title', content: { _version: 1 } });
-    buildDbUpdateFromPatchMock.mockReturnValue({ title: 'Remote title', content: { _version: 1 } });
+    buildDbUpdateFromPatchMock.mockReturnValue({ title: 'Remote title', content: { _version: 1 }, status: 'done' });
+    mapLinearIssueStateToStoryStatusMock.mockReturnValue('done');
 
     const response = await syncStoryById({ supabase, storyId: 'story-1' });
 
-    expect(updateEq).toHaveBeenCalledWith('id', 'story-1');
-    expect(upsertStoryLinearLinkMock).toHaveBeenCalledWith(
-      supabase,
-      expect.objectContaining({ storyId: 'story-1', linearIssueId: 'lin-1' }),
+    expect(rpc).toHaveBeenCalledWith(
+      'apply_linear_issue_writeback',
+      expect.objectContaining({ p_story_id: 'story-1', p_story_status: 'done' }),
     );
     await expect(response.json()).resolves.toEqual({
       success: true,
@@ -200,7 +211,10 @@ describe('linear sync reconcile', () => {
       return { single, update };
     });
     const select = vi.fn().mockReturnValue({ eq });
-    const supabase = { from: vi.fn(() => ({ select, update })) } as never;
+    const rpc = vi.fn().mockReturnValue({
+      single: vi.fn().mockResolvedValue({ data: { applied: true, conflict: false }, error: null }),
+    });
+    const supabase = { from: vi.fn(() => ({ select, update })), rpc } as never;
 
     resolveLinearSyncContextForStoryMock.mockImplementation(async (_supabase, input: { storyId: string }) => {
       if (input.storyId === 'a') {

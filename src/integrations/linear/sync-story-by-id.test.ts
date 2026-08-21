@@ -53,6 +53,7 @@ describe('processStoryLinearSyncById', () => {
           title: 'Story',
           content: { _version: 1, user_story: 'r', acceptance_criteria: 'a' },
           status: 'todo',
+          updated_at: '2026-03-06T00:00:00.000Z',
         },
       },
     } as never);
@@ -63,6 +64,7 @@ describe('processStoryLinearSyncById', () => {
       targetConfigured: true,
       target: { teamId: 'linear_team_1', statusMapping: { todo: 'mapped_state_todo' } },
       linearIssueSync: { createIssue: vi.fn(), getIssueById: vi.fn(), updateIssue: vi.fn(), deleteIssue: vi.fn() },
+      accessToken: 'token_1',
     });
 
     vi.mocked(getStoryLinearLink).mockResolvedValue(null);
@@ -91,18 +93,18 @@ describe('processStoryLinearSyncById', () => {
   it('applies sync label after successful remote sync', async () => {
     await processStoryLinearSyncById({} as never, { storyId: 'story_1' });
 
-    expect(resolveLinearStateIdForStoryStatus).toHaveBeenCalledWith(
-      'token_1',
-      'linear_team_1',
-      'todo',
-      'mapped_state_todo',
-    );
+    expect(resolveLinearStateIdForStoryStatus).not.toHaveBeenCalled();
     expect(syncStoryToRemote).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ stateId: 'resolved_state' }),
+      expect.objectContaining({ stateId: 'mapped_state_todo' }),
       null,
     );
     expect(upsertStoryLinearLink).toHaveBeenCalled();
+    expect(upsertStoryLinearLink).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ lastLocalUpdatedAt: '2026-03-06T00:00:00.000Z' }),
+    );
+    expect(resolveLinearAuthTokenForTeam).not.toHaveBeenCalled();
     expect(ensureLinearIssueHasLabel).toHaveBeenCalledWith({
       authToken: 'token_1',
       issueId: 'lin_1',
@@ -142,6 +144,7 @@ describe('processStoryLinearSyncById', () => {
         updateIssue: vi.fn(),
         deleteIssue: vi.fn(),
       },
+      accessToken: 'token_1',
     });
 
     await processStoryLinearSyncById({} as never, { storyId: 'story_1' });
@@ -152,5 +155,49 @@ describe('processStoryLinearSyncById', () => {
       expect.objectContaining({ preserveFromDescription: '## QA Notes\nKeep this section' }),
     );
     expect(syncStoryToRemote).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'lin_existing');
+  });
+
+  it('aborts an update when the existing description cannot be loaded safely', async () => {
+    vi.mocked(getStoryLinearLink).mockResolvedValue({ linearIssueId: 'lin_existing' } as never);
+    vi.mocked(resolveLinearSyncContextForStoryMap).mockResolvedValue({
+      status: 'ready',
+      teamId: 'team_1',
+      targetConfigured: true,
+      target: { teamId: 'linear_team_1' },
+      linearIssueSync: {
+        createIssue: vi.fn(),
+        getIssueById: vi.fn().mockRejectedValue(new Error('Linear unavailable')),
+        updateIssue: vi.fn(),
+        deleteIssue: vi.fn(),
+      },
+      accessToken: 'token_1',
+    });
+
+    await expect(processStoryLinearSyncById({} as never, { storyId: 'story_1' })).rejects.toThrow('Linear unavailable');
+    expect(syncStoryToRemote).not.toHaveBeenCalled();
+  });
+
+  it('recovers an issue created before a missing link write by deterministic story id', async () => {
+    const getIssueById = vi.fn().mockResolvedValue({
+      id: 'story_1',
+      identifier: 'BEE-10',
+      title: 'Story',
+      description: 'Existing description',
+      stateId: null,
+      updatedAt: '2026-03-05T00:00:00.000Z',
+    });
+    vi.mocked(resolveLinearSyncContextForStoryMap).mockResolvedValue({
+      status: 'ready',
+      teamId: 'team_1',
+      targetConfigured: true,
+      target: { teamId: 'linear_team_1' },
+      linearIssueSync: { createIssue: vi.fn(), getIssueById, updateIssue: vi.fn(), deleteIssue: vi.fn() },
+      accessToken: 'token_1',
+    });
+
+    await processStoryLinearSyncById({} as never, { storyId: 'story_1', recoverDeterministicCreate: true });
+
+    expect(getIssueById).toHaveBeenCalledWith('story_1');
+    expect(syncStoryToRemote).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'story_1');
   });
 });
