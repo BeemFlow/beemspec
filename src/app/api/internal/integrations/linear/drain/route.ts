@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { drainLinearSyncQueue } from '@/integrations/linear/jobs';
+import { processLinearSyncBatch } from '@/integrations/linear/jobs';
 import { env } from '@/lib/env';
 
 export async function POST(request: Request) {
@@ -10,6 +10,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const summary = await drainLinearSyncQueue({ limit: 25 });
+  const summary = await processLinearSyncBatch({ limit: 25 });
   return NextResponse.json({ success: true, ...summary });
 }

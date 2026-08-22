@@ -1,6 +1,6 @@
 import { createStorySchema, reorderStoriesSchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
-import { scheduleLinearSyncDrain } from '@/integrations/linear/schedule';
+import { scheduleLinearSyncWorker } from '@/integrations/linear/schedule';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     return serverErrorResponse('Failed to create story', error);
   }
 
-  scheduleLinearSyncDrain();
+  scheduleLinearSyncWorker();
 
   return NextResponse.json(data);
 }

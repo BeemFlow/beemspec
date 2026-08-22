@@ -11,15 +11,15 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }));
 
-vi.mock('@/integrations/linear/sync-reconcile', () => ({
-  syncStoriesByIdList: vi.fn(),
+vi.mock('@/integrations/linear/reconcile', () => ({
+  reconcileStoriesForStoryMap: vi.fn(),
 }));
 
 vi.mock('@/integrations/linear/settings', () => ({
   getTeamIdForStoryMap: vi.fn().mockResolvedValue(null),
 }));
 
-import { syncStoriesByIdList } from '@/integrations/linear/sync-reconcile';
+import { reconcileStoriesForStoryMap } from '@/integrations/linear/reconcile';
 
 const STORY_MAP_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
@@ -61,7 +61,7 @@ describe('story map linear sync route', () => {
     });
 
     vi.mocked(createClient).mockResolvedValue({ from } as never);
-    vi.mocked(syncStoriesByIdList).mockResolvedValue({
+    vi.mocked(reconcileStoriesForStoryMap).mockResolvedValue({
       considered: 2,
       succeeded: 2,
       failed: 0,
@@ -69,14 +69,18 @@ describe('story map linear sync route', () => {
       createdRemote: 1,
       localToRemote: 1,
       remoteToLocal: 0,
-      responses: [
+      results: [
         {
           storyId: 'story_1',
-          response: Response.json({ success: true, action: 'created_remote', linear_issue_id: 'lin_1' }),
+          success: true,
+          action: 'created_remote',
+          linearIssueId: 'lin_1',
         },
         {
           storyId: 'story_2',
-          response: Response.json({ success: true, action: 'local_to_remote', linear_issue_id: 'lin_2' }),
+          success: true,
+          action: 'local_to_remote',
+          linearIssueId: 'lin_2',
         },
       ],
     });
@@ -85,9 +89,10 @@ describe('story map linear sync route', () => {
       params: Promise.resolve({ id: STORY_MAP_ID }),
     });
 
-    expect(syncStoriesByIdList).toHaveBeenCalledWith(
+    expect(reconcileStoriesForStoryMap).toHaveBeenCalledWith(
       expect.objectContaining({
         supabase: expect.anything(),
+        storyMapId: STORY_MAP_ID,
         storyIds: ['story_1', 'story_2'],
       }),
     );
@@ -149,7 +154,7 @@ describe('story map linear sync route', () => {
       params: Promise.resolve({ id: STORY_MAP_ID }),
     });
 
-    expect(syncStoriesByIdList).not.toHaveBeenCalled();
+    expect(reconcileStoriesForStoryMap).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       success: true,
@@ -200,7 +205,7 @@ describe('story map linear sync route', () => {
     });
 
     vi.mocked(createClient).mockResolvedValue({ from } as never);
-    vi.mocked(syncStoriesByIdList).mockResolvedValue({
+    vi.mocked(reconcileStoriesForStoryMap).mockResolvedValue({
       considered: 2,
       succeeded: 1,
       failed: 1,
@@ -208,14 +213,18 @@ describe('story map linear sync route', () => {
       createdRemote: 0,
       localToRemote: 0,
       remoteToLocal: 0,
-      responses: [
+      results: [
         {
           storyId: 'story_1',
-          response: Response.json({ success: true, ignored: true, reason: 'Linear integration is not enabled' }),
+          success: true,
+          action: 'ignored',
+          reason: 'Linear integration is not enabled',
         },
         {
           storyId: 'story_2',
-          response: Response.json({ error: 'boom' }, { status: 500 }),
+          success: false,
+          action: 'failed',
+          reason: 'sync failed',
         },
       ],
     });
@@ -268,7 +277,7 @@ describe('story map linear sync route', () => {
       params: Promise.resolve({ id: STORY_MAP_ID }),
     });
 
-    expect(syncStoriesByIdList).not.toHaveBeenCalled();
+    expect(reconcileStoriesForStoryMap).not.toHaveBeenCalled();
     expect(response.status).toBe(422);
     await expect(response.json()).resolves.toMatchObject({
       error: 'Manual sync requires a saved Linear project for this story map',

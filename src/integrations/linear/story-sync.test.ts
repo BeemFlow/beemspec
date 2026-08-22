@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { processStoryLinearSyncById } from './sync-story-by-id';
+import { pushStoryToLinearById } from './story-sync';
 
 vi.mock('@beemspec/linear', () => ({
   mapStoryToLinearIssueInput: vi.fn(),
@@ -40,7 +40,7 @@ import { getStoryMapLinearImportSettings } from '@/integrations/linear/settings'
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { loadStoryWithStoryMap } from '@/storymap/story-context';
 
-describe('processStoryLinearSyncById', () => {
+describe('pushStoryToLinearById', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -91,7 +91,7 @@ describe('processStoryLinearSyncById', () => {
   });
 
   it('applies sync label after successful remote sync', async () => {
-    await processStoryLinearSyncById({} as never, { storyId: 'story_1' });
+    await pushStoryToLinearById({} as never, { storyId: 'story_1' });
 
     expect(resolveLinearStateIdForStoryStatus).not.toHaveBeenCalled();
     expect(syncStoryToRemote).toHaveBeenCalledWith(
@@ -116,7 +116,7 @@ describe('processStoryLinearSyncById', () => {
   it('does not fail story sync when label apply fails', async () => {
     vi.mocked(ensureLinearIssueHasLabel).mockRejectedValue(new Error('label apply failed'));
 
-    await expect(processStoryLinearSyncById({} as never, { storyId: 'story_1' })).resolves.toMatchObject({
+    await expect(pushStoryToLinearById({} as never, { storyId: 'story_1' })).resolves.toMatchObject({
       id: 'lin_1',
       identifier: 'BEE-1',
     });
@@ -147,7 +147,7 @@ describe('processStoryLinearSyncById', () => {
       accessToken: 'token_1',
     });
 
-    await processStoryLinearSyncById({} as never, { storyId: 'story_1' });
+    await pushStoryToLinearById({} as never, { storyId: 'story_1' });
 
     expect(mapStoryToLinearIssueInput).toHaveBeenCalledWith(
       expect.anything(),
@@ -173,7 +173,7 @@ describe('processStoryLinearSyncById', () => {
       accessToken: 'token_1',
     });
 
-    await expect(processStoryLinearSyncById({} as never, { storyId: 'story_1' })).rejects.toThrow('Linear unavailable');
+    await expect(pushStoryToLinearById({} as never, { storyId: 'story_1' })).rejects.toThrow('Linear unavailable');
     expect(syncStoryToRemote).not.toHaveBeenCalled();
   });
 
@@ -195,7 +195,7 @@ describe('processStoryLinearSyncById', () => {
       accessToken: 'token_1',
     });
 
-    await processStoryLinearSyncById({} as never, { storyId: 'story_1', recoverDeterministicCreate: true });
+    await pushStoryToLinearById({} as never, { storyId: 'story_1', recoverDeterministicCreate: true });
 
     expect(getIssueById).toHaveBeenCalledWith('story_1');
     expect(syncStoryToRemote).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'story_1');

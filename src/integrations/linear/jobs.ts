@@ -1,6 +1,6 @@
 import { createLinearClient } from '@beemspec/linear';
 import { resolveLinearAuthTokenForTeamResult } from '@/integrations/linear/auth';
-import { processStoryLinearSyncById } from '@/integrations/linear/sync-story-by-id';
+import { pushStoryToLinearById } from '@/integrations/linear/story-sync';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 const MAX_ATTEMPTS = 8;
@@ -36,7 +36,7 @@ interface LinearSyncState {
   status: 'pending' | 'processing' | 'synced' | 'error';
 }
 
-export interface LinearSyncDrainSummary {
+export interface LinearSyncBatchSummary {
   claimed: number;
   succeeded: number;
   retried: number;
@@ -165,7 +165,7 @@ async function processDeleteJob(state: LinearSyncState): Promise<string> {
 async function processClaimedJob(
   supabase: AdminSupabase,
   job: ClaimedLinearSyncJob,
-  summary: LinearSyncDrainSummary,
+  summary: LinearSyncBatchSummary,
 ): Promise<void> {
   const payload = parseJobPayload(job.payload);
   if (!payload) {
@@ -198,7 +198,7 @@ async function processClaimedJob(
       payload.operation === 'delete'
         ? await processDeleteJob(state)
         : (
-            await processStoryLinearSyncById(supabase as never, {
+            await pushStoryToLinearById(supabase as never, {
               storyId: payload.entity_id,
               recoverDeterministicCreate: job.read_count > 1,
             })
@@ -240,9 +240,9 @@ async function processClaimedJob(
   }
 }
 
-export async function drainLinearSyncQueue(
+export async function processLinearSyncBatch(
   input: { limit?: number; supabase?: AdminSupabase } = {},
-): Promise<LinearSyncDrainSummary> {
+): Promise<LinearSyncBatchSummary> {
   const supabase = input.supabase ?? createAdminClient();
   const limit = Math.min(100, Math.max(1, input.limit ?? 10));
   const { data, error } = await supabase.rpc('claim_linear_sync_jobs', {
@@ -252,7 +252,7 @@ export async function drainLinearSyncQueue(
   if (error) throw error;
 
   const jobs = (data ?? []) as ClaimedLinearSyncJob[];
-  const summary: LinearSyncDrainSummary = {
+  const summary: LinearSyncBatchSummary = {
     claimed: jobs.length,
     succeeded: 0,
     retried: 0,

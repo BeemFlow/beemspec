@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StoryMapCanvas } from '@/components/story-map/StoryMapCanvas';
-import { scheduleLinearSyncDrain } from '@/integrations/linear/schedule';
+import { scheduleLinearSyncWorker } from '@/integrations/linear/schedule';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import type { StoryMapFull } from '@/types';
@@ -19,7 +19,7 @@ import { POST as postTasks, PUT as putTasks } from '../tasks/route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
-vi.mock('@/integrations/linear/schedule', () => ({ scheduleLinearSyncDrain: vi.fn() }));
+vi.mock('@/integrations/linear/schedule', () => ({ scheduleLinearSyncWorker: vi.fn() }));
 
 const VALID_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 
@@ -214,7 +214,7 @@ describe('story map domain routes', () => {
         content: { user_story: 'As a user...', acceptance_criteria: '- [ ] Can log in' },
       }),
     );
-    expect(scheduleLinearSyncDrain).toHaveBeenCalledOnce();
+    expect(scheduleLinearSyncWorker).toHaveBeenCalledOnce();
   });
 
   it('deletes stories through the durable sync RPC', async () => {
@@ -230,7 +230,7 @@ describe('story map domain routes', () => {
 
     expect(rpc).toHaveBeenCalledWith('delete_story_with_linear_sync', { p_story_id: VALID_ID });
     expect(remove).toHaveBeenCalled();
-    expect(scheduleLinearSyncDrain).toHaveBeenCalledOnce();
+    expect(scheduleLinearSyncWorker).toHaveBeenCalledOnce();
     expect(response.status).toBe(200);
   });
 });

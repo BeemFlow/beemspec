@@ -4,23 +4,17 @@ const {
   createAdminClientMock,
   createLinearClientMock,
   getLinearOAuthConnectionForTeamMock,
-  hasLinearOAuthConnectionForTeamMock,
   refreshLinearOAuthAccessTokenMock,
   upsertLinearOAuthConnectionMock,
-  getSyncTargetForStoryMock,
   getSyncTargetForStoryMapMock,
-  getTeamIdForStoryMock,
   getTeamIdForStoryMapMock,
 } = vi.hoisted(() => ({
   createAdminClientMock: vi.fn(),
   createLinearClientMock: vi.fn(),
   getLinearOAuthConnectionForTeamMock: vi.fn(),
-  hasLinearOAuthConnectionForTeamMock: vi.fn(),
   refreshLinearOAuthAccessTokenMock: vi.fn(),
   upsertLinearOAuthConnectionMock: vi.fn(),
-  getSyncTargetForStoryMock: vi.fn(),
   getSyncTargetForStoryMapMock: vi.fn(),
-  getTeamIdForStoryMock: vi.fn(),
   getTeamIdForStoryMapMock: vi.fn(),
 }));
 
@@ -31,23 +25,18 @@ vi.mock('./connections', async () => {
   return {
     ...actual,
     getLinearOAuthConnectionForTeam: getLinearOAuthConnectionForTeamMock,
-    hasLinearOAuthConnectionForTeam: hasLinearOAuthConnectionForTeamMock,
     upsertLinearOAuthConnection: upsertLinearOAuthConnectionMock,
   };
 });
 vi.mock('./oauth-token', () => ({ refreshLinearOAuthAccessToken: refreshLinearOAuthAccessTokenMock }));
 vi.mock('./settings', () => ({
-  getSyncTargetForStory: getSyncTargetForStoryMock,
   getSyncTargetForStoryMap: getSyncTargetForStoryMapMock,
-  getTeamIdForStory: getTeamIdForStoryMock,
   getTeamIdForStoryMap: getTeamIdForStoryMapMock,
 }));
 
 import {
-  isLinearSyncAvailableForStoryMap,
   resolveLinearAuthTokenForTeam,
   resolveLinearAuthTokenForTeamResult,
-  resolveLinearSyncContextForStory,
   resolveLinearSyncContextForStoryMap,
 } from './auth';
 
@@ -122,20 +111,6 @@ describe('linear auth', () => {
     });
   });
 
-  it('distinguishes a failed context lookup from an unconfigured integration', async () => {
-    const error = new Error('boom');
-    getSyncTargetForStoryMock.mockRejectedValue(error);
-
-    await expect(resolveLinearSyncContextForStory({} as never, { storyId: 'story-1' })).resolves.toEqual({
-      status: 'error',
-      teamId: null,
-      target: null,
-      targetConfigured: false,
-      linearIssueSync: null,
-      error,
-    });
-  });
-
   it('reports token infrastructure failures separately from a missing connection', async () => {
     const error = new Error('database unavailable');
     getLinearOAuthConnectionForTeamMock.mockRejectedValue(error);
@@ -144,15 +119,5 @@ describe('linear auth', () => {
 
     getLinearOAuthConnectionForTeamMock.mockResolvedValue(null);
     await expect(resolveLinearAuthTokenForTeamResult('team-1')).resolves.toEqual({ status: 'not_connected' });
-  });
-
-  it('checks team availability before reporting story map sync availability', async () => {
-    getTeamIdForStoryMapMock.mockResolvedValue('team-1');
-    hasLinearOAuthConnectionForTeamMock.mockResolvedValue(true);
-
-    await expect(isLinearSyncAvailableForStoryMap({} as never, { storyMapId: 'map-1' })).resolves.toBe(true);
-
-    getTeamIdForStoryMapMock.mockResolvedValue(null);
-    await expect(isLinearSyncAvailableForStoryMap({} as never, { storyMapId: 'map-2' })).resolves.toBe(false);
   });
 });

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createLinearClientMock, processStoryLinearSyncByIdMock, resolveLinearAuthTokenForTeamResultMock } = vi.hoisted(
+const { createLinearClientMock, pushStoryToLinearByIdMock, resolveLinearAuthTokenForTeamResultMock } = vi.hoisted(
   () => ({
     createLinearClientMock: vi.fn(),
-    processStoryLinearSyncByIdMock: vi.fn(),
+    pushStoryToLinearByIdMock: vi.fn(),
     resolveLinearAuthTokenForTeamResultMock: vi.fn(),
   }),
 );
@@ -15,11 +15,11 @@ vi.mock('@beemspec/linear', async (importOriginal) => ({
 vi.mock('@/integrations/linear/auth', () => ({
   resolveLinearAuthTokenForTeamResult: resolveLinearAuthTokenForTeamResultMock,
 }));
-vi.mock('@/integrations/linear/sync-story-by-id', () => ({
-  processStoryLinearSyncById: processStoryLinearSyncByIdMock,
+vi.mock('@/integrations/linear/story-sync', () => ({
+  pushStoryToLinearById: pushStoryToLinearByIdMock,
 }));
 
-import { drainLinearSyncQueue } from './jobs';
+import { processLinearSyncBatch } from './jobs';
 
 const VERSION = '2026-08-21T12:00:00.000Z';
 
@@ -107,18 +107,18 @@ function makeSupabase(input: {
   return { supabase: { rpc, from } as never, state, archived, retries };
 }
 
-describe('Linear sync queue drain', () => {
+describe('Linear sync queue batch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    processStoryLinearSyncByIdMock.mockResolvedValue({ id: 'linear-1' });
+    pushStoryToLinearByIdMock.mockResolvedValue({ id: 'linear-1' });
   });
 
   it('processes and archives the current upsert message', async () => {
     const fixture = makeSupabase({});
 
-    const summary = await drainLinearSyncQueue({ supabase: fixture.supabase, limit: 1 });
+    const summary = await processLinearSyncBatch({ supabase: fixture.supabase, limit: 1 });
 
-    expect(processStoryLinearSyncByIdMock).toHaveBeenCalledWith(expect.anything(), {
+    expect(pushStoryToLinearByIdMock).toHaveBeenCalledWith(expect.anything(), {
       storyId: '10000000-0000-4000-8000-000000000041',
       recoverDeterministicCreate: false,
     });
@@ -130,18 +130,18 @@ describe('Linear sync queue drain', () => {
   it('archives a superseded message without calling Linear', async () => {
     const fixture = makeSupabase({ stateVersion: '2026-08-21T12:01:00.000Z' });
 
-    const summary = await drainLinearSyncQueue({ supabase: fixture.supabase });
+    const summary = await processLinearSyncBatch({ supabase: fixture.supabase });
 
-    expect(processStoryLinearSyncByIdMock).not.toHaveBeenCalled();
+    expect(pushStoryToLinearByIdMock).not.toHaveBeenCalled();
     expect(fixture.archived).toEqual([7]);
     expect(summary.stale).toBe(1);
   });
 
   it('makes transient failures visible and delays the same durable message', async () => {
     const fixture = makeSupabase({ readCount: 2 });
-    processStoryLinearSyncByIdMock.mockRejectedValue(new Error('Linear unavailable'));
+    pushStoryToLinearByIdMock.mockRejectedValue(new Error('Linear unavailable'));
 
-    const summary = await drainLinearSyncQueue({ supabase: fixture.supabase });
+    const summary = await processLinearSyncBatch({ supabase: fixture.supabase });
 
     expect(fixture.archived).toEqual([]);
     expect(fixture.retries).toEqual([{ messageId: 7, delay: 30 }]);
@@ -151,9 +151,9 @@ describe('Linear sync queue drain', () => {
 
   it('records and archives a terminal failure after the retry budget', async () => {
     const fixture = makeSupabase({ readCount: 8 });
-    processStoryLinearSyncByIdMock.mockRejectedValue(new Error('Permanent failure'));
+    pushStoryToLinearByIdMock.mockRejectedValue(new Error('Permanent failure'));
 
-    const summary = await drainLinearSyncQueue({ supabase: fixture.supabase });
+    const summary = await processLinearSyncBatch({ supabase: fixture.supabase });
 
     expect(fixture.archived).toEqual([7]);
     expect(fixture.state).toMatchObject({ status: 'error', attempt_count: 8, last_error: 'Permanent failure' });
@@ -166,7 +166,7 @@ describe('Linear sync queue drain', () => {
     resolveLinearAuthTokenForTeamResultMock.mockResolvedValue({ status: 'ready', accessToken: 'token' });
     createLinearClientMock.mockReturnValue({ deleteIssue });
 
-    const summary = await drainLinearSyncQueue({ supabase: fixture.supabase });
+    const summary = await processLinearSyncBatch({ supabase: fixture.supabase });
 
     expect(deleteIssue).toHaveBeenCalledWith('linear-delete-1');
     expect(fixture.state).toMatchObject({ status: 'synced', remote_id: 'linear-delete-1' });

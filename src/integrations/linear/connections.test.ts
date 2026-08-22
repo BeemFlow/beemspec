@@ -3,7 +3,6 @@ import {
   deleteLinearOAuthConnectionForTeam,
   getLinearOAuthConnectionForTeam,
   getLinearOAuthConnectionStatusForTeam,
-  hasLinearOAuthConnectionForTeam,
   isExpired,
   toExpiresAt,
   upsertLinearOAuthConnection,
@@ -57,8 +56,6 @@ describe('linear connections', () => {
     const deleteEq = vi.fn().mockResolvedValue({ error: null });
     const remove = vi.fn().mockReturnValue({ eq: deleteEq });
     const supabase = { from: vi.fn(() => ({ select, upsert, delete: remove })) } as never;
-
-    await expect(hasLinearOAuthConnectionForTeam(supabase, 'team-1')).resolves.toBe(true);
 
     maybeSingle.mockResolvedValueOnce({
       data: { team_id: 'team-1', scope: ' read ', expires_at: ' 2026-03-26T13:00:00Z ' },

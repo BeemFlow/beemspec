@@ -1,10 +1,4 @@
-import { buildStoryPatchFromLinearIssue, mapLinearStateToStoryStatus } from '@beemspec/linear';
-import {
-  buildDbUpdateFromPatch,
-  hasMutableStoryFields,
-  shouldApplyRemoteUpdate,
-  type WebhookEvent,
-} from '@beemspec/sync';
+import { shouldApplyRemoteUpdate, type WebhookEvent } from '@beemspec/sync';
 import { NextResponse } from 'next/server';
 import { getLinearWebhookIngest, getLinearWebhookSignatureVerifier } from '@/integrations/linear/helpers';
 import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
@@ -15,6 +9,7 @@ import {
 } from '@/integrations/linear/label-sync';
 import { getSyncTargetForStory } from '@/integrations/linear/settings';
 import { getStoryLinearLinkByLinearIssueId, upsertStoryLinearLink } from '@/integrations/linear/story-links';
+import { applyLinearIssueToStory } from '@/integrations/linear/story-sync';
 import { serverErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -246,7 +241,7 @@ async function processIssueEvent(
 
   const { data: story, error: storyError } = await supabase
     .from('stories')
-    .select('id, updated_at')
+    .select('id, updated_at, content')
     .eq('id', link.storyId)
     .single();
   if (storyError || !story) {
@@ -255,6 +250,7 @@ async function processIssueEvent(
 
   const remoteUpdatedAt = getString(payload?.updatedAt) ?? event.occurredAt;
   const localUpdatedAt = getString((story as Record<string, unknown>).updated_at);
+  if (!localUpdatedAt) throw new Error('Story update timestamp is missing');
   if (!shouldApplyRemoteUpdate(remoteUpdatedAt, localUpdatedAt)) {
     await upsertStoryLinearLink(supabase, {
       storyId: link.storyId,
@@ -273,22 +269,32 @@ async function processIssueEvent(
     return persistIgnoredReceipt(supabase, event, 'Ignored stale remote update (local is newer)');
   }
 
-  const patch = buildStoryPatchFromLinearIssue({
-    title: getString(payload?.title),
-    description: getString(payload?.description),
-    stateName: getString(asRecord(payload?.state)?.name),
-    updatedAt: remoteUpdatedAt,
-  });
-
   const syncTarget = await getSyncTargetForStory(supabase, link.storyId);
-  const mappedStatus = mapLinearStateToStoryStatus({
-    stateId: getString(asRecord(payload?.state)?.id),
-    stateName: getString(asRecord(payload?.state)?.name),
-    statusMapping: syncTarget?.statusMapping,
+  const writebackResult = await applyLinearIssueToStory(supabase, {
+    story: {
+      id: link.storyId,
+      updated_at: localUpdatedAt,
+      content: story.content,
+    },
+    issue: {
+      id: linearIssueId,
+      identifier: getString(payload?.identifier) ?? link.linearIssueIdentifier,
+      title: getString(payload?.title),
+      description: getString(payload?.description),
+      stateId: getString(asRecord(payload?.state)?.id),
+      stateName: getString(asRecord(payload?.state)?.name),
+      updatedAt: remoteUpdatedAt,
+    },
+    target: syncTarget,
+    receipt: {
+      idempotencyKey: event.idempotencyKey,
+      type: event.type,
+      action: event.action,
+      payload: event.payload,
+    },
   });
-  if (mappedStatus) patch.status = mappedStatus;
 
-  if (!hasMutableStoryFields(patch)) {
+  if (writebackResult.ignoredReason) {
     logLinearWebhook('info', 'ignored_no_mutable_fields', {
       delivery_id: event.idempotencyKey,
       issue_id: linearIssueId,
@@ -297,34 +303,7 @@ async function processIssueEvent(
     return persistIgnoredReceipt(supabase, event, 'No supported fields for writeback');
   }
 
-  // Load current content for merge (only needed if patch has content fields)
-  let currentContent = null;
-  if (patch.content) {
-    const { data: currentStory } = await supabase.from('stories').select('content').eq('id', link.storyId).single();
-    currentContent = currentStory?.content ?? null;
-  }
-  const dbUpdate = buildDbUpdateFromPatch(patch, currentContent);
-
-  const { data: writebackResult, error: writebackError } = await supabase
-    .rpc('apply_linear_issue_writeback_with_receipt', {
-      p_story_id: link.storyId,
-      p_linear_issue_id: linearIssueId,
-      p_linear_issue_identifier: getString(payload?.identifier) ?? link.linearIssueIdentifier,
-      p_expected_story_updated_at: localUpdatedAt,
-      p_last_linear_updated_at: remoteUpdatedAt,
-      p_story_title: typeof dbUpdate.title === 'string' ? dbUpdate.title : null,
-      p_story_status: typeof dbUpdate.status === 'string' ? dbUpdate.status : null,
-      p_story_content:
-        dbUpdate.content && typeof dbUpdate.content === 'object' ? (dbUpdate.content as Record<string, unknown>) : null,
-      p_idempotency_key: event.idempotencyKey,
-      p_event_type: event.type,
-      p_event_action: event.action,
-      p_payload: event.payload,
-    })
-    .single<{ duplicate: boolean; applied: boolean; conflict: boolean }>();
-  if (writebackError) throw writebackError;
-
-  if (writebackResult?.conflict) {
+  if (writebackResult.conflict) {
     logLinearWebhook('info', 'ignored_concurrent_local_update', {
       delivery_id: event.idempotencyKey,
       issue_id: linearIssueId,
@@ -339,8 +318,8 @@ async function processIssueEvent(
     story_id: link.storyId,
   });
   return successResponse({
-    duplicate: writebackResult?.duplicate ?? false,
-    applied: writebackResult?.applied ?? false,
+    duplicate: writebackResult.duplicate,
+    applied: writebackResult.applied,
     storyId: link.storyId,
   });
 }

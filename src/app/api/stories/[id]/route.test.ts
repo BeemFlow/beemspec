@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/integrations/linear/schedule', () => ({ scheduleLinearSyncDrain: vi.fn() }));
+vi.mock('@/integrations/linear/schedule', () => ({ scheduleLinearSyncWorker: vi.fn() }));
 
-import { scheduleLinearSyncDrain } from '@/integrations/linear/schedule';
+import { scheduleLinearSyncWorker } from '@/integrations/linear/schedule';
 import { requireAuth } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { deleteStory, getStory, updateStory } from '@/storymap/service';
@@ -87,7 +87,7 @@ describe('stories [id] route', () => {
 
     expect(response.status).toBe(200);
     expect(updateStory).toHaveBeenCalledWith(client, VALID_ID, { status: 'done' });
-    expect(scheduleLinearSyncDrain).toHaveBeenCalledOnce();
+    expect(scheduleLinearSyncWorker).toHaveBeenCalledOnce();
   });
 
   it('deletes a story and returns the deleted payload', async () => {
@@ -102,6 +102,6 @@ describe('stories [id] route', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true, deleted: { id: VALID_ID } });
     expect(deleteStory).toHaveBeenCalledWith(client, VALID_ID);
-    expect(scheduleLinearSyncDrain).toHaveBeenCalledOnce();
+    expect(scheduleLinearSyncWorker).toHaveBeenCalledOnce();
   });
 });

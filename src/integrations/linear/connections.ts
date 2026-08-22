@@ -94,14 +94,6 @@ export async function getLinearOAuthConnectionForTeam(
   return toConnection(data);
 }
 
-export async function hasLinearOAuthConnectionForTeam(supabase: SupabaseLike, teamId: string): Promise<boolean> {
-  const table = supabase.from(LINEAR_OAUTH_CONNECTIONS_TABLE) as ConnectionsTable;
-  const { data, error } = await table.select('team_id').eq('team_id', teamId).maybeSingle<{ team_id: string }>();
-
-  if (error) throw error;
-  return Boolean(data?.team_id);
-}
-
 export async function getLinearOAuthConnectionStatusForTeam(
   supabase: SupabaseLike,
   teamId: string,

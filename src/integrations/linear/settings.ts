@@ -233,14 +233,3 @@ export async function getSyncTargetForStory(supabase: SupabaseLike, storyId: str
 
   return applyStoryMapOverrides(teamTarget, storyMapOverrides);
 }
-
-export async function getTeamIdForStory(supabase: SupabaseLike, storyId: string): Promise<string | null> {
-  const storiesTable = supabase.from('stories') as StoriesTable;
-  const { data, error } = await storiesTable
-    .select('tasks!inner(activities!inner(story_maps!inner(team_id)))')
-    .eq('id', storyId)
-    .single();
-  if (error) throw error;
-
-  return data?.tasks?.activities?.story_maps?.team_id ?? null;
-}

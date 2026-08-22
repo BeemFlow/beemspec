@@ -2,15 +2,9 @@ import { createLinearClient } from '@beemspec/linear';
 import type { IssueSync, SyncTarget } from '@beemspec/sync';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { SupabaseLike } from '@/lib/supabase/types';
-import {
-  getLinearOAuthConnectionForTeam,
-  hasLinearOAuthConnectionForTeam,
-  isExpired,
-  toExpiresAt,
-  upsertLinearOAuthConnection,
-} from './connections';
+import { getLinearOAuthConnectionForTeam, isExpired, toExpiresAt, upsertLinearOAuthConnection } from './connections';
 import { refreshLinearOAuthAccessToken } from './oauth-token';
-import { getSyncTargetForStory, getSyncTargetForStoryMap, getTeamIdForStory, getTeamIdForStoryMap } from './settings';
+import { getSyncTargetForStoryMap, getTeamIdForStoryMap } from './settings';
 
 export interface LinearSyncContext {
   status: 'ready' | 'not_configured' | 'not_connected' | 'auth_unavailable' | 'error';
@@ -131,81 +125,5 @@ export async function resolveLinearSyncContextForStoryMap(
       linearIssueSync: null,
       error,
     };
-  }
-}
-
-export async function resolveLinearSyncContextForStory(
-  supabase: SupabaseLike,
-  input: {
-    storyId: string;
-  },
-): Promise<LinearSyncContext> {
-  try {
-    const [target, teamId] = await Promise.all([
-      getSyncTargetForStory(supabase, input.storyId),
-      getTeamIdForStory(supabase, input.storyId),
-    ]);
-
-    if (!target) {
-      return {
-        status: 'not_configured',
-        teamId,
-        target: null,
-        targetConfigured: false,
-        linearIssueSync: null,
-      };
-    }
-
-    if (teamId) {
-      const oauthSync = await resolveOAuthIssueSync(teamId);
-      if (oauthSync.status === 'ready') {
-        return {
-          status: 'ready',
-          teamId,
-          target,
-          targetConfigured: true,
-          linearIssueSync: oauthSync.issueSync,
-          accessToken: oauthSync.accessToken,
-        };
-      }
-      if (oauthSync.status === 'error') {
-        return {
-          status: 'error',
-          teamId,
-          target,
-          targetConfigured: true,
-          linearIssueSync: null,
-          error: oauthSync.error,
-        };
-      }
-      return { status: oauthSync.status, teamId, target, targetConfigured: true, linearIssueSync: null };
-    }
-
-    return { status: 'not_connected', teamId, target, targetConfigured: true, linearIssueSync: null };
-  } catch (error) {
-    return {
-      status: 'error',
-      teamId: null,
-      target: null,
-      targetConfigured: false,
-      linearIssueSync: null,
-      error,
-    };
-  }
-}
-
-export async function isLinearSyncAvailableForStoryMap(
-  supabase: SupabaseLike,
-  input: {
-    storyMapId: string;
-  },
-): Promise<boolean> {
-  try {
-    const teamId = await getTeamIdForStoryMap(supabase, input.storyMapId);
-    if (!teamId) return false;
-    const admin = createAdminClient();
-    return hasLinearOAuthConnectionForTeam(admin, teamId);
-  } catch {
-    return false;
   }
 }

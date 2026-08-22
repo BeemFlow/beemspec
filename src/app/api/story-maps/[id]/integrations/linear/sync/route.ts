@@ -2,9 +2,9 @@ import { listLinearProjectIssuesForImport, manualLinearSyncResponseSchema } from
 import { NextResponse } from 'next/server';
 import { resolveLinearAuthTokenForTeam } from '@/integrations/linear/auth';
 import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
+import { type LinearStorySyncResult, reconcileStoriesForStoryMap } from '@/integrations/linear/reconcile';
 import { getTeamIdForStoryMap } from '@/integrations/linear/settings';
 import { getStoryLinearLinkByLinearIssueId } from '@/integrations/linear/story-links';
-import { syncStoriesByIdList } from '@/integrations/linear/sync-reconcile';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { normalize } from '@/lib/strings';
@@ -26,22 +26,6 @@ interface ManualImportIssueResult {
   outcome: 'imported' | 'skipped_already_linked' | 'skipped_no_candidate';
   reason: string | null;
   story_id: string | null;
-}
-
-interface SyncResponsePayload {
-  success?: boolean;
-  ignored?: boolean;
-  reason?: string;
-  linear_issue_id?: string;
-  action?: 'ignored' | 'created_remote' | 'local_to_remote' | 'remote_to_local';
-}
-
-async function readSyncResponsePayload(response: Response): Promise<SyncResponsePayload | null> {
-  try {
-    return (await response.clone().json()) as SyncResponsePayload;
-  } catch {
-    return null;
-  }
 }
 
 async function runManualImportForStoryMap(
@@ -178,16 +162,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const taskIds = (tasks ?? []).map((row) => row.id as string).filter(Boolean);
 
-  let summary: {
-    considered: number;
-    succeeded: number;
-    failed: number;
-    ignored: number;
-    createdRemote: number;
-    localToRemote: number;
-    remoteToLocal: number;
-    responses: Array<{ storyId: string; response: Response }>;
-  } = {
+  let summary = {
     considered: 0,
     succeeded: 0,
     failed: 0,
@@ -195,7 +170,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     createdRemote: 0,
     localToRemote: 0,
     remoteToLocal: 0,
-    responses: [],
+    results: [] as LinearStorySyncResult[],
   };
 
   const storyTitles = new Map<string, string | null>();
@@ -212,8 +187,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       storyTitles.set(row.id as string, (row.title as string | null) ?? null);
     }
     if (storyIds.length > 0) {
-      summary = await syncStoriesByIdList({
+      summary = await reconcileStoriesForStoryMap({
         supabase,
+        storyMapId,
         storyIds,
       });
     }
@@ -234,22 +210,22 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   const storyResults: ManualSyncStoryResult[] = [];
-  for (const { storyId, response } of summary.responses) {
-    const payload = await readSyncResponsePayload(response);
-    let outcome: ManualSyncStoryResult['outcome'] = 'failed';
-    if (response.ok) {
-      if (payload?.ignored) outcome = 'ignored';
-      else if (payload?.action === 'created_remote') outcome = 'created_in_linear';
-      else if (payload?.action === 'remote_to_local') outcome = 'synced_from_linear';
-      else outcome = 'synced_to_linear';
-    }
+  for (const result of summary.results) {
+    const outcome: ManualSyncStoryResult['outcome'] =
+      result.action === 'created_remote'
+        ? 'created_in_linear'
+        : result.action === 'local_to_remote'
+          ? 'synced_to_linear'
+          : result.action === 'remote_to_local'
+            ? 'synced_from_linear'
+            : result.action;
 
     storyResults.push({
-      story_id: storyId,
-      title: storyTitles.get(storyId) ?? null,
+      story_id: result.storyId,
+      title: storyTitles.get(result.storyId) ?? null,
       outcome,
-      reason: payload?.reason ?? (!response.ok ? 'sync failed' : null),
-      linear_issue_id: payload?.linear_issue_id ?? null,
+      reason: result.reason ?? (!result.success ? 'sync failed' : null),
+      linear_issue_id: result.linearIssueId ?? null,
     });
   }
 
