@@ -8,8 +8,8 @@ const { createLinearClientMock, pushStoryToLinearByIdMock, resolveLinearAuthToke
   }),
 );
 
-vi.mock('@beemspec/linear', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@beemspec/linear')>()),
+vi.mock('@/integrations/linear/adapter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/integrations/linear/adapter')>()),
   createLinearClient: createLinearClientMock,
 }));
 vi.mock('@/integrations/linear/auth', () => ({

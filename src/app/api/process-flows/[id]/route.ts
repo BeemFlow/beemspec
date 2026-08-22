@@ -1,5 +1,5 @@
-import { updateProcessFlowSchema } from '@beemspec/processflow';
 import { NextResponse } from 'next/server';
+import { updateProcessFlowSchema } from '@/domain/process-flow';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';

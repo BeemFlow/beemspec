@@ -1,11 +1,11 @@
+import type { StoryStatus } from '@/domain/story-map';
 import {
   getLinearWorkspaceOptions,
   type LinearProjectOption,
   type LinearStateOption,
   type LinearTeamOption,
   type LinearWorkspaceOptions,
-} from '@beemspec/linear';
-import type { StoryStatus } from '@beemspec/storymap';
+} from '@/integrations/linear/adapter';
 import { normalize } from '@/lib/strings';
 
 const STORY_STATUSES: StoryStatus[] = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];

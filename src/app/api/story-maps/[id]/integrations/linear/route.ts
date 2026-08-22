@@ -1,5 +1,8 @@
-import { storyMapLinearSettingsResponseSchema, updateStoryMapLinearSettingsSchema } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
+import {
+  storyMapLinearSettingsResponseSchema,
+  updateStoryMapLinearSettingsSchema,
+} from '@/integrations/linear/adapter';
 import { getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/connections';
 import { DEFAULT_AUTO_IMPORT_LABELED_ISSUES, DEFAULT_LINEAR_IMPORT_LABEL } from '@/integrations/linear/settings';
 import { requireAuth } from '@/lib/auth';

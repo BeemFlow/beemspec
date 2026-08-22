@@ -1,5 +1,5 @@
-import { updatePersonaSchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
+import { updatePersonaSchema } from '@/domain/story-map';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';

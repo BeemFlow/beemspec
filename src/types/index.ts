@@ -10,7 +10,7 @@ export type {
   ProcessFlowValidationResult,
   ProcessFlowValidationWarning,
   ProcessFlowViewport,
-} from '@beemspec/processflow';
+} from '@/domain/process-flow';
 
 export type {
   Activity,
@@ -23,7 +23,7 @@ export type {
   StoryStatus,
   Task,
   TaskWithStories,
-} from '@beemspec/storymap';
+} from '@/domain/story-map';
 
 export type TeamRole = 'owner' | 'member';
 
@@ -71,4 +71,4 @@ export interface ReleaseWithStories extends Release {
 }
 
 // Import for local use in ReleaseWithStories
-import type { Release, Story } from '@beemspec/storymap';
+import type { Release, Story } from '@/domain/story-map';

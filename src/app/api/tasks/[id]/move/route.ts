@@ -1,5 +1,5 @@
-import { moveTaskSchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
+import { moveTaskSchema } from '@/domain/story-map';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';

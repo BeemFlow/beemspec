@@ -1,4 +1,4 @@
-import type { CreateStoryMap, MoveStory, Story, StoryMapFull, UpdateStory } from '@beemspec/storymap';
+import type { CreateStoryMap, MoveStory, Story, StoryMapFull, UpdateStory } from '@/domain/story-map';
 
 export type StoryEditSave = UpdateStory & {
   release_id?: string | null;

@@ -1,9 +1,9 @@
-import { resolveLinearStateIdForStoryStatus } from '@beemspec/linear';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolveLinearStateIdForStoryStatus } from '@/integrations/linear/adapter';
 import { applyStoryStatusToLinearInput, mapLinearIssueStateToStoryStatus } from './state-sync';
 
-vi.mock('@beemspec/linear', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@beemspec/linear')>()),
+vi.mock('@/integrations/linear/adapter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/integrations/linear/adapter')>()),
   resolveLinearStateIdForStoryStatus: vi.fn(),
 }));
 

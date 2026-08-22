@@ -1,5 +1,5 @@
-import { batchProcessFlowNodesBodySchema, createProcessFlowNodeBodySchema } from '@beemspec/processflow';
 import { NextResponse } from 'next/server';
+import { batchProcessFlowNodesBodySchema, createProcessFlowNodeBodySchema } from '@/domain/process-flow';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';

@@ -1,13 +1,13 @@
 import { createHmac } from 'node:crypto';
-import { createLinearWebhookSignatureVerifier, parseLinearWebhookEvent } from '@beemspec/linear';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLinearWebhookIngest, getLinearWebhookSignatureVerifier } from '@/integrations/linear/helpers';
-import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
+import { createLinearWebhookSignatureVerifier, parseLinearWebhookEvent } from '@/integrations/linear/adapter';
 import {
   getLinearIssueLabelNames,
   getLinearIssueProjectIdFromPayload,
   getLinearIssueTeamIdFromPayload,
-} from '@/integrations/linear/label-sync';
+} from '@/integrations/linear/adapter/labels';
+import { getLinearWebhookIngest, getLinearWebhookSignatureVerifier } from '@/integrations/linear/helpers';
+import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { POST } from './route';
 
@@ -25,7 +25,7 @@ vi.mock('@/integrations/linear/import', () => ({
   importLinearIssueIntoStoryMap: vi.fn(),
 }));
 
-vi.mock('@/integrations/linear/label-sync', () => ({
+vi.mock('@/integrations/linear/adapter/labels', () => ({
   getLinearIssueLabelNames: vi.fn(),
   getLinearIssueProjectIdFromPayload: vi.fn(),
   getLinearIssueTeamIdFromPayload: vi.fn(),

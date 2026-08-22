@@ -1,6 +1,6 @@
-import { getLinearViewerInfo } from '@beemspec/linear';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { getLinearViewerInfo } from '@/integrations/linear/adapter';
 import { toExpiresAt, upsertLinearOAuthConnection } from '@/integrations/linear/connections';
 import { applySuggestedLinearSettings, resolveLinearOptions } from '@/integrations/linear/discovery';
 import { OAUTH_STATE_COOKIE, parseStateCookie } from '@/integrations/linear/oauth';

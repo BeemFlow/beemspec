@@ -1,7 +1,8 @@
-import { buildStoryPatchFromLinearIssue } from '@beemspec/linear';
-import { emptyContent } from '@beemspec/storymap';
-import { buildDbUpdateFromPatch, type StoryStatus } from '@beemspec/sync';
+import type { StoryStatus } from '@/domain/story-map';
+import { emptyContent } from '@/domain/story-map';
+import { buildStoryPatchFromLinearIssue } from '@/integrations/linear/adapter';
 import { toStoryMapLinearImportSettings } from '@/integrations/linear/settings';
+import { buildDbUpdateFromPatch } from '@/integrations/linear/story-patch';
 import { normalize } from '@/lib/strings';
 import type { Supabase, SupabaseLike } from '@/lib/supabase/types';
 

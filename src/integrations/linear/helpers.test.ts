@@ -9,7 +9,7 @@ const { envMock, createLinearWebhookIngestMock, createLinearWebhookSignatureVeri
 }));
 
 vi.mock('@/lib/env', () => ({ env: envMock }));
-vi.mock('@beemspec/linear', () => ({
+vi.mock('@/integrations/linear/adapter', () => ({
   createLinearWebhookIngest: createLinearWebhookIngestMock,
   createLinearWebhookSignatureVerifier: createLinearWebhookSignatureVerifierMock,
 }));

@@ -1,4 +1,4 @@
-import { createLinearClient } from '@beemspec/linear';
+import { createLinearClient } from '@/integrations/linear/adapter';
 import { resolveLinearAuthTokenForTeamResult } from '@/integrations/linear/auth';
 import { pushStoryToLinearById } from '@/integrations/linear/story-sync';
 import { createAdminClient } from '@/lib/supabase/admin';

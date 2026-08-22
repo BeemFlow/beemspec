@@ -1,3 +1,4 @@
+import ELK from 'elkjs/lib/elk.bundled.js';
 import type {
   BatchMutateProcessFlowEdges,
   BatchMutateProcessFlowNodes,
@@ -12,8 +13,7 @@ import type {
   UpdateProcessFlow,
   UpdateProcessFlowEdge,
   UpdateProcessFlowNode,
-} from '@beemspec/processflow';
-import ELK from 'elkjs/lib/elk.bundled.js';
+} from '@/domain/process-flow';
 import type { Supabase } from '@/lib/supabase/types';
 import { pickDefined } from '@/lib/validations';
 

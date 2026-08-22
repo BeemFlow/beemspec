@@ -1,6 +1,5 @@
 'use client';
 
-import { createContent, type StoryContent } from '@beemspec/storymap';
 import { useEffect, useState } from 'react';
 import { AgentKickoffButton, buildStoryKickoffPrompt } from '@/components/story-map/AgentKickoffButton';
 import type { StoryEditSave } from '@/components/story-map/payloads';
@@ -13,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { nonCredentialFieldProps, nonCredentialFormProps } from '@/components/ui/non-credential-fields';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { createContent, type StoryContent } from '@/domain/story-map';
 import type { Release, Story, StoryStatus } from '@/types';
 
 interface StoryFormData {

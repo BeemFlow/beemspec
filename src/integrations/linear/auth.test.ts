@@ -18,7 +18,7 @@ const {
   getTeamIdForStoryMapMock: vi.fn(),
 }));
 
-vi.mock('@beemspec/linear', () => ({ createLinearClient: createLinearClientMock }));
+vi.mock('@/integrations/linear/adapter', () => ({ createLinearClient: createLinearClientMock }));
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: createAdminClientMock }));
 vi.mock('./connections', async () => {
   const actual = await import('./connections');

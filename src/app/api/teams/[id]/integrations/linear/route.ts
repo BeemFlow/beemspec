@@ -1,5 +1,5 @@
-import { updateLinearIntegrationSettingsSchema } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
+import { updateLinearIntegrationSettingsSchema } from '@/integrations/linear/adapter';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { normalize } from '@/lib/strings';

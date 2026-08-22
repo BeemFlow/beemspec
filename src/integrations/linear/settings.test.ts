@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { LinearSettingsForm } from '@/components/TeamSettingsDialog';
+import { LinearSettingsForm } from '@/components/integrations/linear/TeamLinearSettings';
 import {
   DEFAULT_AUTO_IMPORT_LABELED_ISSUES,
   DEFAULT_LINEAR_IMPORT_LABEL,

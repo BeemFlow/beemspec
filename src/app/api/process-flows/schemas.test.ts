@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import {
   batchProcessFlowEdgesBodySchema,
   batchProcessFlowNodesBodySchema,
@@ -5,8 +6,7 @@ import {
   updateProcessFlowEdgeSchema,
   updateProcessFlowNodeSchema,
   updateProcessFlowSchema,
-} from '@beemspec/processflow';
-import { describe, expect, it } from 'vitest';
+} from '@/domain/process-flow';
 
 describe('process-flow schemas', () => {
   it('accepts minimal process flow creation payload', () => {

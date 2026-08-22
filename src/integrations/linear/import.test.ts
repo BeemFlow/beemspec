@@ -6,13 +6,13 @@ const { buildStoryPatchFromLinearIssueMock, emptyContentMock, buildDbUpdateFromP
   buildDbUpdateFromPatchMock: vi.fn(),
 }));
 
-vi.mock('@beemspec/linear', () => ({
+vi.mock('@/integrations/linear/adapter', () => ({
   buildStoryPatchFromLinearIssue: buildStoryPatchFromLinearIssueMock,
 }));
-vi.mock('@beemspec/storymap', () => ({
+vi.mock('@/domain/story-map', () => ({
   emptyContent: emptyContentMock,
 }));
-vi.mock('@beemspec/sync', () => ({
+vi.mock('@/integrations/linear/story-patch', () => ({
   buildDbUpdateFromPatch: buildDbUpdateFromPatchMock,
 }));
 

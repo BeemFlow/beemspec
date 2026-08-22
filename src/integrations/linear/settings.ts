@@ -1,5 +1,5 @@
-import type { StoryStatus } from '@beemspec/storymap';
-import type { SyncTarget } from '@beemspec/sync';
+import type { StoryStatus } from '@/domain/story-map';
+import type { LinearSyncTarget } from '@/integrations/linear/adapter';
 import { normalize } from '@/lib/strings';
 import type { SupabaseLike } from '@/lib/supabase/types';
 
@@ -111,7 +111,7 @@ function mergeStatusMappings(
   return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
-function toLinearTarget(row: IntegrationSettingsRow | null): SyncTarget | null {
+function toLinearTarget(row: IntegrationSettingsRow | null): LinearSyncTarget | null {
   if (!row) return null;
 
   const teamId = normalize(row.linear_team_id);
@@ -124,9 +124,9 @@ function toLinearTarget(row: IntegrationSettingsRow | null): SyncTarget | null {
 }
 
 function applyStoryMapOverrides(
-  target: SyncTarget,
+  target: LinearSyncTarget,
   overrides: StoryMapIntegrationSettingsRow | null,
-): SyncTarget | null {
+): LinearSyncTarget | null {
   const mapProjectId = normalize(overrides?.linear_project_id);
   if (!mapProjectId) return null;
 
@@ -176,7 +176,7 @@ export async function getStoryMapLinearImportSettings(
   return toStoryMapLinearImportSettings(row);
 }
 
-async function getSettingsForTeamId(supabase: SupabaseLike, teamId: string): Promise<SyncTarget | null> {
+async function getSettingsForTeamId(supabase: SupabaseLike, teamId: string): Promise<LinearSyncTarget | null> {
   const table = supabase.from('integration_settings') as IntegrationSettingsTable;
   const { data, error } = await table
     .select('linear_team_id, linear_status_mapping')
@@ -199,7 +199,10 @@ export async function getTeamIdForStoryMap(supabase: SupabaseLike, storyMapId: s
   return result.teamId;
 }
 
-export async function getSyncTargetForStoryMap(supabase: SupabaseLike, storyMapId: string): Promise<SyncTarget | null> {
+export async function getSyncTargetForStoryMap(
+  supabase: SupabaseLike,
+  storyMapId: string,
+): Promise<LinearSyncTarget | null> {
   const result = await getTeamIdForStoryMapInternal(supabase, storyMapId);
   if (!result.teamId) return null;
 
@@ -212,7 +215,7 @@ export async function getSyncTargetForStoryMap(supabase: SupabaseLike, storyMapI
   return applyStoryMapOverrides(teamTarget, storyMapOverrides);
 }
 
-export async function getSyncTargetForStory(supabase: SupabaseLike, storyId: string): Promise<SyncTarget | null> {
+export async function getSyncTargetForStory(supabase: SupabaseLike, storyId: string): Promise<LinearSyncTarget | null> {
   const storiesTable = supabase.from('stories') as StoriesTable;
   const { data, error } = await storiesTable
     .select('tasks!inner(activities!inner(story_maps!inner(id, team_id)))')

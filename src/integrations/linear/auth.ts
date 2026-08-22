@@ -1,5 +1,5 @@
-import { createLinearClient } from '@beemspec/linear';
-import type { IssueSync, SyncTarget } from '@beemspec/sync';
+import type { LinearIssueGateway, LinearSyncTarget } from '@/integrations/linear/adapter';
+import { createLinearClient } from '@/integrations/linear/adapter';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { SupabaseLike } from '@/lib/supabase/types';
 import { getLinearOAuthConnectionForTeam, isExpired, toExpiresAt, upsertLinearOAuthConnection } from './connections';
@@ -9,9 +9,9 @@ import { getSyncTargetForStoryMap, getTeamIdForStoryMap } from './settings';
 export interface LinearSyncContext {
   status: 'ready' | 'not_configured' | 'not_connected' | 'auth_unavailable' | 'error';
   teamId: string | null;
-  target: SyncTarget | null;
+  target: LinearSyncTarget | null;
   targetConfigured: boolean;
-  linearIssueSync: IssueSync | null;
+  linearIssueSync: LinearIssueGateway | null;
   accessToken?: string | null;
   error?: unknown;
 }
@@ -60,7 +60,7 @@ export async function resolveLinearAuthTokenForTeam(teamId: string): Promise<str
 async function resolveOAuthIssueSync(
   teamId: string,
 ): Promise<
-  | { status: 'ready'; issueSync: IssueSync; accessToken: string }
+  | { status: 'ready'; issueSync: LinearIssueGateway; accessToken: string }
   | { status: 'not_connected' | 'auth_unavailable' }
   | { status: 'error'; error: unknown }
 > {

@@ -17,7 +17,7 @@ import type {
   UpdateStory,
   UpdateStoryMap,
   UpdateTask,
-} from '@beemspec/storymap';
+} from '@/domain/story-map';
 import type { Supabase } from '@/lib/supabase/types';
 import { pickDefined } from '@/lib/validations';
 

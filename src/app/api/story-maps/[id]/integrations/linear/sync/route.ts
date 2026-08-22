@@ -1,5 +1,5 @@
-import { listLinearProjectIssuesForImport, manualLinearSyncResponseSchema } from '@beemspec/linear';
 import { NextResponse } from 'next/server';
+import { listLinearProjectIssuesForImport, manualLinearSyncResponseSchema } from '@/integrations/linear/adapter';
 import { resolveLinearAuthTokenForTeam } from '@/integrations/linear/auth';
 import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
 import { type LinearStorySyncResult, reconcileStoriesForStoryMap } from '@/integrations/linear/reconcile';

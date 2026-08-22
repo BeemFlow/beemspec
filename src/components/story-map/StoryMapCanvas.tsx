@@ -1,6 +1,5 @@
 'use client';
 
-import { reorderItems } from '@beemspec/storymap';
 import {
   DndContext,
   type DragEndEvent,
@@ -40,6 +39,7 @@ import { Button } from '@/components/ui/button';
 import { DeleteButton } from '@/components/ui/delete-button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { reorderItems } from '@/domain/story-map';
 import { errorMessage } from '@/lib/errors';
 import { fetchJson } from '@/lib/http';
 import type { Activity, Story, StoryMapFull, Task, TaskWithStories } from '@/types';

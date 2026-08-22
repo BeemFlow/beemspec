@@ -282,8 +282,8 @@ This is already the established pattern for story maps in the codebase:
 
 - `src/storymap/service.ts` contains all domain operations (list, get, create, update, delete, reorder, move)
 - API routes in `src/app/api/story-maps/`, `src/app/api/stories/`, `src/app/api/activities/`, etc. are thin HTTP handlers that call service functions
-- MCP tools in `src/integrations/mcp/server.ts` are thin MCP handlers that call the same service functions
-- Both API and MCP validate against the same shared schema package (`@beemspec/storymap`)
+- MCP tools in `src/integrations/mcp/tools` are thin handlers that call the same service functions
+- Both API and MCP validate against the same shared story-map domain schemas
 
 Process flow must follow this same pattern exactly.
 
@@ -291,8 +291,8 @@ Process flow must follow this same pattern exactly.
 
 ```
 src/processflow/service.ts          — all domain operations
-packages/processflow/src/schemas.ts — shared Zod schemas and types
-packages/processflow/src/types.ts   — shared TypeScript types
+src/domain/process-flow/schemas.ts — shared Zod schemas
+src/domain/process-flow/types.ts   — shared TypeScript types
 ```
 
 ### API routes (frontend-facing transport)
@@ -513,7 +513,7 @@ That makes roadmap a portfolio view, not another planning primitive.
 ### Phase 1: Foundation
 
 - add `process flow` domain concept
-- define canonical JSON schema in `@beemspec/processflow`
+- define canonical JSON schema in `src/domain/process-flow`
 - add DB tables (`process_flows`, `process_flow_nodes`, `process_flow_edges`)
 - add shared service layer at `src/processflow/service.ts`
 - add REST API routes at `src/app/api/process-flows/`

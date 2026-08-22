@@ -1,4 +1,4 @@
-import { shouldApplyRemoteUpdate } from '@beemspec/sync';
+import { shouldApplyRemoteUpdate } from '@/integrations/conflict';
 import { type LinearSyncContext, resolveLinearSyncContextForStoryMap } from '@/integrations/linear/auth';
 import { getStoryLinearLink } from '@/integrations/linear/story-links';
 import { applyLinearIssueToStory, pushStoryToLinear } from '@/integrations/linear/story-sync';

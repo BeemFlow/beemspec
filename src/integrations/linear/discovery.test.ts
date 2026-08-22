@@ -4,7 +4,7 @@ const { getLinearWorkspaceOptionsMock } = vi.hoisted(() => ({
   getLinearWorkspaceOptionsMock: vi.fn(),
 }));
 
-vi.mock('@beemspec/linear', () => ({
+vi.mock('@/integrations/linear/adapter', () => ({
   getLinearWorkspaceOptions: getLinearWorkspaceOptionsMock,
 }));
 

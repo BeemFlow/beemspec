@@ -1,5 +1,5 @@
-import { updateStorySchema } from '@beemspec/storymap';
 import { NextResponse } from 'next/server';
+import { updateStorySchema } from '@/domain/story-map';
 import { scheduleLinearSyncWorker } from '@/integrations/linear/schedule';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';

@@ -1,11 +1,11 @@
-import { mapLinearStateToStoryStatus, resolveLinearStateIdForStoryStatus } from '@beemspec/linear';
-import type { StoryStatus } from '@beemspec/storymap';
-import type { IssueSnapshot, IssueUpsertInput, SyncTarget } from '@beemspec/sync';
+import type { StoryStatus } from '@/domain/story-map';
+import type { LinearIssueSnapshot, LinearIssueUpsertInput, LinearSyncTarget } from '@/integrations/linear/adapter';
+import { mapLinearStateToStoryStatus, resolveLinearStateIdForStoryStatus } from '@/integrations/linear/adapter';
 
 export async function applyStoryStatusToLinearInput(input: {
-  issue: IssueUpsertInput;
+  issue: LinearIssueUpsertInput;
   storyStatus: StoryStatus;
-  target: SyncTarget;
+  target: LinearSyncTarget;
   accessToken?: string | null;
 }): Promise<void> {
   const configuredStateId = input.target.statusMapping?.[input.storyStatus];
@@ -30,8 +30,8 @@ export async function applyStoryStatusToLinearInput(input: {
 }
 
 export function mapLinearIssueStateToStoryStatus(
-  issue: Pick<IssueSnapshot, 'stateId' | 'stateName'>,
-  target: SyncTarget,
+  issue: Pick<LinearIssueSnapshot, 'stateId' | 'stateName'>,
+  target: LinearSyncTarget,
 ): StoryStatus | null {
   return mapLinearStateToStoryStatus({
     stateId: issue.stateId,

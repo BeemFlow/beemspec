@@ -1,10 +1,10 @@
-# BeemSpec Process Flow Package and MCP Spec
+# BeemSpec Process Flow Domain and MCP Spec
 
 ## Objective
 
 Define the first modular implementation slice for `Process Flow` so it fits the existing BeemSpec architecture:
 
-- shared headless package for schemas and types
+- shared headless domain module for schemas and types
 - shared service layer for domain logic
 - thin REST API routes for the editor
 - thin MCP tools for agents
@@ -14,37 +14,35 @@ This spec is intentionally conservative. It prioritizes a clean v1 over a broad 
 ## Design Rules
 
 - Keep domain logic out of route handlers and MCP handlers.
-- Keep the shared package headless and reusable.
+- Keep the shared domain module headless and reusable.
 - Keep the MCP surface small and predictable.
 - Prefer batch mutations for editor practicality.
 - Prefer one canonical read shape unless a narrower one is clearly needed.
 - Do not model optional future concepts until they are validated.
 
-## Package Shape
+## Domain Module Shape
 
-Create a new package:
+Keep the model in the application domain tree:
 
 ```text
-packages/processflow/
-  package.json
-  src/
-    index.ts
-    types.ts
-    schemas.ts
+src/domain/process-flow/
+  index.ts
+  types.ts
+  schemas.ts
 ```
 
-This should mirror the modular pattern already used in `packages/storymap/src/types.ts`, `packages/storymap/src/schemas.ts`, and `packages/storymap/src/index.ts`.
+This mirrors the modular pattern in `src/domain/story-map`.
 
-## Package Responsibility
+## Domain Module Responsibility
 
-`@beemspec/processflow` should own:
+`src/domain/process-flow` should own:
 
 - TypeScript domain types
 - Zod schemas for validation
 - inferred input/output types derived from schemas
 - shared primitives used by API, MCP, and services
 
-`@beemspec/processflow` should not own:
+`src/domain/process-flow` should not own:
 
 - database access
 - Supabase calls
@@ -53,28 +51,7 @@ This should mirror the modular pattern already used in `packages/storymap/src/ty
 - React components
 - editor-specific state management
 
-## Package `package.json`
-
-Recommended shape:
-
-```json
-{
-  "name": "@beemspec/processflow",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "description": "Headless process flow kernel — types and validation schemas for operational flow modeling",
-  "main": "src/index.ts",
-  "exports": {
-    ".": "./src/index.ts"
-  },
-  "peerDependencies": {
-    "zod": ">=3"
-  }
-}
-```
-
-Unlike `@beemspec/storymap`, this package does not need a `react` peer dependency.
+The root application owns dependencies. The domain module has no package manifest and no React dependency.
 
 ## `types.ts`
 
@@ -179,7 +156,7 @@ export interface ProcessFlowFull extends ProcessFlow {
 
 ## `schemas.ts`
 
-Follow the `@beemspec/storymap` style:
+Follow the `src/domain/story-map` style:
 
 - shared primitives at the top
 - base schemas for entities
@@ -195,7 +172,7 @@ const name = z.string().min(1, 'Required').max(200);
 const nonEmptyLabel = z.string().min(1, 'Required').max(200);
 ```
 
-Reuse the same `atLeastOneField` helper pattern from `packages/storymap/src/schemas.ts`.
+Reuse the same `atLeastOneField` helper pattern from `src/domain/story-map/schemas.ts`.
 
 ### Recommended schemas
 
@@ -618,9 +595,9 @@ Keep it explainable and stable for both editor and agent use.
 
 Before implementation, verify:
 
-- `@beemspec/processflow` has no Supabase imports
-- `@beemspec/processflow` has no Next.js imports
-- `@beemspec/processflow` has no MCP imports
+- `src/domain/process-flow` has no Supabase imports
+- `src/domain/process-flow` has no Next.js imports
+- `src/domain/process-flow` has no MCP imports
 - `src/processflow/service.ts` owns all mutation rules
 - API routes call service functions only
 - MCP tools call service functions only
@@ -629,7 +606,7 @@ Before implementation, verify:
 
 ## Recommended First Build Order
 
-1. Create `@beemspec/processflow` with `types.ts`, `schemas.ts`, `index.ts`
+1. Create `src/domain/process-flow` with `types.ts`, `schemas.ts`, `index.ts`
 2. Create DB schema and `src/processflow/service.ts`
 3. Add REST routes for process flow CRUD and validation
 4. Add MCP tools and `processflow_workflow_guide`

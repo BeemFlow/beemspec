@@ -1,5 +1,5 @@
-import type { ProcessFlowFull } from '@beemspec/processflow';
 import { describe, expect, it, vi } from 'vitest';
+import type { ProcessFlowFull } from '@/domain/process-flow';
 
 const { elkLayout } = vi.hoisted(() => ({ elkLayout: vi.fn() }));
 

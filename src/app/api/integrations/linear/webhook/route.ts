@@ -1,12 +1,13 @@
-import { shouldApplyRemoteUpdate, type WebhookEvent } from '@beemspec/sync';
 import { NextResponse } from 'next/server';
-import { getLinearWebhookIngest, getLinearWebhookSignatureVerifier } from '@/integrations/linear/helpers';
-import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
+import { shouldApplyRemoteUpdate } from '@/integrations/conflict';
+import type { LinearWebhookEvent } from '@/integrations/linear/adapter';
 import {
   getLinearIssueLabelNames,
   getLinearIssueProjectIdFromPayload,
   getLinearIssueTeamIdFromPayload,
-} from '@/integrations/linear/label-sync';
+} from '@/integrations/linear/adapter/labels';
+import { getLinearWebhookIngest, getLinearWebhookSignatureVerifier } from '@/integrations/linear/helpers';
+import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
 import { getSyncTargetForStory } from '@/integrations/linear/settings';
 import { getStoryLinearLinkByLinearIssueId, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { applyLinearIssueToStory } from '@/integrations/linear/story-sync';
@@ -77,7 +78,7 @@ async function insertWebhookReceipt(
 
 async function persistIgnoredReceipt(
   supabase: ReturnType<typeof createAdminClient>,
-  event: WebhookEvent,
+  event: LinearWebhookEvent,
   error?: string,
 ): Promise<NextResponse> {
   const receipt = await insertWebhookReceipt(supabase, {
@@ -92,15 +93,15 @@ async function persistIgnoredReceipt(
   return successResponse({ duplicate: receipt.duplicate, ignored: true });
 }
 
-function isSupportedIssueEvent(event: WebhookEvent): boolean {
+function isSupportedIssueEvent(event: LinearWebhookEvent): boolean {
   return event.type === 'Issue' && ['create', 'update', 'remove', 'restore'].includes(event.action);
 }
 
-function parseAndVerifyEvent(request: Request, rawBody: string): WebhookEvent | null {
+function parseAndVerifyEvent(request: Request, rawBody: string): LinearWebhookEvent | null {
   const ingest = getLinearWebhookIngest();
   if (!ingest) return null;
 
-  let event: WebhookEvent;
+  let event: LinearWebhookEvent;
   try {
     event = ingest.parseAndValidate({ rawBody, headers: request.headers });
   } catch {
@@ -120,7 +121,7 @@ function parseAndVerifyEvent(request: Request, rawBody: string): WebhookEvent | 
 
 async function processIssueEvent(
   supabase: ReturnType<typeof createAdminClient>,
-  event: WebhookEvent,
+  event: LinearWebhookEvent,
 ): Promise<NextResponse> {
   const payload = asRecord(event.payload);
   const linearIssueId = getString(payload?.id);
@@ -330,7 +331,7 @@ export async function POST(request: Request) {
   }
 
   const rawBody = await request.text();
-  let event: WebhookEvent;
+  let event: LinearWebhookEvent;
 
   try {
     const parsed = parseAndVerifyEvent(request, rawBody);

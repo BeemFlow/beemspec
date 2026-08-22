@@ -1,21 +1,21 @@
-import { buildStoryPatchFromLinearIssue, mapStoryToLinearIssueInput } from '@beemspec/linear';
-import type { StoryContent, StoryStatus } from '@beemspec/storymap';
+import type { StoryContent, StoryStatus } from '@/domain/story-map';
 import {
-  buildDbUpdateFromPatch,
-  hasMutableStoryFields,
-  type IssueSnapshot,
-  type SyncTarget,
+  buildStoryPatchFromLinearIssue,
+  type LinearIssueSnapshot,
+  type LinearSyncTarget,
+  mapStoryToLinearIssueInput,
   syncStoryToRemote,
-} from '@beemspec/sync';
+} from '@/integrations/linear/adapter';
+import { ensureLinearIssueHasLabel } from '@/integrations/linear/adapter/labels';
 import {
   type LinearSyncContext,
   resolveLinearAuthTokenForTeam,
   resolveLinearSyncContextForStoryMap,
 } from '@/integrations/linear/auth';
-import { ensureLinearIssueHasLabel } from '@/integrations/linear/label-sync';
 import { getStoryMapLinearImportSettings } from '@/integrations/linear/settings';
 import { applyStoryStatusToLinearInput, mapLinearIssueStateToStoryStatus } from '@/integrations/linear/state-sync';
 import { getStoryLinearLink, type StoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
+import { buildDbUpdateFromPatch, hasMutableStoryFields } from '@/integrations/linear/story-patch';
 import type { Supabase } from '@/lib/supabase/types';
 import { loadStoryWithStoryMap } from '@/storymap/story-context';
 import type { Story } from '@/types';
@@ -47,7 +47,7 @@ export interface LinearIssueWritebackResult {
 }
 
 function requireReadyContext(context: LinearSyncContext): asserts context is LinearSyncContext & {
-  target: SyncTarget;
+  target: LinearSyncTarget;
   linearIssueSync: NonNullable<LinearSyncContext['linearIssueSync']>;
 } {
   if (context.status === 'error') {
@@ -72,10 +72,10 @@ export async function pushStoryToLinear(
     storyMapId: string;
     context: LinearSyncContext;
     link: StoryLinearLink | null;
-    remote?: IssueSnapshot | null;
+    remote?: LinearIssueSnapshot | null;
     recoverDeterministicCreate?: boolean;
   },
-): Promise<IssueSnapshot> {
+): Promise<LinearIssueSnapshot> {
   requireReadyContext(input.context);
 
   let existingIssueId = input.link?.linearIssueId ?? null;
@@ -137,7 +137,7 @@ export async function pushStoryToLinear(
 export async function pushStoryToLinearById(
   supabase: Supabase,
   input: { storyId: string; recoverDeterministicCreate?: boolean },
-): Promise<IssueSnapshot> {
+): Promise<LinearIssueSnapshot> {
   const storyContext = await loadStoryWithStoryMap(supabase, input.storyId);
   if (!storyContext.ok) throw new Error(`Failed to load story: ${storyContext.reason}`);
 
@@ -160,7 +160,7 @@ export async function applyLinearIssueToStory(
   input: {
     story: { id: string; updated_at: string; content?: StoryContent | null };
     issue: LinearIssueForWriteback;
-    target?: SyncTarget | null;
+    target?: LinearSyncTarget | null;
     receipt?: WebhookReceipt;
   },
 ): Promise<LinearIssueWritebackResult> {

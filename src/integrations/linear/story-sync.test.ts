@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { pushStoryToLinearById } from './story-sync';
 
-vi.mock('@beemspec/linear', () => ({
+vi.mock('@/integrations/linear/adapter', () => ({
   mapStoryToLinearIssueInput: vi.fn(),
   resolveLinearStateIdForStoryStatus: vi.fn(),
+  syncStoryToRemote: vi.fn(),
 }));
 
 vi.mock('@/storymap/story-context', () => ({
@@ -20,22 +21,21 @@ vi.mock('@/integrations/linear/story-links', () => ({
   upsertStoryLinearLink: vi.fn(),
 }));
 
-vi.mock('@beemspec/sync', () => ({
-  syncStoryToRemote: vi.fn(),
-}));
-
 vi.mock('@/integrations/linear/settings', () => ({
   getStoryMapLinearImportSettings: vi.fn(),
 }));
 
-vi.mock('@/integrations/linear/label-sync', () => ({
+vi.mock('@/integrations/linear/adapter/labels', () => ({
   ensureLinearIssueHasLabel: vi.fn(),
 }));
 
-import { mapStoryToLinearIssueInput, resolveLinearStateIdForStoryStatus } from '@beemspec/linear';
-import { syncStoryToRemote } from '@beemspec/sync';
+import {
+  mapStoryToLinearIssueInput,
+  resolveLinearStateIdForStoryStatus,
+  syncStoryToRemote,
+} from '@/integrations/linear/adapter';
+import { ensureLinearIssueHasLabel } from '@/integrations/linear/adapter/labels';
 import { resolveLinearAuthTokenForTeam, resolveLinearSyncContextForStoryMap } from '@/integrations/linear/auth';
-import { ensureLinearIssueHasLabel } from '@/integrations/linear/label-sync';
 import { getStoryMapLinearImportSettings } from '@/integrations/linear/settings';
 import { getStoryLinearLink, upsertStoryLinearLink } from '@/integrations/linear/story-links';
 import { loadStoryWithStoryMap } from '@/storymap/story-context';
