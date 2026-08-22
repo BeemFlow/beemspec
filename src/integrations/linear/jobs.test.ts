@@ -19,7 +19,7 @@ vi.mock('@/integrations/linear/story-sync', () => ({
   pushStoryToLinearById: pushStoryToLinearByIdMock,
 }));
 
-import { processLinearSyncBatch } from './jobs';
+import { processLinearSyncBatch, pruneIntegrationHistory } from './jobs';
 
 const VERSION = '2026-08-21T12:00:00.000Z';
 
@@ -47,7 +47,8 @@ function makeSupabase(input: {
     remote_id: input.remoteId ?? null,
     status: 'pending',
   };
-  const archived: number[] = [];
+  const deletedMessages: number[] = [];
+  let stateExists = true;
   const retries: Array<{ messageId: number; delay: number }> = [];
 
   const rpc = vi.fn(async (name: string, args: Record<string, number>) => {
@@ -64,8 +65,8 @@ function makeSupabase(input: {
         error: null,
       };
     }
-    if (name === 'archive_linear_sync_job') {
-      archived.push(args.p_message_id);
+    if (name === 'delete_linear_sync_job') {
+      deletedMessages.push(args.p_message_id);
       return { data: true, error: null };
     }
     if (name === 'retry_linear_sync_job') {
@@ -75,18 +76,25 @@ function makeSupabase(input: {
     throw new Error(`Unexpected RPC ${name}`);
   });
 
-  function makeChain(mode: 'select' | 'update', changes?: Record<string, unknown>) {
+  function makeChain(mode: 'select' | 'update' | 'delete', changes?: Record<string, unknown>) {
     const filters = new Map<string, unknown>();
     const chain = {
       eq(column: string, value: unknown) {
         filters.set(column, value);
+        if (mode === 'delete' && column === 'desired_version') {
+          const isCurrent =
+            filters.get('operation') === state.operation &&
+            Date.parse(String(filters.get('desired_version'))) === Date.parse(String(state.desired_version));
+          if (isCurrent) stateExists = false;
+          return Promise.resolve({ data: null, error: null });
+        }
         return chain;
       },
       select() {
         return chain;
       },
       async maybeSingle() {
-        if (mode === 'select') return { data: { ...state }, error: null };
+        if (mode === 'select') return { data: stateExists ? { ...state } : null, error: null };
 
         const isCurrent =
           filters.get('operation') === state.operation &&
@@ -102,9 +110,10 @@ function makeSupabase(input: {
   const from = vi.fn(() => ({
     select: () => makeChain('select'),
     update: (changes: Record<string, unknown>) => makeChain('update', changes),
+    delete: () => makeChain('delete'),
   }));
 
-  return { supabase: { rpc, from } as never, state, archived, retries };
+  return { supabase: { rpc, from } as never, state, deletedMessages, stateExists: () => stateExists, retries };
 }
 
 describe('Linear sync queue batch', () => {
@@ -113,7 +122,7 @@ describe('Linear sync queue batch', () => {
     pushStoryToLinearByIdMock.mockResolvedValue({ id: 'linear-1' });
   });
 
-  it('processes and archives the current upsert message', async () => {
+  it('processes and deletes the current upsert message', async () => {
     const fixture = makeSupabase({});
 
     const summary = await processLinearSyncBatch({ supabase: fixture.supabase, limit: 1 });
@@ -122,18 +131,18 @@ describe('Linear sync queue batch', () => {
       storyId: '10000000-0000-4000-8000-000000000041',
       recoverDeterministicCreate: false,
     });
-    expect(fixture.archived).toEqual([7]);
+    expect(fixture.deletedMessages).toEqual([7]);
     expect(fixture.state).toMatchObject({ status: 'synced', remote_id: 'linear-1' });
     expect(summary).toMatchObject({ claimed: 1, succeeded: 1, retried: 0, failed: 0, stale: 0 });
   });
 
-  it('archives a superseded message without calling Linear', async () => {
+  it('deletes a superseded message without calling Linear', async () => {
     const fixture = makeSupabase({ stateVersion: '2026-08-21T12:01:00.000Z' });
 
     const summary = await processLinearSyncBatch({ supabase: fixture.supabase });
 
     expect(pushStoryToLinearByIdMock).not.toHaveBeenCalled();
-    expect(fixture.archived).toEqual([7]);
+    expect(fixture.deletedMessages).toEqual([7]);
     expect(summary.stale).toBe(1);
   });
 
@@ -143,19 +152,19 @@ describe('Linear sync queue batch', () => {
 
     const summary = await processLinearSyncBatch({ supabase: fixture.supabase });
 
-    expect(fixture.archived).toEqual([]);
+    expect(fixture.deletedMessages).toEqual([]);
     expect(fixture.retries).toEqual([{ messageId: 7, delay: 30 }]);
     expect(fixture.state).toMatchObject({ status: 'pending', attempt_count: 2, last_error: 'Linear unavailable' });
     expect(summary.retried).toBe(1);
   });
 
-  it('records and archives a terminal failure after the retry budget', async () => {
+  it('records a terminal failure and deletes its message after the retry budget', async () => {
     const fixture = makeSupabase({ readCount: 8 });
     pushStoryToLinearByIdMock.mockRejectedValue(new Error('Permanent failure'));
 
     const summary = await processLinearSyncBatch({ supabase: fixture.supabase });
 
-    expect(fixture.archived).toEqual([7]);
+    expect(fixture.deletedMessages).toEqual([7]);
     expect(fixture.state).toMatchObject({ status: 'error', attempt_count: 8, last_error: 'Permanent failure' });
     expect(summary.failed).toBe(1);
   });
@@ -169,7 +178,24 @@ describe('Linear sync queue batch', () => {
     const summary = await processLinearSyncBatch({ supabase: fixture.supabase });
 
     expect(deleteIssue).toHaveBeenCalledWith('linear-delete-1');
-    expect(fixture.state).toMatchObject({ status: 'synced', remote_id: 'linear-delete-1' });
+    expect(fixture.stateExists()).toBe(false);
+    expect(fixture.deletedMessages).toEqual([7]);
     expect(summary.succeeded).toBe(1);
+  });
+
+  it('prunes retained integration history through the restricted database function', async () => {
+    const single = vi.fn().mockResolvedValue({
+      data: { webhook_receipts_deleted: 4, orphan_sync_states_deleted: 2 },
+      error: null,
+    });
+    const rpc = vi.fn().mockReturnValue({ single });
+
+    const summary = await pruneIntegrationHistory({ supabase: { rpc } as never });
+
+    expect(rpc).toHaveBeenCalledWith('prune_integration_history', {
+      p_processed_receipt_days: 30,
+      p_failed_receipt_days: 90,
+    });
+    expect(summary).toEqual({ webhookReceiptsDeleted: 4, orphanSyncStatesDeleted: 2 });
   });
 });

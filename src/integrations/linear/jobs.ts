@@ -44,6 +44,11 @@ export interface LinearSyncBatchSummary {
   stale: number;
 }
 
+export interface IntegrationHistoryPruneSummary {
+  webhookReceiptsDeleted: number;
+  orphanSyncStatesDeleted: number;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object');
 }
@@ -97,8 +102,20 @@ function retryDelaySeconds(readCount: number): number {
   return Math.min(3_600, 15 * 2 ** Math.max(0, readCount - 1));
 }
 
-async function archiveJob(supabase: AdminSupabase, messageId: number): Promise<void> {
-  const { error } = await supabase.rpc('archive_linear_sync_job', { p_message_id: messageId });
+async function deleteJob(supabase: AdminSupabase, messageId: number): Promise<void> {
+  const { error } = await supabase.rpc('delete_linear_sync_job', { p_message_id: messageId });
+  if (error) throw error;
+}
+
+async function deleteCurrentState(supabase: AdminSupabase, payload: LinearSyncJobPayload): Promise<void> {
+  const { error } = await supabase
+    .from('integration_sync_state')
+    .delete()
+    .eq('provider', payload.provider)
+    .eq('entity_type', payload.entity_type)
+    .eq('entity_id', payload.entity_id)
+    .eq('operation', payload.operation)
+    .eq('desired_version', payload.desired_version);
   if (error) throw error;
 }
 
@@ -169,14 +186,14 @@ async function processClaimedJob(
 ): Promise<void> {
   const payload = parseJobPayload(job.payload);
   if (!payload) {
-    await archiveJob(supabase, job.message_id);
+    await deleteJob(supabase, job.message_id);
     summary.failed += 1;
     return;
   }
 
   const state = await loadCurrentState(supabase, payload);
   if (!state || state.operation !== payload.operation || !sameVersion(state.desired_version, payload.desired_version)) {
-    await archiveJob(supabase, job.message_id);
+    await deleteJob(supabase, job.message_id);
     summary.stale += 1;
     return;
   }
@@ -188,7 +205,7 @@ async function processClaimedJob(
     last_attempted_at: new Date().toISOString(),
   });
   if (!claimedCurrentState) {
-    await archiveJob(supabase, job.message_id);
+    await deleteJob(supabase, job.message_id);
     summary.stale += 1;
     return;
   }
@@ -204,14 +221,18 @@ async function processClaimedJob(
             })
           ).id;
 
-    await updateCurrentState(supabase, payload, {
-      status: 'synced',
-      remote_id: remoteId,
-      attempt_count: job.read_count,
-      last_error: null,
-      last_synced_at: new Date().toISOString(),
-    });
-    await archiveJob(supabase, job.message_id);
+    if (payload.operation === 'delete') {
+      await deleteCurrentState(supabase, payload);
+    } else {
+      await updateCurrentState(supabase, payload, {
+        status: 'synced',
+        remote_id: remoteId,
+        attempt_count: job.read_count,
+        last_error: null,
+        last_synced_at: new Date().toISOString(),
+      });
+    }
+    await deleteJob(supabase, job.message_id);
     summary.succeeded += 1;
   } catch (error) {
     const message = errorMessage(error);
@@ -221,7 +242,7 @@ async function processClaimedJob(
         attempt_count: job.read_count,
         last_error: message,
       });
-      await archiveJob(supabase, job.message_id);
+      await deleteJob(supabase, job.message_id);
       summary.failed += 1;
       return;
     }
@@ -265,4 +286,22 @@ export async function processLinearSyncBatch(
   }
 
   return summary;
+}
+
+export async function pruneIntegrationHistory(
+  input: { supabase?: AdminSupabase; processedReceiptDays?: number; failedReceiptDays?: number } = {},
+): Promise<IntegrationHistoryPruneSummary> {
+  const supabase = input.supabase ?? createAdminClient();
+  const { data, error } = await supabase
+    .rpc('prune_integration_history', {
+      p_processed_receipt_days: input.processedReceiptDays ?? 30,
+      p_failed_receipt_days: input.failedReceiptDays ?? 90,
+    })
+    .single<{ webhook_receipts_deleted: number; orphan_sync_states_deleted: number }>();
+  if (error) throw error;
+
+  return {
+    webhookReceiptsDeleted: data?.webhook_receipts_deleted ?? 0,
+    orphanSyncStatesDeleted: data?.orphan_sync_states_deleted ?? 0,
+  };
 }

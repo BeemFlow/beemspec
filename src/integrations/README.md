@@ -11,7 +11,7 @@ src/integrations/
     auth.ts                   # application auth/context resolution
     connections.ts            # persisted OAuth connection access
     conflict.ts               # Linear timestamp conflict rule
-    jobs.ts                   # durable outbound queue worker
+    jobs.ts                   # durable outbound queue worker and retention
     reconcile.ts              # manual and queued reconciliation orchestration
     settings.ts               # effective team/map settings
     story-links.ts            # local-to-remote identity links
@@ -34,7 +34,7 @@ Only one project-management provider may be active for a story map. When a secon
 
 Provider-specific authentication, settings, remote models, status and content mapping, conflict policy, and orchestration stay inside the provider directory. Do not force them through a common project-management interface.
 
-The existing `integration_webhook_receipts` and `integration_sync_state` tables are intentionally provider-keyed. When a second provider proves the need, share only the durable job envelope and queue claim, retry, and archive lifecycle. Dispatch jobs with an explicit provider switch; do not introduce a runtime registry. Until then, keep the worker and database trigger behavior Linear-specific.
+The existing `integration_webhook_receipts` and `integration_sync_state` tables are intentionally provider-keyed. When a second provider proves the need, share only the durable job envelope and queue claim, retry, completion, and retention lifecycle. Dispatch jobs with an explicit provider switch; do not introduce a runtime registry. Until then, keep the worker and database trigger behavior Linear-specific.
 
 ## Adding another provider
 

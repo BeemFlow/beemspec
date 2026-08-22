@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { processLinearSyncBatch } from '@/integrations/linear/jobs';
+import { processLinearSyncBatch, pruneIntegrationHistory } from '@/integrations/linear/jobs';
 import { env } from '@/lib/env';
 
 export async function POST(request: Request) {
@@ -11,5 +11,6 @@ export async function POST(request: Request) {
   }
 
   const summary = await processLinearSyncBatch({ limit: 25 });
-  return NextResponse.json({ success: true, ...summary });
+  const cleanup = await pruneIntegrationHistory();
+  return NextResponse.json({ success: true, ...summary, cleanup });
 }

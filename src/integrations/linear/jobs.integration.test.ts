@@ -24,11 +24,8 @@ async function claimOne() {
     .single<{ message_id: number; read_count: number; payload: Record<string, unknown> }>();
 }
 
-async function archive(messageId: number) {
-  await mustSucceed(
-    admin.rpc('archive_linear_sync_job', { p_message_id: messageId }),
-    'Failed to archive queue message',
-  );
+async function deleteMessage(messageId: number) {
+  await mustSucceed(admin.rpc('delete_linear_sync_job', { p_message_id: messageId }), 'Failed to delete queue message');
 }
 
 describe.sequential('durable Linear sync database integration', () => {
@@ -106,7 +103,7 @@ describe.sequential('durable Linear sync database integration', () => {
       operation: 'upsert',
       desired_version: createdState.data?.desired_version,
     });
-    await archive(firstMessage.data?.message_id ?? 0);
+    await deleteMessage(firstMessage.data?.message_id ?? 0);
 
     const updated = await updateStory(member as never, ids.story, { title: 'Queued story v2' });
     expect(updated.error).toBeNull();
@@ -114,7 +111,7 @@ describe.sequential('durable Linear sync database integration', () => {
     const updatedMessage = await claimOne();
     expect(updatedMessage.data?.payload).toMatchObject({ entity_id: ids.story, operation: 'upsert' });
     expect(updatedMessage.data?.payload.desired_version).not.toBe(createdState.data?.desired_version);
-    await archive(updatedMessage.data?.message_id ?? 0);
+    await deleteMessage(updatedMessage.data?.message_id ?? 0);
   });
 
   it('captures remote delete intent before the local link cascades away', async () => {
@@ -144,7 +141,7 @@ describe.sequential('durable Linear sync database integration', () => {
       remote_id: 'linear-delete-issue',
       team_id: ids.team,
     });
-    await archive(message.data?.message_id ?? 0);
+    await deleteMessage(message.data?.message_id ?? 0);
   });
 
   it('uses the deterministic issue id when deletion races a missing link write', async () => {
@@ -158,21 +155,80 @@ describe.sequential('durable Linear sync database integration', () => {
     const storyId = created.data?.id as string;
 
     const createMessage = await claimOne();
-    await archive(createMessage.data?.message_id ?? 0);
+    await deleteMessage(createMessage.data?.message_id ?? 0);
 
     const deleted = await deleteStory(member as never, storyId);
     expect(deleted.error).toBeNull();
 
-    const [state, deleteMessage] = await Promise.all([
+    const [state, deleteJob] = await Promise.all([
       admin.from('integration_sync_state').select('operation, remote_id, status').eq('entity_id', storyId).single(),
       claimOne(),
     ]);
     expect(state.data).toMatchObject({ operation: 'delete', remote_id: storyId, status: 'pending' });
-    expect(deleteMessage.data?.payload).toMatchObject({
+    expect(deleteJob.data?.payload).toMatchObject({
       entity_id: storyId,
       operation: 'delete',
       remote_id: storyId,
     });
-    await archive(deleteMessage.data?.message_id ?? 0);
+    await deleteMessage(deleteJob.data?.message_id ?? 0);
+  });
+
+  it('prunes expired webhook receipts and completed orphan sync state', async () => {
+    const oldProcessedKey = `old-processed-${crypto.randomUUID()}`;
+    const oldFailedKey = `old-failed-${crypto.randomUUID()}`;
+    const recentFailedKey = `recent-failed-${crypto.randomUUID()}`;
+    const orphanStoryId = crypto.randomUUID();
+    const now = Date.now();
+
+    await mustSucceed(
+      admin.from('integration_webhook_receipts').insert([
+        {
+          provider: 'linear',
+          idempotency_key: oldProcessedKey,
+          status: 'processed',
+          processed_at: new Date(now - 31 * 86_400_000).toISOString(),
+        },
+        {
+          provider: 'linear',
+          idempotency_key: oldFailedKey,
+          status: 'failed',
+          processed_at: new Date(now - 91 * 86_400_000).toISOString(),
+        },
+        {
+          provider: 'linear',
+          idempotency_key: recentFailedKey,
+          status: 'failed',
+          processed_at: new Date(now - 89 * 86_400_000).toISOString(),
+        },
+      ]),
+      'Failed to seed webhook receipts',
+    );
+    await mustSucceed(
+      admin.from('integration_sync_state').insert({
+        provider: 'linear',
+        entity_type: 'story',
+        entity_id: orphanStoryId,
+        team_id: ids.team,
+        operation: 'delete',
+        desired_version: new Date(now - 31 * 86_400_000).toISOString(),
+        status: 'synced',
+      }),
+      'Failed to seed orphan sync state',
+    );
+
+    const cleanup = await admin
+      .rpc('prune_integration_history', {
+        p_processed_receipt_days: 30,
+        p_failed_receipt_days: 90,
+      })
+      .single<{ webhook_receipts_deleted: number; orphan_sync_states_deleted: number }>();
+    expect(cleanup.error).toBeNull();
+    expect(cleanup.data).toEqual({ webhook_receipts_deleted: 2, orphan_sync_states_deleted: 1 });
+
+    const receipts = await admin
+      .from('integration_webhook_receipts')
+      .select('idempotency_key')
+      .in('idempotency_key', [oldProcessedKey, oldFailedKey, recentFailedKey]);
+    expect(receipts.data).toEqual([{ idempotency_key: recentFailedKey }]);
   });
 });

@@ -147,7 +147,9 @@ and `npm run sync:drain` provides a portable recovery command for a scheduled
 job. Configure `INTEGRATION_SYNC_SECRET` in the app and scheduler, plus
 `SYNC_DRAIN_URL` (or `APP_URL`) in the scheduler. A 15-minute DigitalOcean App
 Platform scheduled job is sufficient for recovery; the queue remains durable
-between runs.
+between runs. Terminal queue messages are deleted after their outcome is
+recorded, processed webhook receipts are retained for 30 days, and failed
+receipts are retained for 90 days.
 
 ## Tech stack
 
