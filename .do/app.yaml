@@ -1,0 +1,100 @@
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+
+domains:
+  - domain: beemspec.com
+    type: PRIMARY
+
+envs:
+  - key: INTEGRATION_SYNC_SECRET
+    scope: RUN_TIME
+    type: SECRET
+    value: ${INTEGRATION_SYNC_SECRET}
+
+features:
+  - buildpack-stack=ubuntu-22
+
+ingress:
+  rules:
+    - component:
+        name: beemspec
+      match:
+        authority:
+          exact: ""
+        path:
+          prefix: /
+    - match:
+        authority:
+          exact: ${STARTER_DOMAIN}
+        path:
+          prefix: /
+      redirect:
+        authority: beemspec.com
+        redirect_code: 308
+        scheme: https
+
+jobs:
+  - name: linear-sync-drain
+    environment_slug: node-js
+    envs:
+      - key: SYNC_DRAIN_URL
+        scope: RUN_TIME
+        value: ${APP_URL}
+    github:
+      branch: main
+      deploy_on_push: false
+      repo: BeemFlow/beemspec
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    kind: SCHEDULED
+    run_command: npm run sync:drain
+    schedule:
+      cron: "*/15 * * * *"
+      time_zone: UTC
+    source_dir: /
+
+name: beemspec
+region: nyc
+
+services:
+  - name: beemspec
+    environment_slug: node-js
+    envs:
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${NEXT_PUBLIC_SUPABASE_URL}
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        scope: RUN_AND_BUILD_TIME
+        value: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
+      - key: SUPABASE_SECRET_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: ${SUPABASE_SECRET_KEY}
+      - key: SHARE_LINK_SECRET
+        scope: RUN_TIME
+        type: SECRET
+        value: ${SHARE_LINK_SECRET}
+      - key: LINEAR_CLIENT_ID
+        scope: RUN_TIME
+        value: ${LINEAR_CLIENT_ID}
+      - key: LINEAR_CLIENT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+        value: ${LINEAR_CLIENT_SECRET}
+      - key: LINEAR_WEBHOOK_SECRET
+        scope: RUN_TIME
+        type: SECRET
+        value: ${LINEAR_WEBHOOK_SECRET}
+      - key: LINEAR_OAUTH_REDIRECT_URI
+        scope: RUN_TIME
+        value: ${LINEAR_OAUTH_REDIRECT_URI}
+    github:
+      branch: main
+      deploy_on_push: false
+      repo: BeemFlow/beemspec
+    http_port: 3000
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-1gb-fixed
+    run_command: npm start
+    source_dir: /

@@ -151,6 +151,10 @@ between runs. Terminal queue messages are deleted after their outcome is
 recorded, processed webhook receipts are retained for 30 days, and failed
 receipts are retained for 90 days.
 
+Production topology is defined in [`.do/app.yaml`](.do/app.yaml) and applied by
+GitHub Actions. See [`.do/README.md`](.do/README.md) for the environment contract,
+cutover procedure, and recovery path.
+
 ## Tech stack
 
 - Next.js

@@ -1,0 +1,39 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: digitalocean-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy production App Spec
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: Production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Apply App Spec and deploy
+        uses: digitalocean/app_action/deploy@v2
+        env:
+          INTEGRATION_SYNC_SECRET: ${{ secrets.INTEGRATION_SYNC_SECRET }}
+          LINEAR_CLIENT_ID: ${{ secrets.LINEAR_CLIENT_ID }}
+          LINEAR_CLIENT_SECRET: ${{ secrets.LINEAR_CLIENT_SECRET }}
+          LINEAR_OAUTH_REDIRECT_URI: ${{ secrets.LINEAR_OAUTH_REDIRECT_URI }}
+          LINEAR_WEBHOOK_SECRET: ${{ secrets.LINEAR_WEBHOOK_SECRET }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SHARE_LINK_SECRET: ${{ secrets.SHARE_LINK_SECRET }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
