@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { shouldApplyRemoteUpdate } from '@/integrations/conflict';
 import type { LinearWebhookEvent } from '@/integrations/linear/adapter';
 import {
   getLinearIssueLabelNames,
   getLinearIssueProjectIdFromPayload,
   getLinearIssueTeamIdFromPayload,
 } from '@/integrations/linear/adapter/labels';
+import { shouldApplyRemoteUpdate } from '@/integrations/linear/conflict';
 import { getLinearWebhookIngest, getLinearWebhookSignatureVerifier } from '@/integrations/linear/helpers';
 import { findStoryMapImportCandidate, importLinearIssueIntoStoryMap } from '@/integrations/linear/import';
 import { getSyncTargetForStory } from '@/integrations/linear/settings';

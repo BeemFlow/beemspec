@@ -1,5 +1,5 @@
-import { shouldApplyRemoteUpdate } from '@/integrations/conflict';
 import { type LinearSyncContext, resolveLinearSyncContextForStoryMap } from '@/integrations/linear/auth';
+import { shouldApplyRemoteUpdate } from '@/integrations/linear/conflict';
 import { getStoryLinearLink } from '@/integrations/linear/story-links';
 import { applyLinearIssueToStory, pushStoryToLinear } from '@/integrations/linear/story-sync';
 import type { Supabase } from '@/lib/supabase/types';

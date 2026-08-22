@@ -17,7 +17,7 @@ const {
   shouldApplyRemoteUpdateMock: vi.fn(),
 }));
 
-vi.mock('@/integrations/conflict', () => ({ shouldApplyRemoteUpdate: shouldApplyRemoteUpdateMock }));
+vi.mock('@/integrations/linear/conflict', () => ({ shouldApplyRemoteUpdate: shouldApplyRemoteUpdateMock }));
 vi.mock('@/integrations/linear/auth', () => ({
   resolveLinearSyncContextForStoryMap: resolveLinearSyncContextForStoryMapMock,
 }));
