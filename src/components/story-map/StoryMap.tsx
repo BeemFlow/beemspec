@@ -44,6 +44,7 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mcpSetupOpen, setMcpSetupOpen] = useState(false);
   const [mapContextOpen, setMapContextOpen] = useState(false);
+  const [canvasInteracting, setCanvasInteracting] = useState(false);
   const [releaseContextOpen, setReleaseContextOpen] = useState<{
     releaseId: string;
     releaseName: string;
@@ -54,7 +55,14 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
     setStoryMap(initialStoryMap);
   }, [initialStoryMap]);
 
-  const refreshStoryMap = useRouteRefresh({ auto: true, pollMs: 15000 });
+  const refreshPaused =
+    dialog.type !== 'closed' ||
+    settingsOpen ||
+    mcpSetupOpen ||
+    mapContextOpen ||
+    releaseContextOpen !== null ||
+    canvasInteracting;
+  const refreshStoryMap = useRouteRefresh({ auto: true, paused: refreshPaused, pollMs: 15000 });
 
   async function request(input: RequestInfo | URL, init: RequestInit | undefined, fallback: string) {
     await fetchJson(input, init, fallback);
@@ -476,6 +484,7 @@ export function StoryMap({ initialStoryMap }: { initialStoryMap: StoryMapFull })
               }
             }}
             onError={setUiError}
+            onInteractionChange={setCanvasInteracting}
             onStoryMapChange={setStoryMap}
           />
         </div>

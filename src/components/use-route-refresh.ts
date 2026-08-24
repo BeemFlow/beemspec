@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef } from 'react';
 interface UseRouteRefreshOptions {
   auto?: boolean;
   minIntervalMs?: number;
+  paused?: boolean;
   pollMs?: number;
 }
 
@@ -15,10 +16,12 @@ export function useRouteRefresh(options?: UseRouteRefreshOptions) {
   const router = useRouter();
   const auto = options?.auto ?? false;
   const minIntervalMs = options?.minIntervalMs ?? DEFAULT_MIN_INTERVAL_MS;
+  const paused = options?.paused ?? false;
   const pollMs = options?.pollMs ?? null;
   const lastRefreshAtRef = useRef(0);
 
   const refresh = useCallback(() => {
+    lastRefreshAtRef.current = Date.now();
     router.refresh();
   }, [router]);
 
@@ -28,21 +31,22 @@ export function useRouteRefresh(options?: UseRouteRefreshOptions) {
       return;
     }
 
-    lastRefreshAtRef.current = now;
-    router.refresh();
-  }, [minIntervalMs, router]);
+    refresh();
+  }, [minIntervalMs, refresh]);
+
+  const canAutoRefresh = useCallback(() => {
+    return !paused && document.visibilityState === 'visible' && document.hasFocus();
+  }, [paused]);
 
   useEffect(() => {
     if (!auto) return;
 
     const handleFocus = () => {
-      refreshIfDue();
+      if (canAutoRefresh()) refreshIfDue();
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        refreshIfDue();
-      }
+      if (canAutoRefresh()) refreshIfDue();
     };
 
     window.addEventListener('focus', handleFocus);
@@ -52,21 +56,20 @@ export function useRouteRefresh(options?: UseRouteRefreshOptions) {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [auto, refreshIfDue]);
+  }, [auto, canAutoRefresh, refreshIfDue]);
 
   useEffect(() => {
     if (!auto || !pollMs) return;
 
     const intervalId = window.setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        refreshIfDue();
-      }
+      if (!canAutoRefresh()) return;
+      refreshIfDue();
     }, pollMs);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [auto, pollMs, refreshIfDue]);
+  }, [auto, canAutoRefresh, pollMs, refreshIfDue]);
 
   return refresh;
 }

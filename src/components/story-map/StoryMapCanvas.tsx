@@ -59,6 +59,7 @@ interface Props {
   onDeleteRelease: (releaseId: string) => void;
   onEditReleaseContext?: (releaseId: string) => void;
   onError?: (message: string) => void;
+  onInteractionChange?: (active: boolean) => void;
   onStoryMapChange: React.Dispatch<React.SetStateAction<StoryMapFull | null>>;
 }
 
@@ -89,6 +90,7 @@ export function StoryMapCanvas({
   onDeleteRelease,
   onEditReleaseContext,
   onError,
+  onInteractionChange,
   onStoryMapChange,
 }: Props) {
   const { releases } = storyMap;
@@ -121,6 +123,7 @@ export function StoryMapCanvas({
     const parsed = parseDragId(String(event.active.id));
     setActiveDrag(parsed);
     setDragError(null);
+    onInteractionChange?.(true);
   }
 
   function handleDragOver(event: DragOverEvent) {
@@ -242,17 +245,18 @@ export function StoryMapCanvas({
     const { active, over } = event;
     setActiveDrag(null);
     setDropTargetId(null);
-    if (!over) return;
-
-    const activeId = String(active.id);
-    const overId = String(over.id);
-    if (activeId === overId) return;
-
-    const activeParsed = parseDragId(activeId);
-    const overParsed = parseDragId(overId);
-    if (!activeParsed || !overParsed) return;
 
     try {
+      if (!over) return;
+
+      const activeId = String(active.id);
+      const overId = String(over.id);
+      if (activeId === overId) return;
+
+      const activeParsed = parseDragId(activeId);
+      const overParsed = parseDragId(overId);
+      if (!activeParsed || !overParsed) return;
+
       if (activeParsed.type === 'activity' && (overParsed.type === 'activity' || overParsed.type === 'activity-end')) {
         await handleActivityDrop(activeParsed.id, overParsed);
         return;
@@ -271,7 +275,15 @@ export function StoryMapCanvas({
       const message = errorMessage(err);
       setDragError(message);
       onError?.(message);
+    } finally {
+      onInteractionChange?.(false);
     }
+  }
+
+  function handleDragCancel() {
+    setActiveDrag(null);
+    setDropTargetId(null);
+    onInteractionChange?.(false);
   }
 
   // Derive dragged item from state - no string parsing needed
@@ -292,6 +304,7 @@ export function StoryMapCanvas({
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <div className="inline-flex min-w-full flex-col px-4">
         {sortedActivities.length === 0 && (
