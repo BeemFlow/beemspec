@@ -14,6 +14,11 @@ export const inviteEmailSchema = z.object({
   email: z.string().email('Invalid email address'),
 });
 
+export const updateTeamMemberRoleSchema = z.object({
+  role: z.enum(['owner', 'member']),
+});
+
 export type CreateTeam = z.infer<typeof createTeamSchema>;
 export type UpdateTeam = z.infer<typeof updateTeamSchema>;
 export type InviteEmail = z.infer<typeof inviteEmailSchema>;
+export type UpdateTeamMemberRole = z.infer<typeof updateTeamMemberRoleSchema>;

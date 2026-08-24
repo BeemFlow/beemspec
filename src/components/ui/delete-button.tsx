@@ -63,6 +63,7 @@ export function DeleteButton({
         className={iconOnly ? `h-5 w-5 hover:text-destructive ${className ?? ''}` : className}
         onClick={handleClick}
         disabled={disabled || loading}
+        aria-label={iconOnly ? label : undefined}
       >
         {icon}
         {!iconOnly && label}

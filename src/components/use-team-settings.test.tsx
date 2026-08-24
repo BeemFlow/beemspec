@@ -258,4 +258,60 @@ describe('useTeamSettings', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(onTeamUpdated).toHaveBeenCalledTimes(1);
   });
+
+  it('reuses the member mutation flow for role changes and removal', async () => {
+    const onTeamUpdated = vi.fn().mockResolvedValue(undefined);
+    const member = {
+      id: 'member-2',
+      user_id: 'user-2',
+      role: 'member',
+      email: 'member@example.com',
+      created_at: '2026-01-02T00:00:00Z',
+    };
+    fetchJsonMock
+      .mockResolvedValueOnce(createSettingsPayload({ members: [member] }))
+      .mockResolvedValueOnce({ success: true, role: 'owner' })
+      .mockResolvedValueOnce(createSettingsPayload({ members: [{ ...member, role: 'owner' }] }))
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce(createSettingsPayload({ members: [] }));
+
+    const { result } = renderHook(() =>
+      useTeamSettings({
+        open: true,
+        teamId: 'team-1',
+        teamName: 'Alpha',
+        isOwner: true,
+        onTeamUpdated,
+        onOpenChange: vi.fn(),
+        resolveLinearOAuthStatus: vi.fn(() => ({ type: 'idle' }) as const),
+      }),
+    );
+
+    await waitFor(() => expect(result.current.members).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.handleChangeMemberRole('user-2', 'owner');
+    });
+    expect(fetchJsonMock).toHaveBeenCalledWith(
+      '/api/teams/team-1/members/user-2',
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'owner' }),
+      },
+      'Failed to update member role',
+    );
+    expect(result.current.members[0]?.role).toBe('owner');
+
+    await act(async () => {
+      await result.current.handleRemoveMember('user-2');
+    });
+    expect(fetchJsonMock).toHaveBeenCalledWith(
+      '/api/teams/team-1/members/user-2',
+      { method: 'DELETE' },
+      'Failed to remove member',
+    );
+    expect(result.current.members).toHaveLength(0);
+    expect(onTeamUpdated).toHaveBeenCalledTimes(2);
+  });
 });

@@ -129,4 +129,118 @@ describe.sequential('team membership integration', () => {
     expect(memberLookup.error).toBeNull();
     expect(memberLookup.data?.role).toBe('member');
   });
+
+  it('restricts role changes to owners and preserves at least one owner', async () => {
+    const admin = createAdminClient();
+    const invitee = await ensureLocalAuthUser(admin, {
+      email: E2E_INVITEE_EMAIL,
+      password: E2E_INVITEE_PASSWORD,
+      fullName: 'Invitee Example',
+    });
+    const insertMember = await admin
+      .from('team_members')
+      .insert({ team_id: E2E_TEAM_ID, user_id: invitee.id, role: 'member' });
+    expect(insertMember.error).toBeNull();
+
+    const ownerClient = createPublicClient();
+    const ownerSignIn = await ownerClient.auth.signInWithPassword({
+      email: E2E_OWNER_EMAIL,
+      password: E2E_OWNER_PASSWORD,
+    });
+    expect(ownerSignIn.error).toBeNull();
+
+    const memberClient = createPublicClient();
+    const memberSignIn = await memberClient.auth.signInWithPassword({
+      email: E2E_INVITEE_EMAIL,
+      password: E2E_INVITEE_PASSWORD,
+    });
+    expect(memberSignIn.error).toBeNull();
+
+    const unauthorizedPromotion = await memberClient.rpc('update_team_member_role', {
+      p_team_id: E2E_TEAM_ID,
+      p_user_id: invitee.id,
+      p_role: 'owner',
+    });
+    expect(unauthorizedPromotion.error).toBeNull();
+    expect(unauthorizedPromotion.data).toEqual({ error: 'Only team owners can change member roles' });
+
+    const promotion = await ownerClient.rpc('update_team_member_role', {
+      p_team_id: E2E_TEAM_ID,
+      p_user_id: invitee.id,
+      p_role: 'owner',
+    });
+    expect(promotion.error).toBeNull();
+    expect(promotion.data).toEqual({ success: true, role: 'owner' });
+
+    const demotion = await ownerClient.rpc('update_team_member_role', {
+      p_team_id: E2E_TEAM_ID,
+      p_user_id: invitee.id,
+      p_role: 'member',
+    });
+    expect(demotion.error).toBeNull();
+    expect(demotion.data).toEqual({ success: true, role: 'member' });
+
+    const onlyOwner = await findUserByEmail(admin, E2E_OWNER_EMAIL);
+    if (!onlyOwner) throw new Error('Expected seeded owner auth user to exist');
+
+    const lastOwnerDemotion = await ownerClient.rpc('update_team_member_role', {
+      p_team_id: E2E_TEAM_ID,
+      p_user_id: onlyOwner.id,
+      p_role: 'member',
+    });
+    expect(lastOwnerDemotion.error).toBeNull();
+    expect(lastOwnerDemotion.data).toEqual({ error: 'A team must have at least one owner' });
+
+    const lastOwnerRemoval = await ownerClient.rpc('remove_team_member', {
+      p_team_id: E2E_TEAM_ID,
+      p_user_id: onlyOwner.id,
+    });
+    expect(lastOwnerRemoval.error).toBeNull();
+    expect(lastOwnerRemoval.data).toEqual({ error: 'A team must have at least one owner' });
+
+    const ownerLookup = await admin
+      .from('team_members')
+      .select('role')
+      .eq('team_id', E2E_TEAM_ID)
+      .eq('user_id', onlyOwner.id)
+      .single();
+    expect(ownerLookup.error).toBeNull();
+    expect(ownerLookup.data?.role).toBe('owner');
+  });
+
+  it('lets an owner remove another owner', async () => {
+    const admin = createAdminClient();
+    const invitee = await ensureLocalAuthUser(admin, {
+      email: E2E_INVITEE_EMAIL,
+      password: E2E_INVITEE_PASSWORD,
+      fullName: 'Invitee Example',
+    });
+    const insertMember = await admin
+      .from('team_members')
+      .insert({ team_id: E2E_TEAM_ID, user_id: invitee.id, role: 'owner' });
+    expect(insertMember.error).toBeNull();
+
+    const ownerClient = createPublicClient();
+    const signIn = await ownerClient.auth.signInWithPassword({
+      email: E2E_OWNER_EMAIL,
+      password: E2E_OWNER_PASSWORD,
+    });
+    expect(signIn.error).toBeNull();
+
+    const removal = await ownerClient.rpc('remove_team_member', {
+      p_team_id: E2E_TEAM_ID,
+      p_user_id: invitee.id,
+    });
+    expect(removal.error).toBeNull();
+    expect(removal.data).toEqual({ success: true });
+
+    const removedMembership = await admin
+      .from('team_members')
+      .select('id')
+      .eq('team_id', E2E_TEAM_ID)
+      .eq('user_id', invitee.id)
+      .maybeSingle();
+    expect(removedMembership.error).toBeNull();
+    expect(removedMembership.data).toBeNull();
+  });
 });

@@ -48,12 +48,14 @@ vi.mock('@/components/ui/delete-button', () => ({
     onDelete,
     label,
     confirmDescription,
+    disabled,
   }: {
     onDelete: () => void;
     label?: string;
     confirmDescription?: string;
+    disabled?: boolean;
   }) => (
-    <button type="button" onClick={onDelete}>
+    <button type="button" onClick={onDelete} disabled={disabled}>
       {label ?? confirmDescription ?? 'Delete'}
     </button>
   ),
@@ -92,6 +94,7 @@ function createSettingsPayload(overrides: Record<string, unknown> = {}) {
 describe('TeamSettingsDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    HTMLElement.prototype.scrollIntoView = vi.fn();
   });
 
   afterEach(() => {
@@ -233,7 +236,7 @@ describe('TeamSettingsDialog', () => {
       expect(screen.queryByText('invitee@example.com')).toBeNull();
     });
 
-    await user.click(screen.getByRole('button', { name: 'member@example.com will be removed from the team.' }));
+    await user.click(screen.getByRole('button', { name: 'Remove member@example.com' }));
     await waitFor(() => {
       expect(fetchJsonMock).toHaveBeenCalledWith(
         '/api/teams/team-1/members/user-2',
@@ -245,6 +248,63 @@ describe('TeamSettingsDialog', () => {
     await waitFor(() => {
       expect(screen.queryByText('member@example.com')).toBeNull();
     });
+  });
+
+  it('lets owners promote and remove another owner while protecting the last owner', async () => {
+    const user = userEvent.setup();
+    const onTeamUpdated = vi.fn().mockResolvedValue(undefined);
+
+    fetchJsonMock
+      .mockResolvedValueOnce(createSettingsPayload())
+      .mockResolvedValueOnce({ success: true, role: 'owner' })
+      .mockResolvedValueOnce(
+        createSettingsPayload({
+          members: [createSettingsPayload().members[0], { ...createSettingsPayload().members[1], role: 'owner' }],
+        }),
+      )
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce(
+        createSettingsPayload({
+          members: [createSettingsPayload().members[0]],
+        }),
+      );
+
+    render(
+      <TeamSettingsDialog
+        open
+        onOpenChange={vi.fn()}
+        team={{ id: 'team-1', name: 'Alpha', role: 'owner', created_at: '', updated_at: '' }}
+        onTeamUpdated={onTeamUpdated}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Members' }));
+    const memberRole = await screen.findByRole('combobox', { name: 'Role for member@example.com' });
+    memberRole.focus();
+    await user.keyboard('{Enter}');
+    await user.click(screen.getByRole('option', { name: 'Owner' }));
+
+    await waitFor(() => {
+      expect(fetchJsonMock).toHaveBeenCalledWith(
+        '/api/teams/team-1/members/user-2',
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ role: 'owner' }) }),
+        'Failed to update member role',
+      );
+    });
+
+    const removeOwner = await screen.findByRole('button', { name: 'Remove member@example.com' });
+    expect((removeOwner as HTMLButtonElement).disabled).toBe(false);
+    await user.click(removeOwner);
+
+    await waitFor(() => {
+      expect(fetchJsonMock).toHaveBeenCalledWith(
+        '/api/teams/team-1/members/user-2',
+        { method: 'DELETE' },
+        'Failed to remove member',
+      );
+    });
+    expect((screen.getByRole('button', { name: 'Remove owner@example.com' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(onTeamUpdated).toHaveBeenCalledTimes(2);
   });
 
   it('shows non-owner restrictions through the rendered dialog', async () => {
@@ -272,6 +332,8 @@ describe('TeamSettingsDialog', () => {
 
     await user.click(screen.getByRole('button', { name: 'Members' }));
     expect(screen.queryByPlaceholderText('Email address')).toBeNull();
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Remove / })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Danger' }));
     expect(screen.getByText('Only team owners can delete a team.')).toBeTruthy();

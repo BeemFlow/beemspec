@@ -7,7 +7,7 @@ import {
 } from '@/components/integrations/linear/use-team-linear-settings';
 import { errorMessage } from '@/lib/errors';
 import { fetchJson } from '@/lib/http';
-import type { TeamInvite, TeamMember } from '@/types';
+import type { TeamInvite, TeamMember, TeamRole } from '@/types';
 
 export type SettingsTab = 'general' | 'integrations' | 'members' | 'danger';
 
@@ -47,17 +47,21 @@ interface TeamSettingsState {
   loading: boolean;
   inviteStatus: InviteStatus;
   removingId: string | null;
+  updatingRoleId: string | null;
   cancelingId: string | null;
   deleting: boolean;
   error: string | null;
   handleRename: (event: React.FormEvent) => Promise<void>;
   handleInvite: (event: React.FormEvent) => Promise<void>;
   handleRemoveMember: (userId: string) => Promise<void>;
+  handleChangeMemberRole: (userId: string, role: TeamRole) => Promise<void>;
   handleCancelInvite: (inviteId: string) => Promise<void>;
   handleDeleteTeam: () => Promise<void>;
 }
 
 export type UseTeamSettingsReturn = TeamSettingsState & UseTeamLinearSettingsReturn;
+
+type MemberMutation = { type: 'remove' | 'role'; userId: string };
 
 export function useTeamSettings({
   open,
@@ -77,7 +81,7 @@ export function useTeamSettings({
   const [inviteEmail, setInviteEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [inviteStatus, setInviteStatus] = useState<InviteStatus>({ type: 'idle' });
-  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [memberMutation, setMemberMutation] = useState<MemberMutation | null>(null);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [linearSummary, setLinearSummary] = useState<LinearTeamSummary | null>(null);
@@ -172,18 +176,41 @@ export function useTeamSettings({
     }
   }
 
-  async function handleRemoveMember(userId: string) {
-    if (!teamId) return;
+  async function mutateMember(
+    userId: string,
+    mutation: Omit<MemberMutation, 'userId'>,
+    init: RequestInit,
+    fallback: string,
+  ) {
+    if (!teamId || !isOwner) return;
     try {
-      setRemovingId(userId);
+      setMemberMutation({ ...mutation, userId });
       setError(null);
-      await fetchJson(`/api/teams/${teamId}/members/${userId}`, { method: 'DELETE' }, 'Failed to remove member');
+      await fetchJson(`/api/teams/${teamId}/members/${userId}`, init, fallback);
       await loadData();
-    } catch (removeError) {
-      setError(errorMessage(removeError));
+      await onTeamUpdated();
+    } catch (mutationError) {
+      setError(errorMessage(mutationError));
     } finally {
-      setRemovingId(null);
+      setMemberMutation(null);
     }
+  }
+
+  async function handleRemoveMember(userId: string) {
+    await mutateMember(userId, { type: 'remove' }, { method: 'DELETE' }, 'Failed to remove member');
+  }
+
+  async function handleChangeMemberRole(userId: string, role: TeamRole) {
+    await mutateMember(
+      userId,
+      { type: 'role' },
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      },
+      'Failed to update member role',
+    );
   }
 
   async function handleCancelInvite(inviteId: string) {
@@ -226,13 +253,15 @@ export function useTeamSettings({
     setInviteEmail,
     loading,
     inviteStatus,
-    removingId,
+    removingId: memberMutation?.type === 'remove' ? memberMutation.userId : null,
+    updatingRoleId: memberMutation?.type === 'role' ? memberMutation.userId : null,
     cancelingId,
     deleting,
     error,
     handleRename,
     handleInvite,
     handleRemoveMember,
+    handleChangeMemberRole,
     handleCancelInvite,
     handleDeleteTeam,
     ...linear,

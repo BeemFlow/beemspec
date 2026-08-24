@@ -2,15 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAuth } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { isTeamOwnerForRequest } from '@/lib/teams';
 import { DELETE as deleteInvite } from './[id]/invites/[inviteId]/route';
 import { GET as getInvites, POST as postInvite } from './[id]/invites/route';
-import { DELETE as deleteMember } from './[id]/members/[userId]/route';
+import { DELETE as deleteMember, PATCH as updateMemberRole } from './[id]/members/[userId]/route';
 import { GET as getMembers } from './[id]/members/route';
 import { POST as createTeam } from './route';
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: vi.fn() }));
+vi.mock('@/lib/teams', () => ({ isTeamOwnerForRequest: vi.fn() }));
 vi.mock('next/headers', () => ({ headers: vi.fn().mockResolvedValue({ get: () => 'localhost:3000' }) }));
 
 const VALID_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
@@ -90,6 +92,7 @@ describe('teams routes', () => {
           supabase: await createClient(),
         }) as never,
     );
+    vi.mocked(isTeamOwnerForRequest).mockResolvedValue(true);
   });
 
   it('creates a team and returns created team', async () => {
@@ -244,5 +247,44 @@ describe('teams routes', () => {
       params: Promise.resolve({ id: VALID_ID, userId: VALID_ID }),
     });
     expect(response.status).toBe(400);
+  });
+
+  it('updates a member role for team owners', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { success: true, role: 'owner' }, error: null });
+    vi.mocked(createClient).mockResolvedValue({ rpc } as never);
+
+    const response = await updateMemberRole(
+      new Request('http://localhost/api/test', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ role: 'owner' }),
+      }),
+      { params: Promise.resolve({ id: VALID_ID, userId: VALID_ID }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith('update_team_member_role', {
+      p_team_id: VALID_ID,
+      p_user_id: VALID_ID,
+      p_role: 'owner',
+    });
+  });
+
+  it('rejects member role updates from non-owners', async () => {
+    vi.mocked(isTeamOwnerForRequest).mockResolvedValue(false);
+    const rpc = vi.fn();
+    vi.mocked(createClient).mockResolvedValue({ rpc } as never);
+
+    const response = await updateMemberRole(
+      new Request('http://localhost/api/test', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ role: 'owner' }),
+      }),
+      { params: Promise.resolve({ id: VALID_ID, userId: VALID_ID }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

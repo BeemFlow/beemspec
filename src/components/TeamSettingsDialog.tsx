@@ -8,10 +8,11 @@ import { DeleteButton } from '@/components/ui/delete-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { nonCredentialFieldProps, nonCredentialFormProps } from '@/components/ui/non-credential-fields';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { SettingsDialog } from '@/components/ui/settings-dialog';
 import { type InviteStatus, type SettingsTab, useTeamSettings } from '@/components/use-team-settings';
-import type { TeamInvite, TeamMember, TeamWithRole } from '@/types';
+import type { TeamInvite, TeamMember, TeamRole, TeamWithRole } from '@/types';
 
 interface TeamSettingsDialogProps {
   open: boolean;
@@ -40,10 +41,12 @@ interface TeamMembersTabProps {
   members: TeamMember[];
   invites: TeamInvite[];
   removingId: string | null;
+  updatingRoleId: string | null;
   cancelingId: string | null;
   onInviteEmailChange: (value: string) => void;
   onInviteSubmit: (event: React.FormEvent) => Promise<void>;
   onRemoveMember: (userId: string) => Promise<void>;
+  onChangeMemberRole: (userId: string, role: TeamRole) => Promise<void>;
   onCancelInvite: (inviteId: string) => Promise<void>;
 }
 
@@ -85,12 +88,16 @@ function TeamMembersTab({
   members,
   invites,
   removingId,
+  updatingRoleId,
   cancelingId,
   onInviteEmailChange,
   onInviteSubmit,
   onRemoveMember,
+  onChangeMemberRole,
   onCancelInvite,
 }: TeamMembersTabProps) {
+  const ownerCount = members.filter((member) => member.role === 'owner').length;
+
   return (
     <div className="space-y-4">
       {isOwner && (
@@ -157,23 +164,48 @@ function TeamMembersTab({
             {members.length === 0 ? (
               <p className="py-4 text-center text-sm text-muted-foreground">No members found</p>
             ) : (
-              members.map((member) => (
-                <div key={member.id} className="flex items-center justify-between rounded-md border px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">{member.email}</span>
-                    <Badge variant={member.role === 'owner' ? 'default' : 'secondary'}>{member.role}</Badge>
+              members.map((member) => {
+                const isOnlyOwner = member.role === 'owner' && ownerCount === 1;
+                const isMutating = removingId === member.user_id || updatingRoleId === member.user_id;
+
+                return (
+                  <div key={member.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+                    <span className="min-w-0 truncate text-sm">{member.email}</span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {isOwner ? (
+                        <Select
+                          value={member.role}
+                          onValueChange={(role) => onChangeMemberRole(member.user_id, role as TeamRole)}
+                          disabled={isMutating}
+                        >
+                          <SelectTrigger size="sm" className="w-[110px]" aria-label={`Role for ${member.email}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="member" disabled={isOnlyOwner}>
+                              Member
+                            </SelectItem>
+                            <SelectItem value="owner">Owner</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge variant={member.role === 'owner' ? 'default' : 'secondary'}>{member.role}</Badge>
+                      )}
+                      {isOwner && (
+                        <DeleteButton
+                          onDelete={() => onRemoveMember(member.user_id)}
+                          iconOnly
+                          loading={removingId === member.user_id}
+                          disabled={isOnlyOwner || isMutating}
+                          label={`Remove ${member.email}`}
+                          confirmTitle="Remove member?"
+                          confirmDescription={`${member.email} will be removed from the team.`}
+                        />
+                      )}
+                    </div>
                   </div>
-                  {isOwner && member.role !== 'owner' && (
-                    <DeleteButton
-                      onDelete={() => onRemoveMember(member.user_id)}
-                      iconOnly
-                      loading={removingId === member.user_id}
-                      confirmTitle="Remove member?"
-                      confirmDescription={`${member.email} will be removed from the team.`}
-                    />
-                  )}
-                </div>
-              ))
+                );
+              })
             )}
           </>
         )}
@@ -224,6 +256,7 @@ export function TeamSettingsDialog({
     inviteStatus,
     linearStatus,
     removingId,
+    updatingRoleId,
     cancelingId,
     deleting,
     savingLinearSettings,
@@ -244,6 +277,7 @@ export function TeamSettingsDialog({
     handleRename,
     handleInvite,
     handleRemoveMember,
+    handleChangeMemberRole,
     handleCancelInvite,
     handleConnectLinear,
     handleDisconnectLinear,
@@ -316,10 +350,12 @@ export function TeamSettingsDialog({
           members={members}
           invites={invites}
           removingId={removingId}
+          updatingRoleId={updatingRoleId}
           cancelingId={cancelingId}
           onInviteEmailChange={setInviteEmail}
           onInviteSubmit={handleInvite}
           onRemoveMember={handleRemoveMember}
+          onChangeMemberRole={handleChangeMemberRole}
           onCancelInvite={handleCancelInvite}
         />
       ),
