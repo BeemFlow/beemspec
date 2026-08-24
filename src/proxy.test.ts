@@ -1,3 +1,4 @@
+import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,7 +11,7 @@ vi.mock('@supabase/ssr', () => ({
   createServerClient: createServerClientMock,
 }));
 
-import { proxy } from './proxy';
+import { config, proxy } from './proxy';
 
 function makeRequest(path: string): NextRequest {
   return new NextRequest(`http://internal-service${path}`, {
@@ -97,5 +98,17 @@ describe('proxy auth redirects', () => {
     const response = await proxy(makeRequest('/auth/login?next=%2F%5Cevil.example.com'));
 
     expect(response.headers.get('location')).toBe('https://app.example.com/');
+  });
+});
+
+describe('proxy matcher', () => {
+  it('leaves the generated Apple touch icon publicly accessible', () => {
+    expect(
+      unstable_doesMiddlewareMatch({
+        config,
+        nextConfig: {},
+        url: '/apple-icon',
+      }),
+    ).toBe(false);
   });
 });
