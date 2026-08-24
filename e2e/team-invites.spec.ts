@@ -57,3 +57,27 @@ test('an owner can promote and remove another owner', async ({ page }) => {
   await expect(page.getByText(E2E_INVITEE_EMAIL)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Remove e2e-owner@example.com' })).toBeDisabled();
 });
+
+test('team settings fills the mobile viewport and scrolls within the active tab', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await openTeamMembersSettings(page);
+
+  const dialog = page.getByRole('dialog');
+  const bounds = await dialog.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds?.x).toBeCloseTo(0, 0);
+  expect(bounds?.y).toBeCloseTo(0, 0);
+  expect(bounds?.width).toBeCloseTo(390, 0);
+  expect(bounds?.height).toBeCloseTo(664, 0);
+
+  const activePanel = dialog.locator('[data-slot="tabs-content"][data-state="active"]');
+  await expect(activePanel).toHaveCSS('overflow-y', 'auto');
+  const scrollTop = await activePanel.evaluate((panel) => {
+    const spacer = document.createElement('div');
+    spacer.style.height = '1000px';
+    panel.append(spacer);
+    panel.scrollTop = panel.scrollHeight;
+    return panel.scrollTop;
+  });
+  expect(scrollTop).toBeGreaterThan(0);
+});
