@@ -35,10 +35,11 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  // Refresh session - use getUser() for server-side validation
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Refresh the session cookies and verify the access token. Supabase caches the
+  // signing keys, so production requests do not need a network user lookup.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims.sub;
+  const isAuthenticated = typeof userId === 'string' && userId.length > 0;
 
   const pathname = request.nextUrl.pathname;
   const isAuthRoute = pathname.startsWith('/auth');
@@ -57,7 +58,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Redirect unauthenticated users to login (except auth routes)
-  if (!user && !isAuthRoute && !isPublicAuthCompletionRoute && !isPublicRoute) {
+  if (!isAuthenticated && !isAuthRoute && !isPublicAuthCompletionRoute && !isPublicRoute) {
     const url = resolveRequestUrl(request, '/auth/login');
 
     if (pathname === '/oauth/consent') {
@@ -76,7 +77,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Redirect authenticated users away from guest-only auth pages
-  if (user && isGuestOnlyAuthRoute) {
+  if (isAuthenticated && isGuestOnlyAuthRoute) {
     if (safeNextPath) {
       return NextResponse.redirect(resolveRequestUrl(request, safeNextPath));
     }

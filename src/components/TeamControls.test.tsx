@@ -5,19 +5,23 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TeamControls } from './TeamControls';
 
-const { refreshMock, searchParamsMock, searchParamsState, replaceStateMock } = vi.hoisted(() => ({
-  refreshMock: vi.fn(),
-  searchParamsMock: {
-    get: (key: string) => searchParamsState.current.get(key),
-    toString: () => searchParamsState.current.toString(),
-  },
-  searchParamsState: { current: new URLSearchParams() },
-  replaceStateMock: vi.fn(),
-}));
+const { pathnameState, refreshMock, replaceMock, searchParamsMock, searchParamsState, replaceStateMock } = vi.hoisted(
+  () => ({
+    pathnameState: { current: '/' },
+    refreshMock: vi.fn(),
+    replaceMock: vi.fn(),
+    searchParamsMock: {
+      get: (key: string) => searchParamsState.current.get(key),
+      toString: () => searchParamsState.current.toString(),
+    },
+    searchParamsState: { current: new URLSearchParams() },
+    replaceStateMock: vi.fn(),
+  }),
+);
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/dashboard',
-  useRouter: () => ({ refresh: refreshMock }),
+  usePathname: () => pathnameState.current,
+  useRouter: () => ({ refresh: refreshMock, replace: replaceMock }),
   useSearchParams: () => searchParamsMock,
 }));
 
@@ -74,6 +78,7 @@ vi.mock('@/components/TeamSettingsDialog', () => ({
 describe('TeamControls', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    pathnameState.current = '/';
     searchParamsState.current = new URLSearchParams();
     Object.defineProperty(window, 'history', {
       value: { ...window.history, replaceState: replaceStateMock },
@@ -110,6 +115,29 @@ describe('TeamControls', () => {
     });
     expect(document.cookie).toContain('beemspec_current_team_id=team-2');
     expect(refreshMock).toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
+  it('returns to the selected team dashboard when switching from a team-scoped page', async () => {
+    pathnameState.current = '/story-map/map-1';
+    const user = userEvent.setup();
+
+    render(
+      <TeamControls
+        userEmail="person@example.com"
+        initialTeams={[
+          { id: 'team-1', name: 'Alpha', role: 'owner', created_at: '', updated_at: '' },
+          { id: 'team-2', name: 'Beta', role: 'member', created_at: '', updated_at: '' },
+        ]}
+        initialCurrentTeamId="team-1"
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Beta/i }));
+
+    expect(document.cookie).toContain('beemspec_current_team_id=team-2');
+    expect(replaceMock).toHaveBeenCalledWith('/');
+    expect(refreshMock).not.toHaveBeenCalled();
   });
 
   it('creates a team through the API, reloads teams, and selects the new team', async () => {
@@ -164,6 +192,6 @@ describe('TeamControls', () => {
     await waitFor(() => {
       expect(screen.getByText('Settings for Alpha (error:not_owner)')).toBeTruthy();
     });
-    expect(replaceStateMock).toHaveBeenCalledWith({}, '', '/dashboard');
+    expect(replaceStateMock).toHaveBeenCalledWith({}, '', '/');
   });
 });

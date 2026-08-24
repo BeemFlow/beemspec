@@ -40,7 +40,9 @@ function createStoryMapsClient(options?: { teams?: string[] }) {
 describe('story maps route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user-1' } } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () => ({ success: true, user: { id: 'user-1' }, supabase: await createClient() }) as never,
+    );
   });
 
   it('lists story maps for explicit accessible team', async () => {

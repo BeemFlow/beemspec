@@ -1,16 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createClient } from '@/lib/supabase/server';
+import { describe, expect, it, vi } from 'vitest';
 import { getTeamRoleForUser, isTeamOwnerForRequest, listTeamsForUser } from './teams';
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(),
-}));
-
 describe('teams helpers', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('returns memberships enriched with team names', async () => {
     const membershipsEq = vi.fn().mockResolvedValue({
       data: [
@@ -52,9 +43,9 @@ describe('teams helpers', () => {
     const eqTeam = vi.fn().mockReturnValue({ eq: eqUser });
     const select = vi.fn().mockReturnValue({ eq: eqTeam });
 
-    vi.mocked(createClient).mockResolvedValue({ from: vi.fn(() => ({ select })) } as never);
+    const supabase = { from: vi.fn(() => ({ select })) } as never;
 
-    await expect(getTeamRoleForUser('user-1', 'team-1')).resolves.toBeNull();
+    await expect(getTeamRoleForUser(supabase, 'user-1', 'team-1')).resolves.toBeNull();
     expect(eqTeam).toHaveBeenCalledWith('team_id', 'team-1');
     expect(eqUser).toHaveBeenCalledWith('user_id', 'user-1');
   });
@@ -68,9 +59,9 @@ describe('teams helpers', () => {
     const eqTeam = vi.fn().mockReturnValue({ eq: eqUser });
     const select = vi.fn().mockReturnValue({ eq: eqTeam });
 
-    vi.mocked(createClient).mockResolvedValue({ from: vi.fn(() => ({ select })) } as never);
+    const supabase = { from: vi.fn(() => ({ select })) } as never;
 
-    await expect(isTeamOwnerForRequest('user-1', 'team-1')).resolves.toBe(true);
-    await expect(isTeamOwnerForRequest('user-2', 'team-1')).resolves.toBe(false);
+    await expect(isTeamOwnerForRequest(supabase, 'user-1', 'team-1')).resolves.toBe(true);
+    await expect(isTeamOwnerForRequest(supabase, 'user-2', 'team-1')).resolves.toBe(false);
   });
 });

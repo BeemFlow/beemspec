@@ -8,7 +8,7 @@ import { getStoryLinearLinkByLinearIssueId } from '@/integrations/linear/story-l
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { normalize } from '@/lib/strings';
-import { createClient } from '@/lib/supabase/server';
+import type { Supabase } from '@/lib/supabase/types';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
 
 interface ManualSyncStoryResult {
@@ -29,7 +29,7 @@ interface ManualImportIssueResult {
 }
 
 async function runManualImportForStoryMap(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Supabase,
   storyMapId: string,
 ): Promise<{
   considered: number;
@@ -134,7 +134,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const { id: storyMapId } = await params;
   if (!isValidUuid(storyMapId)) return invalidIdResponse();
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
 
   const { data: mapSettings, error: mapSettingsError } = await supabase
     .from('story_map_integration_settings')

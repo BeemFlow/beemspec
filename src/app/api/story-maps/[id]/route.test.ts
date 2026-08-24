@@ -58,7 +58,9 @@ function createStoryMapGetClient() {
 describe('story maps [id] route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user' } } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () => ({ success: true, user: { id: 'user' }, supabase: await createClient() }) as never,
+    );
   });
 
   it('returns full story map payload including personas', async () => {
@@ -92,7 +94,6 @@ describe('story maps [id] route', () => {
     });
 
     expect(response.status).toBe(400);
-    expect(createClient).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the story map is missing', async () => {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { buildProtectedResourceMetadataUrl } from '@/integrations/mcp/metadata';
 import { resolveRequestOrigin } from '@/integrations/mcp/origin';
-import type { AuthenticatedUser } from '@/lib/auth';
+import { type AuthenticatedUser, getAuthenticatedUser } from '@/lib/auth';
 import { createClientForAccessToken } from '@/lib/supabase/token';
 import type { Supabase } from '@/lib/supabase/types';
 
@@ -47,12 +47,9 @@ export async function authenticateMcpRequest(request: Request): Promise<McpAuthR
   }
 
   const supabase = createClientForAccessToken(accessToken);
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const user = await getAuthenticatedUser(supabase);
 
-  if (error || !user) {
+  if (!user) {
     return {
       ok: false,
       response: unauthorizedResponse(request, 'invalid_token'),
@@ -61,7 +58,7 @@ export async function authenticateMcpRequest(request: Request): Promise<McpAuthR
 
   return {
     ok: true,
-    user: { id: user.id, email: user.email ?? '' },
+    user,
     supabase,
   };
 }

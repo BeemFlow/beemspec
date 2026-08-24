@@ -32,7 +32,7 @@ describe('OAuthConsentPage', () => {
   });
 
   it('redirects unauthenticated users to login', async () => {
-    createClientMock.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) } });
+    createClientMock.mockResolvedValue({ auth: { getClaims: vi.fn().mockResolvedValue({ data: null }) } });
 
     await expect(OAuthConsentPage({ searchParams: Promise.resolve({ authorization_id: 'auth-1' }) })).rejects.toThrow(
       'redirect:/auth/login',
@@ -41,7 +41,7 @@ describe('OAuthConsentPage', () => {
 
   it('shows an environment message when oauth consent APIs are unavailable', async () => {
     createClientMock.mockResolvedValue({
-      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
+      auth: { getClaims: vi.fn().mockResolvedValue({ data: { claims: { sub: 'user-1' } } }) },
     });
 
     render(await OAuthConsentPage({ searchParams: Promise.resolve({ authorization_id: 'auth-1' }) }));
@@ -52,7 +52,7 @@ describe('OAuthConsentPage', () => {
   it('shows authorization errors from Supabase oauth details lookup', async () => {
     createClientMock.mockResolvedValue({
       auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
+        getClaims: vi.fn().mockResolvedValue({ data: { claims: { sub: 'user-1' } } }),
         oauth: {
           getAuthorizationDetails: vi.fn().mockResolvedValue({ data: null, error: { message: 'Expired request' } }),
         },
@@ -69,7 +69,7 @@ describe('OAuthConsentPage', () => {
   it('redirects immediately when the authorization is already resolved', async () => {
     createClientMock.mockResolvedValue({
       auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
+        getClaims: vi.fn().mockResolvedValue({ data: { claims: { sub: 'user-1' } } }),
         oauth: {
           getAuthorizationDetails: vi
             .fn()
@@ -86,7 +86,7 @@ describe('OAuthConsentPage', () => {
   it('renders consent details and normalized scopes for a valid request', async () => {
     createClientMock.mockResolvedValue({
       auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
+        getClaims: vi.fn().mockResolvedValue({ data: { claims: { sub: 'user-1' } } }),
         oauth: {
           getAuthorizationDetails: vi.fn().mockResolvedValue({
             data: {

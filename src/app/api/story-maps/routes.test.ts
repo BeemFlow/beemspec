@@ -99,7 +99,9 @@ function buildStoryMapCanvasMarkup(storyMap: StoryMapFull) {
 describe('story map domain routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user' } } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () => ({ success: true, user: { id: 'user' }, supabase: await createClient() }) as never,
+    );
   });
 
   it('reorders collections through rpc', async () => {

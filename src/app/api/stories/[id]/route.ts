@@ -3,7 +3,6 @@ import { updateStorySchema } from '@/domain/story-map';
 import { scheduleLinearSyncWorker } from '@/integrations/linear/schedule';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
-import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 import { deleteStory, getStory, updateStory } from '@/storymap/service';
 
@@ -14,7 +13,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { id } = await params;
   if (!isValidUuid(id)) return invalidIdResponse();
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await getStory(supabase, id);
 
   if (error) {
@@ -36,7 +35,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const validation = await validateRequest(request, updateStorySchema);
   if (!validation.success) return validation.response;
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await updateStory(supabase, id, validation.data);
 
   if (error) {
@@ -58,7 +57,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   if (!isValidUuid(id)) return invalidIdResponse();
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await deleteStory(supabase, id);
 
   if (error) {

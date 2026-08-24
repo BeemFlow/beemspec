@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
-import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
 import { autolayoutProcessFlow } from '@/processflow/service';
 
@@ -12,7 +11,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
   const { id } = await params;
   if (!isValidUuid(id)) return invalidIdResponse();
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await autolayoutProcessFlow(supabase, id);
   if (error) return serverErrorResponse('Failed to auto-layout process flow', error);
 

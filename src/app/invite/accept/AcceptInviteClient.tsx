@@ -31,11 +31,9 @@ export function AcceptInviteClient() {
         window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
       }
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data } = await supabase.auth.getClaims();
 
-      if (!user) {
+      if (!data?.claims.sub) {
         window.location.replace(buildLoginUrl());
         return;
       }

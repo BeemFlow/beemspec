@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getAuthenticatedUser } from '@/lib/auth';
 import { setOAuthLoginResumeCookie } from '@/lib/oauth-login-resume';
 import { resolveRequestUrl } from '@/lib/request-url';
 import { createClient } from '@/lib/supabase/server';
@@ -20,9 +21,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthenticatedUser(supabase);
 
   if (!user) {
     const loginUrl = resolveRequestUrl(request, '/auth/login');

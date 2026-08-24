@@ -3,7 +3,6 @@ import { createStorySchema, reorderStoriesSchema } from '@/domain/story-map';
 import { scheduleLinearSyncWorker } from '@/integrations/linear/schedule';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
-import { createClient } from '@/lib/supabase/server';
 import { validateRequest } from '@/lib/validations';
 import { createStory, reorderStories } from '@/storymap/service';
 
@@ -14,7 +13,7 @@ export async function PUT(request: Request) {
   const validation = await validateRequest(request, reorderStoriesSchema);
   if (!validation.success) return validation.response;
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { error } = await reorderStories(supabase, validation.data);
 
   if (error) {
@@ -30,7 +29,7 @@ export async function POST(request: Request) {
   const validation = await validateRequest(request, createStorySchema);
   if (!validation.success) return validation.response;
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await createStory(supabase, validation.data);
 
   if (error) {

@@ -3,7 +3,6 @@ import { updateLinearIntegrationSettingsSchema } from '@/integrations/linear/ada
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { normalize } from '@/lib/strings';
-import { createClient } from '@/lib/supabase/server';
 import { isTeamOwnerForRequest } from '@/lib/teams';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 
@@ -14,7 +13,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id: teamId } = await params;
   if (!isValidUuid(teamId)) return invalidIdResponse();
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await supabase
     .from('integration_settings')
     .select('team_id, linear_workspace_id, linear_team_id, linear_status_mapping, updated_at')
@@ -35,11 +34,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const { id: teamId } = await params;
   if (!isValidUuid(teamId)) return invalidIdResponse();
 
-  if (!(await isTeamOwnerForRequest(auth.user.id, teamId))) {
+  if (!(await isTeamOwnerForRequest(auth.supabase, auth.user.id, teamId))) {
     return NextResponse.json({ error: 'Only team owners can update Linear settings' }, { status: 403 });
   }
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
 
   const validation = await validateRequest(request, updateLinearIntegrationSettingsSchema);
   if (!validation.success) return validation.response;

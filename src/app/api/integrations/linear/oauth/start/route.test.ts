@@ -29,7 +29,7 @@ import { GET } from './route';
 describe('linear oauth start route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    requireAuthMock.mockResolvedValue({ success: true, user: { id: 'user-1' } });
+    requireAuthMock.mockResolvedValue({ success: true, user: { id: 'user-1' }, supabase: {} });
     isTeamOwnerForRequestMock.mockResolvedValue(true);
     createLinearOAuthAuthorizeUrlMock.mockReturnValue('https://linear.app/oauth/authorize?state=state-1');
     resolveRequestOriginMock.mockReturnValue('https://app.example.com');

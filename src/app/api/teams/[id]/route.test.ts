@@ -11,7 +11,9 @@ const TEAM_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 describe('teams [id] route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user-1' } } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () => ({ success: true, user: { id: 'user-1' }, supabase: await createClient() }) as never,
+    );
   });
 
   it('updates a team name and stamps updated_at', async () => {

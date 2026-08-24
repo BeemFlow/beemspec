@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
-import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string; userId: string }> }) {
@@ -11,7 +10,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const { id, userId } = await params;
   if (!isValidUuid(id) || !isValidUuid(userId)) return invalidIdResponse();
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await supabase.rpc('remove_team_member', {
     p_team_id: id,
     p_user_id: userId,

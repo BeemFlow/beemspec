@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { createProcessFlowSchema } from '@/domain/process-flow';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
-import { createClient } from '@/lib/supabase/server';
 import { listTeamsForUser } from '@/lib/teams';
 import { validateRequest } from '@/lib/validations';
 import { createProcessFlow, listProcessFlows } from '@/processflow/service';
@@ -14,7 +13,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const requestedTeamId = searchParams.get('team_id');
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   let resolvedTeamId = requestedTeamId;
 
   const teamsResult = await listTeamsForUser(supabase, auth.user.id);
@@ -57,7 +56,7 @@ export async function POST(request: Request) {
   const validation = await validateRequest(request, createProcessFlowSchema);
   if (!validation.success) return validation.response;
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await createProcessFlow(supabase, validation.data);
   if (error) {
     return serverErrorResponse('Failed to create process flow', error);

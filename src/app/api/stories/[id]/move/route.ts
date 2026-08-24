@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { moveStorySchema } from '@/domain/story-map';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
-import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 import { moveStory } from '@/storymap/service';
 
@@ -16,7 +15,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const validation = await validateRequest(request, moveStorySchema);
   if (!validation.success) return validation.response;
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { error } = await moveStory(supabase, id, validation.data);
 
   if (error) {

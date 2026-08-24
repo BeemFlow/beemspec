@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getUserMock, createClientMock, approveAuthorizationMock, denyAuthorizationMock } = vi.hoisted(() => ({
-  getUserMock: vi.fn(),
+const { getClaimsMock, createClientMock, approveAuthorizationMock, denyAuthorizationMock } = vi.hoisted(() => ({
+  getClaimsMock: vi.fn(),
   createClientMock: vi.fn(),
   approveAuthorizationMock: vi.fn(),
   denyAuthorizationMock: vi.fn(),
@@ -18,7 +18,7 @@ describe('oauth decision route', () => {
     vi.clearAllMocks();
     createClientMock.mockResolvedValue({
       auth: {
-        getUser: getUserMock,
+        getClaims: getClaimsMock,
         oauth: {
           approveAuthorization: approveAuthorizationMock,
           denyAuthorization: denyAuthorizationMock,
@@ -28,7 +28,7 @@ describe('oauth decision route', () => {
   });
 
   it('stores oauth resume state when redirecting unauthenticated users to login', async () => {
-    getUserMock.mockResolvedValue({ data: { user: null } });
+    getClaimsMock.mockResolvedValue({ data: null });
 
     const form = new FormData();
     form.set('decision', 'approve');
@@ -49,7 +49,7 @@ describe('oauth decision route', () => {
   });
 
   it('uses see-other redirect after approving authorization', async () => {
-    getUserMock.mockResolvedValue({ data: { user: { id: 'user-1' } } });
+    getClaimsMock.mockResolvedValue({ data: { claims: { sub: 'user-1' } } });
     approveAuthorizationMock.mockResolvedValue({
       data: {
         redirect_url: 'https://claude.ai/api/mcp/auth_callback?code=test&state=abc',

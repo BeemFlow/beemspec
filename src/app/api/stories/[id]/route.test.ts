@@ -27,7 +27,9 @@ const VALID_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 describe('stories [id] route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user-1' } } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () => ({ success: true, user: { id: 'user-1' }, supabase: await createClient() }) as never,
+    );
   });
 
   it('loads a story by id', async () => {
@@ -67,7 +69,6 @@ describe('stories [id] route', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(createClient).not.toHaveBeenCalled();
     expect(updateStory).not.toHaveBeenCalled();
   });
 

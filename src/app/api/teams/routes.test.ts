@@ -82,10 +82,14 @@ function createTeamsPostClient(options?: {
 describe('teams routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({
-      success: true,
-      user: { id: 'user-1', email: 'user@test.com' },
-    } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () =>
+        ({
+          success: true,
+          user: { id: 'user-1', email: 'user@test.com' },
+          supabase: await createClient(),
+        }) as never,
+    );
   });
 
   it('creates a team and returns created team', async () => {

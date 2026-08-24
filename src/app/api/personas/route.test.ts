@@ -11,7 +11,9 @@ vi.mock('@/storymap/service', () => ({ createPersona: vi.fn() }));
 describe('personas route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user-1' } } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () => ({ success: true, user: { id: 'user-1' }, supabase: await createClient() }) as never,
+    );
   });
 
   it('creates a persona from validated input', async () => {
@@ -50,7 +52,6 @@ describe('personas route', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(createClient).not.toHaveBeenCalled();
     expect(createPersona).not.toHaveBeenCalled();
   });
 

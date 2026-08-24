@@ -13,7 +13,9 @@ const STORY_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 describe('stories [id] move route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user-1' } } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () => ({ success: true, user: { id: 'user-1' }, supabase: await createClient() }) as never,
+    );
   });
 
   it('moves a story through the service in normal mode', async () => {

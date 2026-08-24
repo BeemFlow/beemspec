@@ -3,7 +3,6 @@ import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { resolveRequestUrl } from '@/lib/request-url';
 import { createShareToken } from '@/lib/share-links';
-import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -13,7 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   if (!isValidUuid(id)) return invalidIdResponse();
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await supabase.from('process_flows').select('id').eq('id', id).single();
   if (error || !data) {
     if ((error as { code?: string } | null)?.code === DbErrorCode.NOT_FOUND) {

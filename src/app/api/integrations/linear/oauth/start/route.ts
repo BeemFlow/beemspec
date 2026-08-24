@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Valid team_id is required' }, { status: 400 });
   }
 
-  if (!(await isTeamOwnerForRequest(auth.user.id, teamId))) {
+  if (!(await isTeamOwnerForRequest(auth.supabase, auth.user.id, teamId))) {
     return NextResponse.json({ error: 'Only team owners can connect Linear' }, { status: 403 });
   }
 

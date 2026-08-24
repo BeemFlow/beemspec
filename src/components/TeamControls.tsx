@@ -101,12 +101,21 @@ export function TeamControls({
     const team = await res.json();
     await reloadTeams();
     setCurrentTeam({ ...team, role: 'owner' as const });
-    router.refresh();
+    openCurrentTeam();
   }
 
   function handleSelectTeam(team: TeamWithRole) {
     setCurrentTeam(team);
-    router.refresh();
+    openCurrentTeam();
+  }
+
+  function openCurrentTeam() {
+    if (pathname === '/') {
+      router.refresh();
+      return;
+    }
+
+    router.replace('/');
   }
 
   const isOwner = currentTeam?.role === 'owner';

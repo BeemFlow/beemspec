@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
-import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
 import { validateProcessFlowById } from '@/processflow/service';
 
@@ -12,7 +11,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { id } = await params;
   if (!isValidUuid(id)) return invalidIdResponse();
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await validateProcessFlowById(supabase, id);
   if (error) {
     if ((error as { code?: string } | null)?.code === DbErrorCode.NOT_FOUND) {

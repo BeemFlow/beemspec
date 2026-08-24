@@ -40,7 +40,9 @@ function jsonRequest(body: unknown): Request {
 describe('story map linear integration settings route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () => ({ success: true, user: { id: 'user_1' }, supabase: await createClient() }) as never,
+    );
     vi.mocked(createAdminClient).mockReturnValue({} as never);
     vi.mocked(getLinearOAuthConnectionStatusForTeam).mockResolvedValue({
       teamId: TEAM_ID,

@@ -31,7 +31,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id: teamId } = await params;
   if (!isValidUuid(teamId)) return invalidIdResponse();
 
-  if (!(await isTeamOwnerForRequest(auth.user.id, teamId))) {
+  if (!(await isTeamOwnerForRequest(auth.supabase, auth.user.id, teamId))) {
     return NextResponse.json({ error: 'Only team owners can view Linear options' }, { status: 403 });
   }
 

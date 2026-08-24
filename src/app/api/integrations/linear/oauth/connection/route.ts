@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const teamId = getTeamId(request);
   if (!teamId) return NextResponse.json({ error: 'Valid team_id is required' }, { status: 400 });
 
-  if (!(await isTeamOwnerForRequest(auth.user.id, teamId))) {
+  if (!(await isTeamOwnerForRequest(auth.supabase, auth.user.id, teamId))) {
     return NextResponse.json({ error: 'Only team owners can view Linear connection' }, { status: 403 });
   }
 
@@ -39,7 +39,7 @@ export async function DELETE(request: Request) {
   const teamId = getTeamId(request);
   if (!teamId) return NextResponse.json({ error: 'Valid team_id is required' }, { status: 400 });
 
-  if (!(await isTeamOwnerForRequest(auth.user.id, teamId))) {
+  if (!(await isTeamOwnerForRequest(auth.supabase, auth.user.id, teamId))) {
     return NextResponse.json({ error: 'Only team owners can disconnect Linear' }, { status: 403 });
   }
 

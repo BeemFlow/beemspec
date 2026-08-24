@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { requireAuth } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
 import { POST } from './route';
 
-vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
+vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn() }));
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: vi.fn() }));
 
 describe('invite accept route', () => {
@@ -13,9 +13,10 @@ describe('invite accept route', () => {
 
   it('accepts a pending invite for the authenticated user', async () => {
     const rpc = vi.fn().mockResolvedValue({ error: null });
-    vi.mocked(createClient).mockResolvedValue({
-      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1', email: 'person@example.com' } } }) },
-      rpc,
+    vi.mocked(requireAuth).mockResolvedValue({
+      success: true,
+      user: { id: 'user-1', email: 'person@example.com' },
+      supabase: { rpc },
     } as never);
 
     const order = vi.fn().mockResolvedValue({
@@ -38,8 +39,9 @@ describe('invite accept route', () => {
   });
 
   it('returns 401 when no authenticated user is present', async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
+    vi.mocked(requireAuth).mockResolvedValue({
+      success: false,
+      response: new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }),
     } as never);
 
     const response = await POST();
@@ -49,9 +51,10 @@ describe('invite accept route', () => {
 
   it('accepts all pending invites matching the authenticated email', async () => {
     const rpc = vi.fn().mockResolvedValue({ error: null });
-    vi.mocked(createClient).mockResolvedValue({
-      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1', email: 'person@example.com' } } }) },
-      rpc,
+    vi.mocked(requireAuth).mockResolvedValue({
+      success: true,
+      user: { id: 'user-1', email: 'person@example.com' },
+      supabase: { rpc },
     } as never);
 
     const order = vi.fn().mockResolvedValue({

@@ -24,7 +24,9 @@ function jsonRequest(body: unknown): Request {
 describe('team linear integration settings route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () => ({ success: true, user: { id: 'user_1' }, supabase: await createClient() }) as never,
+    );
   });
 
   it('returns current settings on GET', async () => {

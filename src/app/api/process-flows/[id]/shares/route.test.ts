@@ -12,10 +12,14 @@ describe('process flow shares route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.SHARE_LINK_SECRET = 'test-share-link-secret';
-    vi.mocked(requireAuth).mockResolvedValue({
-      success: true,
-      user: { id: 'user-1', email: 'person@example.com' },
-    } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () =>
+        ({
+          success: true,
+          user: { id: 'user-1', email: 'person@example.com' },
+          supabase: await createClient(),
+        }) as never,
+    );
   });
 
   it('returns a signed embed url for an accessible flow', async () => {

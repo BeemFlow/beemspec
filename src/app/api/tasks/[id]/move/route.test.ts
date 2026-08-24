@@ -13,7 +13,9 @@ const TASK_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 describe('tasks [id] move route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user-1' } } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () => ({ success: true, user: { id: 'user-1' }, supabase: await createClient() }) as never,
+    );
   });
 
   it('moves a task through the storymap service', async () => {
@@ -50,7 +52,6 @@ describe('tasks [id] move route', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(createClient).not.toHaveBeenCalled();
     expect(moveTask).not.toHaveBeenCalled();
   });
 

@@ -9,7 +9,9 @@ export const E2E_INVITEE_PASSWORD = 'password123';
 export const MAILPIT_BASE_URL = process.env.MAILPIT_URL?.trim() || 'http://127.0.0.1:55324';
 
 export const E2E_TEAM_ID = '00000000-0000-4000-8000-000000000001';
+export const E2E_SECOND_TEAM_ID = '00000000-0000-4000-8000-000000000002';
 export const E2E_STORY_MAP_ID = '10000000-0000-4000-8000-000000000001';
+export const E2E_SECOND_STORY_MAP_ID = '10000000-0000-4000-8000-000000000002';
 const E2E_ACTIVITY_ID = '10000000-0000-4000-8000-000000000011';
 const E2E_TASK_ID = '10000000-0000-4000-8000-000000000021';
 const E2E_RELEASE_ID = '10000000-0000-4000-8000-000000000031';
@@ -130,19 +132,18 @@ export async function resetLocalAppState(scenario: ResetScenario = 'default') {
 
   await clearMailpitInbox();
   await deleteUserByEmail(admin, E2E_INVITEE_EMAIL);
-  await admin.from('teams').delete().eq('id', E2E_TEAM_ID);
+  await admin.from('teams').delete().in('id', [E2E_TEAM_ID, E2E_SECOND_TEAM_ID]);
 
-  const { error: teamError } = await admin.from('teams').insert({
-    id: E2E_TEAM_ID,
-    name: 'E2E Team',
-  });
+  const { error: teamError } = await admin.from('teams').insert([
+    { id: E2E_TEAM_ID, name: 'E2E Team' },
+    { id: E2E_SECOND_TEAM_ID, name: 'E2E Secondary Team' },
+  ]);
   if (teamError) throw new Error(`Failed to seed team: ${teamError.message}`);
 
-  const { error: memberError } = await admin.from('team_members').insert({
-    team_id: E2E_TEAM_ID,
-    user_id: owner.id,
-    role: 'owner',
-  });
+  const { error: memberError } = await admin.from('team_members').insert([
+    { team_id: E2E_TEAM_ID, user_id: owner.id, role: 'owner' },
+    { team_id: E2E_SECOND_TEAM_ID, user_id: owner.id, role: 'owner' },
+  ]);
   if (memberError) throw new Error(`Failed to seed team membership: ${memberError.message}`);
 
   const { error: mapError } = await admin.from('story_maps').insert({
@@ -153,6 +154,15 @@ export async function resetLocalAppState(scenario: ResetScenario = 'default') {
     context_markdown: 'Seeded local Supabase fixture for story map testing.',
   });
   if (mapError) throw new Error(`Failed to seed story map: ${mapError.message}`);
+
+  const { error: secondMapError } = await admin.from('story_maps').insert({
+    id: E2E_SECOND_STORY_MAP_ID,
+    team_id: E2E_SECOND_TEAM_ID,
+    name: 'Secondary Roadmap',
+    description: 'Seeded story map for team switching',
+    context_markdown: null,
+  });
+  if (secondMapError) throw new Error(`Failed to seed second story map: ${secondMapError.message}`);
 
   const { error: activityError } = await admin.from('activities').insert({
     id: E2E_ACTIVITY_ID,

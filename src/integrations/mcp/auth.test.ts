@@ -25,8 +25,8 @@ describe('mcp auth', () => {
   it('returns 401 when Supabase rejects token', async () => {
     createClientForAccessTokenMock.mockReturnValue({
       auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: null },
+        getClaims: vi.fn().mockResolvedValue({
+          data: null,
           error: { message: 'invalid token' },
         }),
       },
@@ -49,10 +49,10 @@ describe('mcp auth', () => {
   it('returns user and supabase client for valid token', async () => {
     const supabase = {
       auth: {
-        getUser: vi.fn().mockResolvedValue({
+        getClaims: vi.fn().mockResolvedValue({
           data: {
-            user: {
-              id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+            claims: {
+              sub: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
               email: 'owner@example.com',
             },
           },

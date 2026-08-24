@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { createStoryMapSchema } from '@/domain/story-map';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
-import { createClient } from '@/lib/supabase/server';
 import { listTeamsForUser } from '@/lib/teams';
 import { validateRequest } from '@/lib/validations';
 import { createStoryMap, listStoryMaps } from '@/storymap/service';
@@ -14,7 +13,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const requestedTeamId = searchParams.get('team_id');
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   let resolvedTeamId = requestedTeamId;
 
   const teamsResult = await listTeamsForUser(supabase, auth.user.id);
@@ -57,7 +56,7 @@ export async function POST(request: Request) {
   const validation = await validateRequest(request, createStoryMapSchema);
   if (!validation.success) return validation.response;
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await createStoryMap(supabase, validation.data);
 
   if (error) {

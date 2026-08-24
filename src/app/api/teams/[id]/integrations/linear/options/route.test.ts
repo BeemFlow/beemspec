@@ -37,7 +37,7 @@ const TEAM_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 describe('team linear options route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
+    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' }, supabase: {} } as never);
     vi.mocked(isTeamOwnerForRequest).mockResolvedValue(true);
     vi.mocked(resolveLinearAuthTokenForTeam).mockResolvedValue('token_1');
   });

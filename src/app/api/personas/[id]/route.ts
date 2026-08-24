@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { updatePersonaSchema } from '@/domain/story-map';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
-import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 import { deletePersona, updatePersona } from '@/storymap/service';
 
@@ -16,7 +15,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const validation = await validateRequest(request, updatePersonaSchema);
   if (!validation.success) return validation.response;
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await updatePersona(supabase, id, validation.data);
 
   if (error) {
@@ -35,7 +34,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   if (!isValidUuid(id)) return invalidIdResponse();
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await deletePersona(supabase, id);
 
   if (error) {

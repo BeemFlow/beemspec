@@ -43,7 +43,7 @@ export async function GET(request: Request) {
     return redirectWithState(request, cookie.returnTo, 'error', 'invalid_state');
   }
 
-  if (!(await isTeamOwnerForRequest(auth.user.id, cookie.teamId))) {
+  if (!(await isTeamOwnerForRequest(auth.supabase, auth.user.id, cookie.teamId))) {
     return redirectWithState(request, cookie.returnTo, 'error', 'not_owner');
   }
 

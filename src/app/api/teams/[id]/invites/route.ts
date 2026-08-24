@@ -4,7 +4,6 @@ import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { resolveRequestOrigin } from '@/lib/request-url';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 
 function isAlreadyRegisteredError(error: { code?: string; message?: string }): boolean {
@@ -22,7 +21,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   if (!isValidUuid(id)) return invalidIdResponse();
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await supabase
     .from('team_invites')
     .select('*')
@@ -48,7 +47,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!validation.success) return validation.response;
 
   const email = validation.data.email.toLowerCase();
-  const supabase = await createClient();
+  const supabase = auth.supabase;
 
   // Check if already a member
   const { data: existingMember } = await supabase.rpc('get_team_members', { p_team_id: teamId });

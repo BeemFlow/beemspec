@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { createTeamSchema } from '@/app/api/teams/schemas';
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
-import { createClient } from '@/lib/supabase/server';
 import { validateRequest } from '@/lib/validations';
 import type { TeamWithRole } from '@/types';
 
@@ -10,7 +9,7 @@ export async function GET() {
   const auth = await requireAuth();
   if (!auth.success) return auth.response;
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await supabase
     .from('team_members')
     .select('role, teams(id, name, created_at, updated_at)')
@@ -39,7 +38,7 @@ export async function POST(request: Request) {
   const validation = await validateRequest(request, createTeamSchema);
   if (!validation.success) return validation.response;
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data: team, error } = await supabase.rpc('create_team_with_owner', { p_name: validation.data.name }).single();
   if (error || !team) {
     return serverErrorResponse('Failed to create team', error);

@@ -26,7 +26,9 @@ const STORY_MAP_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 describe('story map linear sync route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user_1' } } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () => ({ success: true, user: { id: 'user_1' }, supabase: await createClient() }) as never,
+    );
   });
 
   it('syncs all stories in the story map and returns summary', async () => {

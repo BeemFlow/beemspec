@@ -3,7 +3,6 @@ import { getLinearOAuthConnectionStatusForTeam } from '@/integrations/linear/con
 import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
 import { getTeamRoleForUser } from '@/lib/teams';
 import { invalidIdResponse, isValidUuid } from '@/lib/validations';
 
@@ -14,13 +13,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id: teamId } = await params;
   if (!isValidUuid(teamId)) return invalidIdResponse();
 
-  const role = await getTeamRoleForUser(auth.user.id, teamId);
+  const role = await getTeamRoleForUser(auth.supabase, auth.user.id, teamId);
 
   if (!role) {
     return NextResponse.json({ error: 'Team not found' }, { status: 404 });
   }
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
 
   const isOwner = role === 'owner';
 

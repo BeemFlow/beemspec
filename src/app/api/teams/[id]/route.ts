@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { updateTeamSchema } from '@/app/api/teams/schemas';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
-import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -15,7 +14,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const validation = await validateRequest(request, updateTeamSchema);
   if (!validation.success) return validation.response;
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await supabase
     .from('teams')
     .update({ name: validation.data.name, updated_at: new Date().toISOString() })
@@ -39,7 +38,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const { id } = await params;
   if (!isValidUuid(id)) return invalidIdResponse();
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
 
   // RLS enforces owner-only deletion
   const { error } = await supabase.from('teams').delete().eq('id', id);

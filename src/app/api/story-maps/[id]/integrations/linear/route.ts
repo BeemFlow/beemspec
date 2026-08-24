@@ -9,7 +9,7 @@ import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
 import { normalize } from '@/lib/strings';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
+import type { Supabase } from '@/lib/supabase/types';
 import { isTeamOwnerForRequest } from '@/lib/teams';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 
@@ -36,15 +36,14 @@ interface StoryMapSettingsRow {
 
 const DEFAULT_IMPORT_LABEL_NAME = DEFAULT_LINEAR_IMPORT_LABEL;
 
-async function loadStoryMapContext(storyMapId: string) {
-  const supabase = await createClient();
+async function loadStoryMapContext(supabase: Supabase, storyMapId: string) {
   const { data, error } = await supabase
     .from('story_maps')
     .select('id, team_id')
     .eq('id', storyMapId)
     .single<StoryMapRow>();
 
-  return { supabase, data, error };
+  return { data, error };
 }
 
 function toNullable(input: string | null | undefined): string | null {
@@ -58,7 +57,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id: storyMapId } = await params;
   if (!isValidUuid(storyMapId)) return invalidIdResponse();
 
-  const { supabase, data: storyMap, error: storyMapError } = await loadStoryMapContext(storyMapId);
+  const { supabase } = auth;
+  const { data: storyMap, error: storyMapError } = await loadStoryMapContext(supabase, storyMapId);
   if (storyMapError) {
     if (storyMapError.code === DbErrorCode.NOT_FOUND) return notFoundResponse('Story map');
     return serverErrorResponse('Failed to load story map', storyMapError);
@@ -78,7 +78,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       )
       .eq('story_map_id', storyMapId)
       .maybeSingle<StoryMapSettingsRow>(),
-    isTeamOwnerForRequest(auth.user.id, storyMap.team_id),
+    isTeamOwnerForRequest(auth.supabase, auth.user.id, storyMap.team_id),
     getLinearOAuthConnectionStatusForTeam(createAdminClient(), storyMap.team_id),
   ]);
 
@@ -133,14 +133,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const validation = await validateRequest(request, updateStoryMapLinearSettingsSchema);
   if (!validation.success) return validation.response;
 
-  const { supabase, data: storyMap, error: storyMapError } = await loadStoryMapContext(storyMapId);
+  const { supabase } = auth;
+  const { data: storyMap, error: storyMapError } = await loadStoryMapContext(supabase, storyMapId);
   if (storyMapError) {
     if (storyMapError.code === DbErrorCode.NOT_FOUND) return notFoundResponse('Story map');
     return serverErrorResponse('Failed to load story map', storyMapError);
   }
   if (!storyMap) return notFoundResponse('Story map');
 
-  if (!(await isTeamOwnerForRequest(auth.user.id, storyMap.team_id))) {
+  if (!(await isTeamOwnerForRequest(auth.supabase, auth.user.id, storyMap.team_id))) {
     return NextResponse.json({ error: 'Only team owners can update story map Linear settings' }, { status: 403 });
   }
 

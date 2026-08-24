@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { updateProcessFlowSchema } from '@/domain/process-flow';
 import { requireAuth } from '@/lib/auth';
 import { DbErrorCode, notFoundResponse, serverErrorResponse } from '@/lib/errors';
-import { createClient } from '@/lib/supabase/server';
 import { invalidIdResponse, isValidUuid, validateRequest } from '@/lib/validations';
 import { buildProcessFlowFull, deleteProcessFlow, getProcessFlowGraph, updateProcessFlow } from '@/processflow/service';
 
@@ -13,7 +12,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { id } = await params;
   if (!isValidUuid(id)) return invalidIdResponse();
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { flowResult, nodesResult, edgesResult } = await getProcessFlowGraph(supabase, id);
 
   if (flowResult.error || !flowResult.data) {
@@ -38,7 +37,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const validation = await validateRequest(request, updateProcessFlowSchema);
   if (!validation.success) return validation.response;
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await updateProcessFlow(supabase, id, validation.data);
   if (error) {
     if ((error as { code?: string } | null)?.code === DbErrorCode.NOT_FOUND) {
@@ -57,7 +56,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   if (!isValidUuid(id)) return invalidIdResponse();
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   const { data, error } = await deleteProcessFlow(supabase, id);
   if (error) {
     if ((error as { code?: string } | null)?.code === DbErrorCode.NOT_FOUND) {

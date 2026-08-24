@@ -2,6 +2,7 @@ import 'server-only';
 
 import { cookies } from 'next/headers';
 import { cache } from 'react';
+import { getAuthenticatedUser } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import type { TeamWithRole } from '@/types';
 
@@ -17,9 +18,7 @@ function resolveCurrentTeamId(teams: TeamWithRole[], cookieTeamId: string | null
 export const getAppContext = cache(async () => {
   const supabase = await createClient();
   const cookieStore = await cookies();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthenticatedUser(supabase);
 
   if (!user) {
     return {
@@ -30,11 +29,13 @@ export const getAppContext = cache(async () => {
     };
   }
 
-  const { data: memberData } = await supabase
+  const { data: memberData, error: memberError } = await supabase
     .from('team_members')
     .select('role, teams(id, name, created_at, updated_at)')
     .eq('user_id', user.id)
     .order('created_at');
+
+  if (memberError) throw memberError;
 
   const teams: TeamWithRole[] = (memberData ?? [])
     .filter((membership) => membership.teams)

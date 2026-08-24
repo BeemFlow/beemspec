@@ -2,9 +2,9 @@ import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createServerClientMock, getUserMock } = vi.hoisted(() => ({
+const { createServerClientMock, getClaimsMock } = vi.hoisted(() => ({
   createServerClientMock: vi.fn(),
-  getUserMock: vi.fn(),
+  getClaimsMock: vi.fn(),
 }));
 
 vi.mock('@supabase/ssr', () => ({
@@ -29,10 +29,10 @@ describe('proxy auth redirects', () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://project-ref.supabase.co';
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'publishable-key';
 
-    getUserMock.mockResolvedValue({ data: { user: null } });
+    getClaimsMock.mockResolvedValue({ data: null });
     createServerClientMock.mockReturnValue({
       auth: {
-        getUser: getUserMock,
+        getClaims: getClaimsMock,
       },
     });
   });
@@ -75,7 +75,7 @@ describe('proxy auth redirects', () => {
   });
 
   it('redirects authenticated users away from login using the forwarded public origin', async () => {
-    getUserMock.mockResolvedValue({ data: { user: { id: 'user-1' } } });
+    getClaimsMock.mockResolvedValue({ data: { claims: { sub: 'user-1' } } });
 
     const response = await proxy(makeRequest('/auth/login?next=%2Fstory-map%2F123'));
 
@@ -84,7 +84,7 @@ describe('proxy auth redirects', () => {
   });
 
   it('ignores external next targets and falls back to the app root', async () => {
-    getUserMock.mockResolvedValue({ data: { user: { id: 'user-1' } } });
+    getClaimsMock.mockResolvedValue({ data: { claims: { sub: 'user-1' } } });
 
     const response = await proxy(makeRequest('/auth/login?next=https://evil.example.com/phish'));
 
@@ -93,7 +93,7 @@ describe('proxy auth redirects', () => {
   });
 
   it('rejects backslash-based cross-origin next targets', async () => {
-    getUserMock.mockResolvedValue({ data: { user: { id: 'user-1' } } });
+    getClaimsMock.mockResolvedValue({ data: { claims: { sub: 'user-1' } } });
 
     const response = await proxy(makeRequest('/auth/login?next=%2F%5Cevil.example.com'));
 

@@ -6,13 +6,21 @@ import {
   E2E_OWNER_EMAIL,
   E2E_OWNER_PASSWORD,
   E2E_PROCESS_FLOW_ID,
+  E2E_SECOND_TEAM_ID,
   E2E_STORY_MAP_ID,
   E2E_TEAM_ID,
   MAILPIT_BASE_URL,
   resetLocalAppState,
 } from './local-fixtures';
 
-export { E2E_INVITEE_EMAIL, E2E_NODE_APPROVED_ID, E2E_NODE_RECEIVE_ID, E2E_PROCESS_FLOW_ID, E2E_STORY_MAP_ID };
+export {
+  E2E_INVITEE_EMAIL,
+  E2E_NODE_APPROVED_ID,
+  E2E_NODE_RECEIVE_ID,
+  E2E_PROCESS_FLOW_ID,
+  E2E_SECOND_TEAM_ID,
+  E2E_STORY_MAP_ID,
+};
 
 export async function resetE2EState(scenario: 'default' | 'malformed' = 'default') {
   await resetLocalAppState(scenario);

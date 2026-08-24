@@ -40,7 +40,9 @@ function createProcessFlowsClient(options?: { teams?: string[] }) {
 describe('process flows route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user-1' } } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () => ({ success: true, user: { id: 'user-1' }, supabase: await createClient() }) as never,
+    );
   });
 
   it('lists process flows for explicit accessible team', async () => {

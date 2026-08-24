@@ -3,10 +3,10 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createClientMock, setSessionMock, getUserMock, updateUserMock, replaceMock, fetchMock } = vi.hoisted(() => ({
+const { createClientMock, setSessionMock, getClaimsMock, updateUserMock, replaceMock, fetchMock } = vi.hoisted(() => ({
   createClientMock: vi.fn(),
   setSessionMock: vi.fn(),
-  getUserMock: vi.fn(),
+  getClaimsMock: vi.fn(),
   updateUserMock: vi.fn(),
   replaceMock: vi.fn(),
   fetchMock: vi.fn(),
@@ -22,12 +22,12 @@ describe('AcceptInviteClient', () => {
     createClientMock.mockReturnValue({
       auth: {
         setSession: setSessionMock,
-        getUser: getUserMock,
+        getClaims: getClaimsMock,
         updateUser: updateUserMock,
       },
     });
     setSessionMock.mockResolvedValue({ error: null });
-    getUserMock.mockResolvedValue({ data: { user: { id: 'user-1' } } });
+    getClaimsMock.mockResolvedValue({ data: { claims: { sub: 'user-1' } } });
     updateUserMock.mockResolvedValue({ error: null });
     vi.stubGlobal('fetch', fetchMock);
     fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
@@ -70,7 +70,7 @@ describe('AcceptInviteClient', () => {
       },
       configurable: true,
     });
-    getUserMock.mockResolvedValue({ data: { user: null } });
+    getClaimsMock.mockResolvedValue({ data: null });
 
     render(<AcceptInviteClient />);
 

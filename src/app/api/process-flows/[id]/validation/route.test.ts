@@ -13,7 +13,9 @@ const FLOW_ID = 'd7f34189-5d27-4dc0-b2c5-23d11796add4';
 describe('process flow validation route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({ success: true, user: { id: 'user-1' } } as never);
+    vi.mocked(requireAuth).mockImplementation(
+      async () => ({ success: true, user: { id: 'user-1' }, supabase: await createClient() }) as never,
+    );
   });
 
   it('returns validation results for a persisted process flow', async () => {
@@ -45,7 +47,6 @@ describe('process flow validation route', () => {
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
-    expect(createClient).not.toHaveBeenCalled();
     expect(validateProcessFlowById).not.toHaveBeenCalled();
   });
 
@@ -55,7 +56,6 @@ describe('process flow validation route', () => {
     });
 
     expect(response.status).toBe(400);
-    expect(createClient).not.toHaveBeenCalled();
     expect(validateProcessFlowById).not.toHaveBeenCalled();
   });
 

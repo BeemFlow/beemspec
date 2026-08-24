@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import type { Supabase } from '@/lib/supabase/types';
 
 export interface TeamMembershipSummary {
@@ -34,8 +33,7 @@ export async function listTeamsForUser(supabase: Supabase, userId: string) {
 /**
  * Return the role a user holds on a team, or null if they are not a member.
  */
-export async function getTeamRoleForUser(userId: string, teamId: string): Promise<string | null> {
-  const supabase = await createClient();
+export async function getTeamRoleForUser(supabase: Supabase, userId: string, teamId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from('team_members')
     .select('role')
@@ -51,6 +49,6 @@ export async function getTeamRoleForUser(userId: string, teamId: string): Promis
  * Check whether a user has the 'owner' role on a team.
  * Used by route handlers that require owner-level access.
  */
-export async function isTeamOwnerForRequest(userId: string, teamId: string): Promise<boolean> {
-  return (await getTeamRoleForUser(userId, teamId)) === 'owner';
+export async function isTeamOwnerForRequest(supabase: Supabase, userId: string, teamId: string): Promise<boolean> {
+  return (await getTeamRoleForUser(supabase, userId, teamId)) === 'owner';
 }
