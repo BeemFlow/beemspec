@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createClient } from '@/lib/supabase/server';
-import { requireAuth } from './auth';
+import { getAuthenticatedUser, requireAuth } from './auth';
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 
@@ -23,6 +23,18 @@ describe('requireAuth', () => {
       expect(result.user).toEqual({ id: 'user-1', email: 'person@example.com' });
       expect(result.supabase).toBe(supabase);
     }
+  });
+
+  it('verifies an explicitly supplied bearer token', async () => {
+    const getClaims = vi.fn().mockResolvedValue({
+      data: { claims: { sub: 'user-1', email: 'person@example.com' } },
+      error: null,
+    });
+
+    const user = await getAuthenticatedUser({ auth: { getClaims } } as never, 'access-token');
+
+    expect(getClaims).toHaveBeenCalledWith('access-token');
+    expect(user).toEqual({ id: 'user-1', email: 'person@example.com' });
   });
 
   it('returns an unauthorized response when no user is present', async () => {

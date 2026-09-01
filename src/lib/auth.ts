@@ -12,8 +12,11 @@ export type AuthResult =
   | { success: false; response: NextResponse };
 
 /** Verify and read the current user from locally verifiable JWT claims. */
-export async function getAuthenticatedUser(supabase: Supabase): Promise<AuthenticatedUser | null> {
-  const { data, error } = await supabase.auth.getClaims();
+export async function getAuthenticatedUser(
+  supabase: Supabase,
+  accessToken?: string,
+): Promise<AuthenticatedUser | null> {
+  const { data, error } = await supabase.auth.getClaims(accessToken);
   const userId = data?.claims.sub;
 
   if (error || typeof userId !== 'string' || !userId) return null;

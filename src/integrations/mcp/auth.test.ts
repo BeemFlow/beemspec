@@ -47,17 +47,18 @@ describe('mcp auth', () => {
   });
 
   it('returns user and supabase client for valid token', async () => {
+    const getClaims = vi.fn().mockResolvedValue({
+      data: {
+        claims: {
+          sub: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+          email: 'owner@example.com',
+        },
+      },
+      error: null,
+    });
     const supabase = {
       auth: {
-        getClaims: vi.fn().mockResolvedValue({
-          data: {
-            claims: {
-              sub: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
-              email: 'owner@example.com',
-            },
-          },
-          error: null,
-        }),
+        getClaims,
       },
     };
     createClientForAccessTokenMock.mockReturnValue(supabase);
@@ -74,5 +75,6 @@ describe('mcp auth', () => {
 
     expect(result.user.id).toBe('d7f34189-5d27-4dc0-b2c5-23d11796add4');
     expect(result.supabase).toBe(supabase);
+    expect(getClaims).toHaveBeenCalledWith('valid-token');
   });
 });

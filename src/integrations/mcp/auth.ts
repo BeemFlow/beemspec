@@ -47,7 +47,7 @@ export async function authenticateMcpRequest(request: Request): Promise<McpAuthR
   }
 
   const supabase = createClientForAccessToken(accessToken);
-  const user = await getAuthenticatedUser(supabase);
+  const user = await getAuthenticatedUser(supabase, accessToken);
 
   if (!user) {
     return {
