@@ -1,5 +1,5 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
+import { getMcpAuthContext } from '@/integrations/mcp/auth';
 import type { AuthenticatedUser } from '@/lib/auth';
 import type { Supabase } from '@/lib/supabase/types';
 import { listTeamsForUser } from '@/lib/teams';
@@ -39,27 +39,14 @@ function createMcpServer(supabase: Supabase, user: AuthenticatedUser): McpServer
   return server;
 }
 
-async function handleMcpRequestOnce(request: Request, supabase: Supabase, user: AuthenticatedUser): Promise<Response> {
-  const transport = new WebStandardStreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-    enableJsonResponse: true,
-  });
-  const server = createMcpServer(supabase, user);
-  await server.connect(transport);
-
-  try {
-    return await transport.handleRequest(request);
-  } finally {
-    await server.close().catch(() => {
-      // no-op on cleanup failures
-    });
-  }
+export function createBeemspecMcpHandler() {
+  return createMcpHandler(
+    ({ authInfo }) => {
+      const { supabase, user } = getMcpAuthContext(authInfo);
+      return createMcpServer(supabase, user);
+    },
+    { responseMode: 'json' },
+  );
 }
 
-export async function handleMcpRequest(
-  request: Request,
-  supabase: Supabase,
-  user: AuthenticatedUser,
-): Promise<Response> {
-  return handleMcpRequestOnce(request, supabase, user);
-}
+export const mcpHandler = createBeemspecMcpHandler();

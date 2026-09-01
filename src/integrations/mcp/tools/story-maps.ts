@@ -1,6 +1,7 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { createStoryMapSchema, updateStoryMapSchema } from '@/domain/story-map';
+import { createStoryMapSchema } from '@/domain/story-map';
+import { updateStoryMapToolSchema } from '@/domain/story-map/schemas';
 import type { AuthenticatedUser } from '@/lib/auth';
 import type { Supabase } from '@/lib/supabase/types';
 import {
@@ -27,6 +28,10 @@ import {
   successResult,
   withToolErrorBoundary,
 } from '../tool-support';
+
+const createStoryMapToolSchema = createStoryMapSchema.extend({
+  team_id: z.string().uuid().optional().describe('Team UUID (optional for single-team users)'),
+});
 
 export function registerStoryMapTools(server: McpServer, supabase: Supabase, user: AuthenticatedUser): void {
   const getUserScopedClient = () => supabase;
@@ -163,9 +168,9 @@ export function registerStoryMapTools(server: McpServer, supabase: Supabase, use
       title: 'List Story Maps',
       description:
         'Starting point. List story maps for a team. team_id is optional when the user has exactly one team.',
-      inputSchema: {
-        team_id: z.string().uuid().optional().describe('Team UUID (optional for single-team users)'),
-      },
+      inputSchema: z
+        .object({ team_id: z.string().uuid().optional().describe('Team UUID (optional for single-team users)') })
+        .strict(),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('storymap_list', async ({ team_id }) => {
@@ -189,11 +194,13 @@ export function registerStoryMapTools(server: McpServer, supabase: Supabase, use
       title: 'Get Story Map',
       description:
         'Primary context loader. Pass story_map_id directly, or pass story_map_name (and optional team_id) for resolution.',
-      inputSchema: {
-        story_map_id: z.string().uuid().optional().describe('Story map UUID'),
-        story_map_name: z.string().min(1).max(200).optional().describe('Story map name'),
-        team_id: z.string().uuid().optional().describe('Team UUID for disambiguating name matches'),
-      },
+      inputSchema: z
+        .object({
+          story_map_id: z.string().uuid().optional().describe('Story map UUID'),
+          story_map_name: z.string().min(1).max(200).optional().describe('Story map name'),
+          team_id: z.string().uuid().optional().describe('Team UUID for disambiguating name matches'),
+        })
+        .strict(),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('storymap_get', async ({ story_map_id, story_map_name, team_id }) => {
@@ -267,9 +274,7 @@ export function registerStoryMapTools(server: McpServer, supabase: Supabase, use
       title: 'Get Release',
       description:
         'Load one release with release context and lightweight story references. Use this for release planning and scope review.',
-      inputSchema: {
-        release_id: z.string().uuid().describe('Release UUID'),
-      },
+      inputSchema: z.object({ release_id: z.string().uuid().describe('Release UUID') }).strict(),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('release_get', async ({ release_id }) => {
@@ -324,12 +329,7 @@ export function registerStoryMapTools(server: McpServer, supabase: Supabase, use
       title: 'Create Story Map',
       description:
         'Create a new story map container. team_id is optional when user has exactly one team. Call storymap_get afterward for full context.',
-      inputSchema: {
-        team_id: z.string().uuid().optional().describe('Team UUID (optional for single-team users)'),
-        name: createStoryMapSchema.shape.name,
-        description: createStoryMapSchema.shape.description,
-        context_markdown: createStoryMapSchema.shape.context_markdown,
-      },
+      inputSchema: createStoryMapToolSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('storymap_create', async (input) => {
@@ -355,10 +355,7 @@ export function registerStoryMapTools(server: McpServer, supabase: Supabase, use
       title: 'Update Story Map',
       description:
         'Update story map metadata (name/description). Re-read with storymap_get to continue planning safely.',
-      inputSchema: {
-        story_map_id: z.string().uuid(),
-        ...updateStoryMapSchema.shape,
-      },
+      inputSchema: updateStoryMapToolSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('storymap_update', async ({ story_map_id, ...changes }) => {

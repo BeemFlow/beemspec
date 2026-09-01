@@ -1,4 +1,3 @@
-import type { z } from 'zod';
 import { DbErrorCode } from '@/lib/errors';
 import type { Supabase } from '@/lib/supabase/types';
 import { listTeamsForUser } from '@/lib/teams';
@@ -66,21 +65,6 @@ export function withToolErrorBoundary<Input>(name: string, handler: ToolCall<Inp
       return errorResult('Unexpected server error', describeDbError(error));
     }
   };
-}
-
-export function validateToolInput<T>(
-  schema: z.ZodSchema<T>,
-  input: unknown,
-): { ok: true; data: T } | { ok: false; result: ReturnType<typeof errorResult> } {
-  const parsed = schema.safeParse(input);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      result: errorResult('Validation failed', parsed.error.flatten()),
-    };
-  }
-
-  return { ok: true, data: parsed.data };
 }
 
 export const readAnnotations = {

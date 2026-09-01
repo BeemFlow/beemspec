@@ -60,11 +60,13 @@ export const createProcessFlowSchema = processFlowBase.partial({
   viewport: true,
 });
 
-export const updateProcessFlowSchema = processFlowBase
-  .omit({ team_id: true })
-  .partial()
-  .strict()
-  .refine(atLeastOneField, atLeastOneFieldMessage);
+const updateProcessFlowFieldsSchema = processFlowBase.omit({ team_id: true }).partial().strict();
+
+export const updateProcessFlowSchema = updateProcessFlowFieldsSchema.refine(atLeastOneField, atLeastOneFieldMessage);
+
+export const updateProcessFlowToolSchema = updateProcessFlowFieldsSchema
+  .extend({ process_flow_id: uuid })
+  .refine(({ process_flow_id: _processFlowId, ...changes }) => atLeastOneField(changes), atLeastOneFieldMessage);
 
 export const processFlowNodeBase = z
   .object({
@@ -85,11 +87,19 @@ export const processFlowNodeBase = z
 
 export const createProcessFlowNodeSchema = processFlowNodeBase;
 
-export const updateProcessFlowNodeSchema = processFlowNodeBase
-  .omit({ process_flow_id: true })
-  .partial()
-  .strict()
-  .refine(atLeastOneField, atLeastOneFieldMessage);
+const updateProcessFlowNodeFieldsSchema = processFlowNodeBase.omit({ process_flow_id: true }).partial().strict();
+
+export const updateProcessFlowNodeSchema = updateProcessFlowNodeFieldsSchema.refine(
+  atLeastOneField,
+  atLeastOneFieldMessage,
+);
+
+export const updateProcessFlowNodeToolSchema = updateProcessFlowNodeFieldsSchema
+  .extend({ process_flow_id: uuid, node_id: uuid })
+  .refine(
+    ({ process_flow_id: _processFlowId, node_id: _nodeId, ...changes }) => atLeastOneField(changes),
+    atLeastOneFieldMessage,
+  );
 
 export const createProcessFlowNodeBodySchema = processFlowNodeBase.omit({ process_flow_id: true });
 
@@ -105,11 +115,22 @@ export const processFlowEdgeBase = z
 
 export const createProcessFlowEdgeSchema = processFlowEdgeBase;
 
-export const updateProcessFlowEdgeSchema = processFlowEdgeBase
+const updateProcessFlowEdgeFieldsSchema = processFlowEdgeBase
   .omit({ process_flow_id: true, source_node_id: true, target_node_id: true })
   .partial()
-  .strict()
-  .refine(atLeastOneField, atLeastOneFieldMessage);
+  .strict();
+
+export const updateProcessFlowEdgeSchema = updateProcessFlowEdgeFieldsSchema.refine(
+  atLeastOneField,
+  atLeastOneFieldMessage,
+);
+
+export const updateProcessFlowEdgeToolSchema = updateProcessFlowEdgeFieldsSchema
+  .extend({ process_flow_id: uuid, edge_id: uuid })
+  .refine(
+    ({ process_flow_id: _processFlowId, edge_id: _edgeId, ...changes }) => atLeastOneField(changes),
+    atLeastOneFieldMessage,
+  );
 
 export const createProcessFlowEdgeBodySchema = processFlowEdgeBase.omit({ process_flow_id: true });
 

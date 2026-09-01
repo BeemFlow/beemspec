@@ -1,8 +1,28 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as processflowService from '@/processflow/service';
 import * as storymapService from '@/storymap/service';
 
-import { handleMcpRequest } from './server';
+import { createMcpAuthInfo } from './auth';
+import { createBeemspecMcpHandler } from './server';
+
+const handler = createBeemspecMcpHandler();
+
+async function handleMcpRequest(
+  request: Request,
+  supabase: never,
+  user: { id: string; email: string },
+): Promise<Response> {
+  const response = await handler.fetch(request, {
+    authInfo: createMcpAuthInfo('test-token', { supabase, user }),
+  });
+  if (!response.headers.get('content-type')?.includes('text/event-stream')) return response;
+
+  const data = (await response.text()).split('\n').find((line) => line.startsWith('data: '));
+  return new Response(data?.slice('data: '.length), {
+    status: response.status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
 
 function rpcRequest(body: unknown): Request {
   return new Request('http://localhost/api/mcp', {
@@ -21,6 +41,10 @@ describe('mcp server', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterAll(async () => {
+    await handler.close();
   });
 
   it('lists major story map management tools', async () => {
@@ -872,12 +896,9 @@ describe('mcp server', () => {
     const payload = (await response.json()) as {
       result: {
         isError: boolean;
-        structuredContent: { ok: boolean; error: string; details?: unknown };
       };
     };
     expect(payload.result.isError).toBe(true);
-    expect(payload.result.structuredContent.ok).toBe(false);
-    expect(payload.result.structuredContent.error).toBe('Validation failed');
     expect(updateTaskSpy).not.toHaveBeenCalled();
   });
 
@@ -906,13 +927,35 @@ describe('mcp server', () => {
     const payload = (await response.json()) as {
       result: {
         isError: boolean;
-        structuredContent: { ok: boolean; error: string; details?: unknown };
       };
     };
     expect(payload.result.isError).toBe(true);
-    expect(payload.result.structuredContent.ok).toBe(false);
-    expect(payload.result.structuredContent.error).toBe('Validation failed');
     expect(updateStorySpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects storymap_update when no changes are supplied', async () => {
+    const fakeSupabase = { from: vi.fn(), rpc: vi.fn() } as never;
+    const updateStoryMapSpy = vi.spyOn(storymapService, 'updateStoryMap');
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 12,
+        method: 'tools/call',
+        params: {
+          name: 'storymap_update',
+          arguments: {
+            story_map_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
+          },
+        },
+      }),
+      fakeSupabase,
+      user,
+    );
+
+    const payload = (await response.json()) as { result: { isError: boolean } };
+    expect(payload.result.isError).toBe(true);
+    expect(updateStoryMapSpy).not.toHaveBeenCalled();
   });
 
   it('returns context for a backlog story', async () => {

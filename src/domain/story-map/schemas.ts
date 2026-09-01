@@ -48,11 +48,13 @@ export const storyMapBase = z
 
 export const createStoryMapSchema = storyMapBase.partial({ description: true, context_markdown: true });
 
-export const updateStoryMapSchema = storyMapBase
-  .omit({ team_id: true })
-  .partial()
-  .strict()
-  .refine(atLeastOneField, atLeastOneFieldMessage);
+const updateStoryMapFieldsSchema = storyMapBase.omit({ team_id: true }).partial().strict();
+
+export const updateStoryMapSchema = updateStoryMapFieldsSchema.refine(atLeastOneField, atLeastOneFieldMessage);
+
+export const updateStoryMapToolSchema = updateStoryMapFieldsSchema
+  .extend({ story_map_id: uuid })
+  .refine(({ story_map_id: _storyMapId, ...changes }) => atLeastOneField(changes), atLeastOneFieldMessage);
 
 // ---------------------------------------------------------------------------
 // Release
@@ -69,11 +71,13 @@ export const releaseBase = z
 
 export const createReleaseSchema = releaseBase.partial({ description: true, context_markdown: true });
 
-export const updateReleaseSchema = releaseBase
-  .omit({ story_map_id: true })
-  .partial()
-  .strict()
-  .refine(atLeastOneField, atLeastOneFieldMessage);
+const updateReleaseFieldsSchema = releaseBase.omit({ story_map_id: true }).partial().strict();
+
+export const updateReleaseSchema = updateReleaseFieldsSchema.refine(atLeastOneField, atLeastOneFieldMessage);
+
+export const updateReleaseToolSchema = updateReleaseFieldsSchema
+  .extend({ release_id: uuid })
+  .refine(({ release_id: _releaseId, ...changes }) => atLeastOneField(changes), atLeastOneFieldMessage);
 
 export const reorderReleasesSchema = z
   .object({
@@ -96,11 +100,13 @@ export const activityBase = z
 
 export const createActivitySchema = activityBase.partial({ description: true });
 
-export const updateActivitySchema = activityBase
-  .omit({ story_map_id: true })
-  .partial()
-  .strict()
-  .refine(atLeastOneField, atLeastOneFieldMessage);
+const updateActivityFieldsSchema = activityBase.omit({ story_map_id: true }).partial().strict();
+
+export const updateActivitySchema = updateActivityFieldsSchema.refine(atLeastOneField, atLeastOneFieldMessage);
+
+export const updateActivityToolSchema = updateActivityFieldsSchema
+  .extend({ activity_id: uuid })
+  .refine(({ activity_id: _activityId, ...changes }) => atLeastOneField(changes), atLeastOneFieldMessage);
 
 export const reorderActivitiesSchema = z
   .object({
@@ -123,11 +129,13 @@ export const taskBase = z
 
 export const createTaskSchema = taskBase.partial({ description: true });
 
-export const updateTaskSchema = taskBase
-  .omit({ activity_id: true })
-  .partial()
-  .strict()
-  .refine(atLeastOneField, atLeastOneFieldMessage);
+const updateTaskFieldsSchema = taskBase.omit({ activity_id: true }).partial().strict();
+
+export const updateTaskSchema = updateTaskFieldsSchema.refine(atLeastOneField, atLeastOneFieldMessage);
+
+export const updateTaskToolSchema = updateTaskFieldsSchema
+  .extend({ task_id: uuid })
+  .refine(({ task_id: _taskId, ...changes }) => atLeastOneField(changes), atLeastOneFieldMessage);
 
 export const reorderTasksSchema = z
   .object({
@@ -164,11 +172,13 @@ export const createStorySchema = storyBase
   })
   .extend({ status: storyStatus.optional().default('backlog') });
 
-export const updateStorySchema = storyBase
-  .omit({ task_id: true, release_id: true })
-  .partial()
-  .strict()
-  .refine(atLeastOneField, atLeastOneFieldMessage);
+const updateStoryFieldsSchema = storyBase.omit({ task_id: true, release_id: true }).partial().strict();
+
+export const updateStorySchema = updateStoryFieldsSchema.refine(atLeastOneField, atLeastOneFieldMessage);
+
+export const updateStoryToolSchema = updateStoryFieldsSchema
+  .extend({ story_id: uuid })
+  .refine(({ story_id: _storyId, ...changes }) => atLeastOneField(changes), atLeastOneFieldMessage);
 
 export const reorderStoriesSchema = z
   .object({
@@ -204,11 +214,13 @@ export const createPersonaSchema = personaBase.partial({
   goals: true,
 });
 
-export const updatePersonaSchema = personaBase
-  .omit({ story_map_id: true })
-  .partial()
-  .strict()
-  .refine(atLeastOneField, atLeastOneFieldMessage);
+const updatePersonaFieldsSchema = personaBase.omit({ story_map_id: true }).partial().strict();
+
+export const updatePersonaSchema = updatePersonaFieldsSchema.refine(atLeastOneField, atLeastOneFieldMessage);
+
+export const updatePersonaToolSchema = updatePersonaFieldsSchema
+  .extend({ persona_id: uuid })
+  .refine(({ persona_id: _personaId, ...changes }) => atLeastOneField(changes), atLeastOneFieldMessage);
 
 // ---------------------------------------------------------------------------
 // Inferred types
