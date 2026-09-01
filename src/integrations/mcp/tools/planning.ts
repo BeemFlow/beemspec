@@ -1,4 +1,4 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import {
   createActivitySchema,
@@ -8,10 +8,8 @@ import {
   reorderActivitiesSchema,
   reorderReleasesSchema,
   reorderTasksSchema,
-  updateActivitySchema,
-  updateReleaseSchema,
-  updateTaskSchema,
 } from '@/domain/story-map';
+import { updateActivityToolSchema, updateReleaseToolSchema, updateTaskToolSchema } from '@/domain/story-map/schemas';
 import type { Supabase } from '@/lib/supabase/types';
 import {
   createActivity,
@@ -36,9 +34,10 @@ import {
   isNotFound,
   mutateAnnotations,
   successResult,
-  validateToolInput,
   withToolErrorBoundary,
 } from '../tool-support';
+
+const moveTaskToolSchema = moveTaskSchema.extend({ task_id: z.string().uuid() });
 
 export function registerPlanningTools(server: McpServer, supabase: Supabase): void {
   const getUserScopedClient = () => supabase;
@@ -47,7 +46,7 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
     {
       title: 'Create Activity',
       description: 'Create an activity column in a story map. Use IDs from storymap_get and refresh after mutation.',
-      inputSchema: createActivitySchema.shape,
+      inputSchema: createActivitySchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('activity_create', async (input) => {
@@ -71,18 +70,12 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
     {
       title: 'Update Activity',
       description: 'Update activity fields like name or description. Use reorder tools for position changes.',
-      inputSchema: {
-        activity_id: z.string().uuid(),
-        ...updateActivitySchema.shape,
-      },
+      inputSchema: updateActivityToolSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('activity_update', async ({ activity_id, ...changes }) => {
-      const validation = validateToolInput(updateActivitySchema, changes);
-      if (!validation.ok) return validation.result;
-
       const supabase = getUserScopedClient();
-      const { data, error } = await updateActivity(supabase, activity_id, validation.data);
+      const { data, error } = await updateActivity(supabase, activity_id, changes);
 
       if (error) {
         if (isNotFound(error)) return errorResult('Activity not found');
@@ -104,9 +97,7 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
     {
       title: 'Delete Activity',
       description: 'Destructive. Deletes an activity and all nested tasks/stories under it.',
-      inputSchema: {
-        activity_id: z.string().uuid(),
-      },
+      inputSchema: z.object({ activity_id: z.string().uuid() }).strict(),
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('activity_delete', async ({ activity_id }) => {
@@ -126,7 +117,7 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
     {
       title: 'Reorder Activities',
       description: 'Reorder activities in final sequence. Provide full ordered ID list from storymap_get context.',
-      inputSchema: reorderActivitiesSchema.shape,
+      inputSchema: reorderActivitiesSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('activity_reorder', async ({ story_map_id, order }) => {
@@ -150,7 +141,7 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
     {
       title: 'Create Task',
       description: 'Create a task under an activity. Choose target activity from storymap_get output.',
-      inputSchema: createTaskSchema.shape,
+      inputSchema: createTaskSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('task_create', async (input) => {
@@ -174,18 +165,12 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
     {
       title: 'Update Task',
       description: 'Update task fields like name or description. Use move/reorder tools for position changes.',
-      inputSchema: {
-        task_id: z.string().uuid(),
-        ...updateTaskSchema.shape,
-      },
+      inputSchema: updateTaskToolSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('task_update', async ({ task_id, ...changes }) => {
-      const validation = validateToolInput(updateTaskSchema, changes);
-      if (!validation.ok) return validation.result;
-
       const supabase = getUserScopedClient();
-      const { data, error } = await updateTask(supabase, task_id, validation.data);
+      const { data, error } = await updateTask(supabase, task_id, changes);
 
       if (error) {
         if (isNotFound(error)) return errorResult('Task not found');
@@ -207,9 +192,7 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
     {
       title: 'Delete Task',
       description: 'Destructive. Deletes a task and all stories under it.',
-      inputSchema: {
-        task_id: z.string().uuid(),
-      },
+      inputSchema: z.object({ task_id: z.string().uuid() }).strict(),
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('task_delete', async ({ task_id }) => {
@@ -229,7 +212,7 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
     {
       title: 'Reorder Tasks',
       description: 'Reorder tasks within an activity. Provide full ordered ID list for that activity.',
-      inputSchema: reorderTasksSchema.shape,
+      inputSchema: reorderTasksSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('task_reorder', async ({ activity_id, order }) => {
@@ -253,10 +236,7 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
     {
       title: 'Move Task',
       description: 'Atomically move a task to another activity and set full target order in one operation.',
-      inputSchema: {
-        task_id: z.string().uuid(),
-        ...moveTaskSchema.shape,
-      },
+      inputSchema: moveTaskToolSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('task_move', async ({ task_id, ...input }) => {
@@ -282,7 +262,7 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
     {
       title: 'Create Release',
       description: 'Create a release lane (row) in a story map. Useful before placing or moving stories.',
-      inputSchema: createReleaseSchema.shape,
+      inputSchema: createReleaseSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('release_create', async (input) => {
@@ -306,18 +286,12 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
     {
       title: 'Update Release',
       description: 'Update release fields like name or description. Use reorder tools for position changes.',
-      inputSchema: {
-        release_id: z.string().uuid(),
-        ...updateReleaseSchema.shape,
-      },
+      inputSchema: updateReleaseToolSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('release_update', async ({ release_id, ...changes }) => {
-      const validation = validateToolInput(updateReleaseSchema, changes);
-      if (!validation.ok) return validation.result;
-
       const supabase = getUserScopedClient();
-      const { data, error } = await updateRelease(supabase, release_id, validation.data);
+      const { data, error } = await updateRelease(supabase, release_id, changes);
 
       if (error) {
         if (isNotFound(error)) return errorResult('Release not found');
@@ -339,9 +313,7 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
     {
       title: 'Delete Release',
       description: 'Destructive. Deletes a release and stories currently assigned to that release.',
-      inputSchema: {
-        release_id: z.string().uuid(),
-      },
+      inputSchema: z.object({ release_id: z.string().uuid() }).strict(),
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('release_delete', async ({ release_id }) => {
@@ -361,7 +333,7 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
     {
       title: 'Reorder Releases',
       description: 'Reorder release lanes in final sequence. Provide full ordered release ID list.',
-      inputSchema: reorderReleasesSchema.shape,
+      inputSchema: reorderReleasesSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('release_reorder', async ({ story_map_id, order }) => {

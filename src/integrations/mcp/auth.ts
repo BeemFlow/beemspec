@@ -1,64 +1,93 @@
-import { NextResponse } from 'next/server';
+import {
+  type AuthInfo,
+  OAuthError,
+  OAuthErrorCode,
+  type OAuthTokenVerifier,
+  requireBearerAuth,
+} from '@modelcontextprotocol/server';
 import { buildProtectedResourceMetadataUrl } from '@/integrations/mcp/metadata';
 import { resolveRequestOrigin } from '@/integrations/mcp/origin';
-import { type AuthenticatedUser, getAuthenticatedUser } from '@/lib/auth';
+import type { AuthenticatedUser } from '@/lib/auth';
 import { createClientForAccessToken } from '@/lib/supabase/token';
 import type { Supabase } from '@/lib/supabase/types';
 
-function buildWwwAuthenticateHeader(request: Request, error: 'invalid_request' | 'invalid_token'): string {
+export interface McpAuthContext {
+  user: AuthenticatedUser;
+  supabase: Supabase;
+}
+
+const AUTH_CONTEXT_KEY = 'beemspec';
+
+function invalidToken(message: string): never {
+  throw new OAuthError(OAuthErrorCode.InvalidToken, message);
+}
+
+const supabaseTokenVerifier: OAuthTokenVerifier = {
+  async verifyAccessToken(token) {
+    const supabase = createClientForAccessToken(token);
+    const { data, error } = await supabase.auth.getClaims(token);
+    const claims = data?.claims;
+
+    if (error || typeof claims?.sub !== 'string' || !claims.sub || typeof claims.exp !== 'number') {
+      invalidToken('The access token is invalid or missing required claims');
+    }
+
+    const user: AuthenticatedUser = {
+      id: claims.sub,
+      email: typeof claims.email === 'string' ? claims.email : '',
+    };
+
+    return {
+      token,
+      clientId: typeof claims.client_id === 'string' ? claims.client_id : claims.sub,
+      scopes: [],
+      expiresAt: claims.exp,
+      extra: {
+        [AUTH_CONTEXT_KEY]: { user, supabase } satisfies McpAuthContext,
+      },
+    };
+  },
+};
+
+export function getMcpAuthContext(authInfo: AuthInfo | undefined): McpAuthContext {
+  const context = authInfo?.extra?.[AUTH_CONTEXT_KEY];
+  if (
+    !context ||
+    typeof context !== 'object' ||
+    !('user' in context) ||
+    !context.user ||
+    typeof context.user !== 'object' ||
+    !('id' in context.user) ||
+    typeof context.user.id !== 'string' ||
+    !('email' in context.user) ||
+    typeof context.user.email !== 'string' ||
+    !('supabase' in context) ||
+    !context.supabase ||
+    typeof context.supabase !== 'object'
+  ) {
+    throw new Error('Missing authenticated BeemSpec context');
+  }
+
+  return context as unknown as McpAuthContext;
+}
+
+export function createMcpAuthInfo(token: string, context: McpAuthContext, expiresAt?: number): AuthInfo {
+  return {
+    token,
+    clientId: context.user.id,
+    scopes: [],
+    expiresAt,
+    extra: { [AUTH_CONTEXT_KEY]: context },
+  };
+}
+
+export async function authenticateMcpRequest(request: Request): Promise<AuthInfo | Response> {
   const origin = resolveRequestOrigin(request);
   const pathname = new URL(request.url).pathname;
-  const resourceMetadata = buildProtectedResourceMetadataUrl(origin, pathname);
-  return ['Bearer realm="beemspec-mcp"', `error="${error}"`, `resource_metadata="${resourceMetadata}"`].join(', ');
-}
+  const authenticate = requireBearerAuth({
+    verifier: supabaseTokenVerifier,
+    resourceMetadataUrl: buildProtectedResourceMetadataUrl(origin, pathname),
+  });
 
-function unauthorizedResponse(request: Request, error: 'invalid_request' | 'invalid_token') {
-  const response = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  response.headers.set('WWW-Authenticate', buildWwwAuthenticateHeader(request, error));
-  return response;
-}
-
-function parseBearerToken(request: Request): string | null {
-  const authHeader = request.headers.get('authorization') ?? '';
-  if (!authHeader.startsWith('Bearer ')) return null;
-
-  const token = authHeader.slice('Bearer '.length).trim();
-  return token.length > 0 ? token : null;
-}
-
-export type McpAuthResult =
-  | {
-      ok: true;
-      user: AuthenticatedUser;
-      supabase: Supabase;
-    }
-  | {
-      ok: false;
-      response: Response;
-    };
-
-export async function authenticateMcpRequest(request: Request): Promise<McpAuthResult> {
-  const accessToken = parseBearerToken(request);
-  if (!accessToken) {
-    return {
-      ok: false,
-      response: unauthorizedResponse(request, 'invalid_request'),
-    };
-  }
-
-  const supabase = createClientForAccessToken(accessToken);
-  const user = await getAuthenticatedUser(supabase, accessToken);
-
-  if (!user) {
-    return {
-      ok: false,
-      response: unauthorizedResponse(request, 'invalid_token'),
-    };
-  }
-
-  return {
-    ok: true,
-    user,
-    supabase,
-  };
+  return authenticate(request);
 }

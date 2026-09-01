@@ -1,13 +1,15 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import {
   createProcessFlowEdgeSchema,
   createProcessFlowNodeSchema,
   createProcessFlowSchema,
-  updateProcessFlowEdgeSchema,
-  updateProcessFlowNodeSchema,
-  updateProcessFlowSchema,
 } from '@/domain/process-flow';
+import {
+  updateProcessFlowEdgeToolSchema,
+  updateProcessFlowNodeToolSchema,
+  updateProcessFlowToolSchema,
+} from '@/domain/process-flow/schemas';
 import type { AuthenticatedUser } from '@/lib/auth';
 import type { Supabase } from '@/lib/supabase/types';
 import {
@@ -37,9 +39,12 @@ import {
   resolveAccessibleTeamId,
   resolveProcessFlowIdByName,
   successResult,
-  validateToolInput,
   withToolErrorBoundary,
 } from '../tool-support';
+
+const createProcessFlowToolSchema = createProcessFlowSchema.extend({
+  team_id: z.string().uuid().optional().describe('Team UUID (optional for single-team users)'),
+});
 
 export function registerProcessFlowTools(server: McpServer, supabase: Supabase, user: AuthenticatedUser): void {
   const getUserScopedClient = () => supabase;
@@ -117,9 +122,9 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       title: 'List Process Flows',
       description:
         'Starting point. List process flows for a team. team_id is optional when the user has exactly one team.',
-      inputSchema: {
-        team_id: z.string().uuid().optional().describe('Team UUID (optional for single-team users)'),
-      },
+      inputSchema: z
+        .object({ team_id: z.string().uuid().optional().describe('Team UUID (optional for single-team users)') })
+        .strict(),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('processflow_list', async ({ team_id }) => {
@@ -140,11 +145,13 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       title: 'Get Process Flow',
       description:
         'Primary context loader. Pass process_flow_id directly, or pass process_flow_name (and optional team_id) for resolution.',
-      inputSchema: {
-        process_flow_id: z.string().uuid().optional().describe('Process flow UUID'),
-        process_flow_name: z.string().min(1).max(200).optional().describe('Process flow name'),
-        team_id: z.string().uuid().optional().describe('Team UUID for disambiguating name matches'),
-      },
+      inputSchema: z
+        .object({
+          process_flow_id: z.string().uuid().optional().describe('Process flow UUID'),
+          process_flow_name: z.string().min(1).max(200).optional().describe('Process flow name'),
+          team_id: z.string().uuid().optional().describe('Team UUID for disambiguating name matches'),
+        })
+        .strict(),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('processflow_get', async ({ process_flow_id, process_flow_name, team_id }) => {
@@ -187,9 +194,7 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
     {
       title: 'Validate Process Flow',
       description: 'Return deterministic structural warnings for a process flow.',
-      inputSchema: {
-        process_flow_id: z.string().uuid().describe('Process flow UUID'),
-      },
+      inputSchema: z.object({ process_flow_id: z.string().uuid().describe('Process flow UUID') }).strict(),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('processflow_validation_get', async ({ process_flow_id }) => {
@@ -209,13 +214,7 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
     {
       title: 'Create Process Flow',
       description: 'Create a new process flow container. team_id is optional when the user has exactly one team.',
-      inputSchema: {
-        team_id: z.string().uuid().optional().describe('Team UUID (optional for single-team users)'),
-        name: createProcessFlowSchema.shape.name,
-        description: createProcessFlowSchema.shape.description,
-        context_markdown: createProcessFlowSchema.shape.context_markdown,
-        viewport: createProcessFlowSchema.shape.viewport,
-      },
+      inputSchema: createProcessFlowToolSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('processflow_create', async (input) => {
@@ -241,18 +240,12 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
     {
       title: 'Update Process Flow',
       description: 'Update process flow metadata such as name, description, context, or viewport.',
-      inputSchema: {
-        process_flow_id: z.string().uuid(),
-        ...updateProcessFlowSchema.shape,
-      },
+      inputSchema: updateProcessFlowToolSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('processflow_update', async ({ process_flow_id, ...changes }) => {
-      const validation = validateToolInput(updateProcessFlowSchema, changes);
-      if (!validation.ok) return validation.result;
-
       const supabase = getUserScopedClient();
-      const { data, error } = await updateProcessFlow(supabase, process_flow_id, validation.data);
+      const { data, error } = await updateProcessFlow(supabase, process_flow_id, changes);
       if (error) {
         if (isNotFound(error)) return errorResult('Process flow not found');
         return errorResult('Failed to update process flow', describeDbError(error));
@@ -267,9 +260,7 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
     {
       title: 'Delete Process Flow',
       description: 'Destructive. Deletes a process flow and all nested nodes and edges.',
-      inputSchema: {
-        process_flow_id: z.string().uuid(),
-      },
+      inputSchema: z.object({ process_flow_id: z.string().uuid() }).strict(),
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('processflow_delete', async ({ process_flow_id }) => {
@@ -290,7 +281,7 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       title: 'Create Process Flow Node',
       description:
         'Create a node in a process flow. Node data fields include label, owner_role, systems, inputs, outputs, pain_points, notes, automation_opportunity, frequency, estimated_duration, and time_constraint.',
-      inputSchema: createProcessFlowNodeSchema.shape,
+      inputSchema: createProcessFlowNodeSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('processflow_node_create', async (input) => {
@@ -308,19 +299,12 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       title: 'Update Process Flow Node',
       description:
         'Update a process flow node. Use this for label, ownership, metadata, position, or node data changes including systems, inputs, outputs, pain_points, notes, automation_opportunity, frequency, estimated_duration, and time_constraint.',
-      inputSchema: {
-        process_flow_id: z.string().uuid(),
-        node_id: z.string().uuid(),
-        ...updateProcessFlowNodeSchema.shape,
-      },
+      inputSchema: updateProcessFlowNodeToolSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('processflow_node_update', async ({ process_flow_id, node_id, ...changes }) => {
-      const validation = validateToolInput(updateProcessFlowNodeSchema, changes);
-      if (!validation.ok) return validation.result;
-
       const supabase = getUserScopedClient();
-      const { data, error } = await updateProcessFlowNode(supabase, process_flow_id, node_id, validation.data);
+      const { data, error } = await updateProcessFlowNode(supabase, process_flow_id, node_id, changes);
       if (error) {
         if (isNotFound(error)) return errorResult('Process flow node not found');
         return errorResult('Failed to update process flow node', describeDbError(error));
@@ -335,10 +319,7 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
     {
       title: 'Delete Process Flow Node',
       description: 'Destructive. Deletes a process flow node and any connected edges removed by cascade.',
-      inputSchema: {
-        process_flow_id: z.string().uuid(),
-        node_id: z.string().uuid(),
-      },
+      inputSchema: z.object({ process_flow_id: z.string().uuid(), node_id: z.string().uuid() }).strict(),
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('processflow_node_delete', async ({ process_flow_id, node_id }) => {
@@ -358,7 +339,7 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
     {
       title: 'Create Process Flow Edge',
       description: 'Create an edge between two nodes in a process flow. Edge data fields include label and condition.',
-      inputSchema: createProcessFlowEdgeSchema.shape,
+      inputSchema: createProcessFlowEdgeSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('processflow_edge_create', async (input) => {
@@ -376,19 +357,12 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       title: 'Update Process Flow Edge',
       description:
         'Update a process flow edge. Use this for type changes or edge data updates including label and condition.',
-      inputSchema: {
-        process_flow_id: z.string().uuid(),
-        edge_id: z.string().uuid(),
-        ...updateProcessFlowEdgeSchema.shape,
-      },
+      inputSchema: updateProcessFlowEdgeToolSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('processflow_edge_update', async ({ process_flow_id, edge_id, ...changes }) => {
-      const validation = validateToolInput(updateProcessFlowEdgeSchema, changes);
-      if (!validation.ok) return validation.result;
-
       const supabase = getUserScopedClient();
-      const { data, error } = await updateProcessFlowEdge(supabase, process_flow_id, edge_id, validation.data);
+      const { data, error } = await updateProcessFlowEdge(supabase, process_flow_id, edge_id, changes);
       if (error) {
         if (isNotFound(error)) return errorResult('Process flow edge not found');
         return errorResult('Failed to update process flow edge', describeDbError(error));
@@ -403,10 +377,7 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
     {
       title: 'Delete Process Flow Edge',
       description: 'Destructive. Deletes a process flow edge.',
-      inputSchema: {
-        process_flow_id: z.string().uuid(),
-        edge_id: z.string().uuid(),
-      },
+      inputSchema: z.object({ process_flow_id: z.string().uuid(), edge_id: z.string().uuid() }).strict(),
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('processflow_edge_delete', async ({ process_flow_id, edge_id }) => {

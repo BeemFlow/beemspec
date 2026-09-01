@@ -1,6 +1,7 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { createPersonaSchema, updatePersonaSchema } from '@/domain/story-map';
+import { createPersonaSchema } from '@/domain/story-map';
+import { updatePersonaToolSchema } from '@/domain/story-map/schemas';
 import type { Supabase } from '@/lib/supabase/types';
 import { createPersona, deletePersona, listPersonas, updatePersona } from '@/storymap/service';
 import { getStoryContext } from '../queries';
@@ -12,7 +13,6 @@ import {
   mutateAnnotations,
   readAnnotations,
   successResult,
-  validateToolInput,
   withToolErrorBoundary,
 } from '../tool-support';
 
@@ -23,9 +23,7 @@ export function registerPersonaTools(server: McpServer, supabase: Supabase): voi
     {
       title: 'List Personas',
       description: 'List personas attached to a story map. Prefer storymap_get if you already need full map context.',
-      inputSchema: {
-        story_map_id: z.string().uuid(),
-      },
+      inputSchema: z.object({ story_map_id: z.string().uuid() }).strict(),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('persona_list', async ({ story_map_id }) => {
@@ -42,7 +40,7 @@ export function registerPersonaTools(server: McpServer, supabase: Supabase): voi
     {
       title: 'Create Persona',
       description: 'Create a persona for a story map to capture user archetypes and goals.',
-      inputSchema: createPersonaSchema.shape,
+      inputSchema: createPersonaSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('persona_create', async (input) => {
@@ -59,18 +57,12 @@ export function registerPersonaTools(server: McpServer, supabase: Supabase): voi
     {
       title: 'Update Persona',
       description: 'Update persona fields like name, description, or goals.',
-      inputSchema: {
-        persona_id: z.string().uuid(),
-        ...updatePersonaSchema.shape,
-      },
+      inputSchema: updatePersonaToolSchema,
       annotations: mutateAnnotations,
     },
     withToolErrorBoundary('persona_update', async ({ persona_id, ...changes }) => {
-      const validation = validateToolInput(updatePersonaSchema, changes);
-      if (!validation.ok) return validation.result;
-
       const supabase = getUserScopedClient();
-      const { data, error } = await updatePersona(supabase, persona_id, validation.data);
+      const { data, error } = await updatePersona(supabase, persona_id, changes);
 
       if (error) {
         if (isNotFound(error)) return errorResult('Persona not found');
@@ -86,9 +78,7 @@ export function registerPersonaTools(server: McpServer, supabase: Supabase): voi
     {
       title: 'Delete Persona',
       description: 'Destructive. Deletes a persona from the story map.',
-      inputSchema: {
-        persona_id: z.string().uuid(),
-      },
+      inputSchema: z.object({ persona_id: z.string().uuid() }).strict(),
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('persona_delete', async ({ persona_id }) => {
@@ -110,9 +100,7 @@ export function registerPersonaTools(server: McpServer, supabase: Supabase): voi
       title: 'Get Story Context',
       description:
         'Full implementation context for one story, including workflow placement, personas, and Figma hints when present. Use after selecting a story via storymap_get.',
-      inputSchema: {
-        story_id: z.string().uuid().describe('BeemSpec story UUID'),
-      },
+      inputSchema: z.object({ story_id: z.string().uuid().describe('BeemSpec story UUID') }).strict(),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('story_context_get', async ({ story_id }) => {

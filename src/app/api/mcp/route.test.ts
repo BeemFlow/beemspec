@@ -1,49 +1,47 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authenticateMcpRequest } from '@/integrations/mcp/auth';
-import { handleMcpRequest } from '@/integrations/mcp/server';
+import { mcpHandler } from '@/integrations/mcp/server';
 import { GET, OPTIONS, POST } from './route';
 
-const mockSupabase = {} as never;
+const authInfo = {
+  token: 'user-token',
+  clientId: 'user-1',
+  scopes: [],
+  expiresAt: Math.floor(Date.now() / 1000) + 3600,
+};
 
 vi.mock('@/integrations/mcp/auth', () => ({
   authenticateMcpRequest: vi.fn(),
 }));
 
 vi.mock('@/integrations/mcp/server', () => ({
-  handleMcpRequest: vi.fn(),
+  mcpHandler: { fetch: vi.fn() },
 }));
 
 describe('mcp route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(authenticateMcpRequest).mockResolvedValue({
-      ok: true,
-      user: { id: 'user-1', email: 'user@example.com' },
-      supabase: mockSupabase,
-    });
-    vi.mocked(handleMcpRequest).mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.mocked(authenticateMcpRequest).mockResolvedValue(authInfo);
+    vi.mocked(mcpHandler.fetch).mockResolvedValue(new Response('{}', { status: 200 }));
   });
 
   it('allows requests when bearer auth succeeds', async () => {
     const response = await GET(new Request('http://localhost/api/mcp', { method: 'GET' }));
 
-    expect(handleMcpRequest).toHaveBeenCalled();
+    expect(mcpHandler.fetch).toHaveBeenCalled();
     expect(response.status).toBe(200);
   });
 
   it('returns 401 when auth fails', async () => {
-    vi.mocked(authenticateMcpRequest).mockResolvedValue({
-      ok: false,
-      response: new Response('{"error":"Unauthorized"}', { status: 401 }),
-    });
+    vi.mocked(authenticateMcpRequest).mockResolvedValue(new Response('{"error":"invalid_token"}', { status: 401 }));
 
     const response = await POST(new Request('http://localhost/api/mcp', { method: 'POST' }));
 
-    expect(handleMcpRequest).not.toHaveBeenCalled();
+    expect(mcpHandler.fetch).not.toHaveBeenCalled();
     expect(response.status).toBe(401);
   });
 
-  it('passes authenticated supabase client into MCP handler', async () => {
+  it('passes authenticated info into the MCP handler', async () => {
     const response = await POST(
       new Request('http://localhost/api/mcp', {
         method: 'POST',
@@ -52,10 +50,7 @@ describe('mcp route', () => {
     );
 
     expect(authenticateMcpRequest).toHaveBeenCalled();
-    expect(handleMcpRequest).toHaveBeenCalledWith(expect.any(Request), mockSupabase, {
-      id: 'user-1',
-      email: 'user@example.com',
-    });
+    expect(mcpHandler.fetch).toHaveBeenCalledWith(expect.any(Request), { authInfo });
     expect(response.status).toBe(200);
   });
 
@@ -71,7 +66,7 @@ describe('mcp route', () => {
     );
 
     expect(authenticateMcpRequest).toHaveBeenCalled();
-    expect(handleMcpRequest).toHaveBeenCalled();
+    expect(mcpHandler.fetch).toHaveBeenCalled();
     expect(response.status).toBe(200);
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://claude.ai');
     expect(response.headers.get('Access-Control-Allow-Methods')).toContain('POST');
@@ -104,7 +99,7 @@ describe('mcp route', () => {
     );
 
     expect(authenticateMcpRequest).not.toHaveBeenCalled();
-    expect(handleMcpRequest).not.toHaveBeenCalled();
+    expect(mcpHandler.fetch).not.toHaveBeenCalled();
     expect(response.status).toBe(403);
   });
 });
