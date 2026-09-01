@@ -1,9 +1,12 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import {
+  batchMutateProcessFlowEdgesSchema,
+  batchMutateProcessFlowNodesSchema,
   createProcessFlowEdgeSchema,
   createProcessFlowNodeSchema,
   createProcessFlowSchema,
+  processFlowAutolayoutSchema,
 } from '@/domain/process-flow';
 import {
   updateProcessFlowEdgeToolSchema,
@@ -13,6 +16,9 @@ import {
 import type { AuthenticatedUser } from '@/lib/auth';
 import type { Supabase } from '@/lib/supabase/types';
 import {
+  autolayoutProcessFlow,
+  batchMutateProcessFlowEdges,
+  batchMutateProcessFlowNodes,
   buildProcessFlowFull,
   createProcessFlow,
   createProcessFlowEdge,
@@ -29,16 +35,18 @@ import {
   validateProcessFlowGraph,
 } from '@/processflow/service';
 import { buildProcessFlowAgentInsights } from '../insights/process-flow';
+import { deletedRowSchema, mcpUuidSchema, nonNegativeCountSchema, successOutputSchema } from '../output-schemas';
 import {
+  createAnnotations,
   describeDbError,
   destructiveAnnotations,
   errorResult,
   isNotFound,
-  mutateAnnotations,
   readAnnotations,
   resolveAccessibleTeamId,
   resolveProcessFlowIdByName,
   successResult,
+  updateAnnotations,
   withToolErrorBoundary,
 } from '../tool-support';
 
@@ -46,76 +54,103 @@ const createProcessFlowToolSchema = createProcessFlowSchema.extend({
   team_id: z.string().uuid().optional().describe('Team UUID (optional for single-team users)'),
 });
 
+const processFlowEntitySchema = z
+  .object({
+    id: mcpUuidSchema,
+    team_id: mcpUuidSchema,
+    name: z.string(),
+    description: z.string().nullable(),
+    context_markdown: z.string().nullable(),
+    viewport: z.object({ x: z.number(), y: z.number(), zoom: z.number() }).strict().nullable(),
+    schema_version: z.literal(1),
+  })
+  .passthrough();
+
+const processFlowNodeEntitySchema = z
+  .object({
+    id: mcpUuidSchema,
+    process_flow_id: mcpUuidSchema,
+    type: z.enum(['step', 'decision', 'subprocess', 'actor', 'system', 'note']),
+    data: z.object({ label: z.string() }).passthrough(),
+  })
+  .passthrough();
+
+const processFlowEdgeEntitySchema = z
+  .object({
+    id: mcpUuidSchema,
+    process_flow_id: mcpUuidSchema,
+    type: z.enum(['flow', 'handoff', 'exception', 'dependency']),
+    source_node_id: mcpUuidSchema,
+    target_node_id: mcpUuidSchema,
+    data: z.object({}).passthrough().nullable(),
+  })
+  .passthrough();
+
+const processFlowValidationSchema = z
+  .object({
+    warnings: z.array(
+      z
+        .object({
+          code: z.string(),
+          message: z.string(),
+          node_ids: z.array(z.string()).optional(),
+          edge_ids: z.array(z.string()).optional(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+const processFlowInsightsSchema = z
+  .object({
+    nodeCountsByType: z.record(z.string(), nonNegativeCountSchema),
+    edgeCount: nonNegativeCountSchema,
+    automationCandidates: nonNegativeCountSchema,
+    ownershipTaggedNodes: nonNegativeCountSchema,
+    frequencyTaggedNodes: nonNegativeCountSchema,
+    timeConstrainedNodes: nonNegativeCountSchema,
+    labeledEdges: nonNegativeCountSchema,
+    conditionedEdges: nonNegativeCountSchema,
+  })
+  .strict();
+
+const processFlowContextSchema = processFlowEntitySchema.extend({
+  nodes: z.array(processFlowNodeEntitySchema),
+  edges: z.array(processFlowEdgeEntitySchema),
+  agent_insights: processFlowInsightsSchema,
+  validation: processFlowValidationSchema,
+});
+
+const processFlowNodeMutationResultSchema = z
+  .object({
+    created: z.array(processFlowNodeEntitySchema),
+    updated: z.array(processFlowNodeEntitySchema),
+    deleted: z.array(processFlowNodeEntitySchema),
+  })
+  .strict();
+
+const processFlowEdgeMutationResultSchema = z
+  .object({
+    created: z.array(processFlowEdgeEntitySchema),
+    updated: z.array(processFlowEdgeEntitySchema),
+    deleted: z.array(processFlowEdgeEntitySchema),
+  })
+  .strict();
+
+const processFlowAutolayoutResultSchema = z
+  .object({
+    nodes: z.array(processFlowNodeEntitySchema),
+    edges: z.array(processFlowEdgeEntitySchema),
+  })
+  .strict();
+
+const batchMutationAnnotations = {
+  ...createAnnotations,
+  destructiveHint: true,
+} as const;
+
 export function registerProcessFlowTools(server: McpServer, supabase: Supabase, user: AuthenticatedUser): void {
   const getUserScopedClient = () => supabase;
-  server.registerTool(
-    'processflow_workflow_guide',
-    {
-      title: 'Process Flow Workflow Guide',
-      description:
-        'CALL THIS FIRST BEFORE TOUCHING THE PROCESS FLOW. Read-first guide for agents translating user input into an operational flow.',
-      annotations: readAnnotations,
-    },
-    withToolErrorBoundary('processflow_workflow_guide', async () => {
-      return successResult({
-        objective:
-          'Use BeemSpec as the structured source of truth for operational process modeling. Build clear flows from messy user input with minimal redundant calls and minimal unsafe inference.',
-        operating_mode: [
-          'Act as an operations-minded modeling partner, not just a note taker.',
-          'Read this guide first, then fetch only the flow context needed for the current decision.',
-          'Prefer representing observed operational reality before proposing automation or redesign.',
-          'Do not invent systems, approvals, branches, or ownership when the source material does not support them.',
-          'When context is missing, prefer one focused clarification or one explicit assumption over speculative process design.',
-        ],
-        tool_sequence: [
-          '1) Call processflow_list(team_id?) to discover candidate flows when the target is unclear.',
-          '2) Call processflow_get(process_flow_id or process_flow_name) before structural edits.',
-          '3) Create or update nodes and edges in focused batches of related changes.',
-          '4) Call processflow_validation_get(process_flow_id) to inspect deterministic warnings after major changes.',
-          '5) Re-read with processflow_get(process_flow_id) only after material structural changes or when flow context has changed.',
-        ],
-        tool_usage_rules: [
-          'Call team_list when team context is unknown or the user may have access to multiple teams.',
-          'Use processflow_get as the canonical read for both reasoning and verification.',
-          'Use node create/update/delete tools for explicit graph changes; use edge tools for connection changes.',
-          'Use processflow_validation_get to surface structural warnings, not to replace reasoning about the business process.',
-          'Use processflow context markdown for durable process context such as scope, assumptions, known constraints, source interviews, and audit notes.',
-          'Avoid redundant reads when the current flow context already answers the next decision.',
-        ],
-        clarification_policy: [
-          'Ask the user questions only when ambiguity would materially change the flow structure, decision logic, ownership, or automation recommendation.',
-          'Do all non-blocked work first before asking clarifying questions.',
-          'Bundle clarifying questions into one focused round instead of many small follow-ups.',
-          'Recommend a reasonable default when asking a question and explain what would change based on the answer.',
-        ],
-        safe_vs_unsafe_inference: {
-          safe_to_infer: [
-            'Minor node wording cleanup that preserves the same operational meaning.',
-            'Simple edge labels for clearly described yes/no style decisions when the transcript explicitly implies them.',
-            'Reasonable frequency estimates when the interviewee describes volume qualitatively (e.g., "we do this constantly" can be captured as "high volume, multiple times per day").',
-            'Reasonable layout choices that do not alter the process semantics.',
-          ],
-          unsafe_to_infer: [
-            'Inventing systems, teams, approvals, or exception paths that the source material never mentioned.',
-            'Rewriting the real-world process into an optimized future process without making that transition explicit to the user.',
-            'Assuming automation feasibility without evidence about tools, systems, or constraints.',
-            'Precise numeric frequency or duration values when the source material only gives vague qualitative descriptions.',
-            'Time constraints or SLAs that were not explicitly stated in the source material — do not invent compliance requirements.',
-          ],
-        },
-        process_modeling_principles: [
-          'Use step nodes for concrete actions, decision nodes for branching logic, actor/system nodes when ownership or system participation matters, and note nodes only for supporting context.',
-          'Keep labels short, operational, and specific.',
-          'Prefer one node per meaningful operational step rather than large paragraphs inside nodes.',
-          'Use handoff edges when work meaningfully changes owner, team, or system context.',
-          'Capture frequency, estimated duration, and time constraints when the source material mentions them — these are high-signal for automation prioritization. Frequency times duration equals operational cost; time constraints indicate urgency and compliance pressure. Both matter for automation ROI but answer different questions.',
-          'Use the condition field on decision outbound edges to record the actual branch logic separately from the display label. The label is what humans read on the diagram; the condition is the rule the automation agent needs to generate workflow logic.',
-          'Treat disconnected nodes as a warning sign unless they are intentionally exploratory notes.',
-        ],
-      });
-    }),
-  );
-
   server.registerTool(
     'processflow_list',
     {
@@ -125,6 +160,7 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       inputSchema: z
         .object({ team_id: z.string().uuid().optional().describe('Team UUID (optional for single-team users)') })
         .strict(),
+      outputSchema: successOutputSchema(z.array(processFlowEntitySchema)),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('processflow_list', async ({ team_id }) => {
@@ -144,14 +180,31 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
     {
       title: 'Get Process Flow',
       description:
-        'Primary context loader. Pass process_flow_id directly, or pass process_flow_name (and optional team_id) for resolution.',
+        'Primary context loader. Select exactly one lookup mode: process_flow_id, or process_flow_name with optional team_id.',
       inputSchema: z
         .object({
-          process_flow_id: z.string().uuid().optional().describe('Process flow UUID'),
-          process_flow_name: z.string().min(1).max(200).optional().describe('Process flow name'),
-          team_id: z.string().uuid().optional().describe('Team UUID for disambiguating name matches'),
+          process_flow_id: z
+            .string()
+            .uuid()
+            .optional()
+            .describe('Exact process flow UUID; omit process_flow_name when using this lookup mode'),
+          process_flow_name: z
+            .string()
+            .min(1)
+            .max(200)
+            .optional()
+            .describe('Exact process flow name; omit process_flow_id when using this lookup mode'),
+          team_id: z
+            .string()
+            .uuid()
+            .optional()
+            .describe('Team UUID used only to disambiguate process_flow_name matches'),
         })
-        .strict(),
+        .strict()
+        .refine(({ process_flow_id, process_flow_name }) => Boolean(process_flow_id) !== Boolean(process_flow_name), {
+          message: 'Provide exactly one of process_flow_id or process_flow_name',
+        }),
+      outputSchema: successOutputSchema(processFlowContextSchema),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('processflow_get', async ({ process_flow_id, process_flow_name, team_id }) => {
@@ -195,6 +248,7 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       title: 'Validate Process Flow',
       description: 'Return deterministic structural warnings for a process flow.',
       inputSchema: z.object({ process_flow_id: z.string().uuid().describe('Process flow UUID') }).strict(),
+      outputSchema: successOutputSchema(processFlowValidationSchema),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('processflow_validation_get', async ({ process_flow_id }) => {
@@ -215,7 +269,8 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       title: 'Create Process Flow',
       description: 'Create a new process flow container. team_id is optional when the user has exactly one team.',
       inputSchema: createProcessFlowToolSchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(processFlowEntitySchema),
+      annotations: createAnnotations,
     },
     withToolErrorBoundary('processflow_create', async (input) => {
       const supabase = getUserScopedClient();
@@ -241,7 +296,8 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       title: 'Update Process Flow',
       description: 'Update process flow metadata such as name, description, context, or viewport.',
       inputSchema: updateProcessFlowToolSchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(processFlowEntitySchema),
+      annotations: updateAnnotations,
     },
     withToolErrorBoundary('processflow_update', async ({ process_flow_id, ...changes }) => {
       const supabase = getUserScopedClient();
@@ -260,7 +316,8 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
     {
       title: 'Delete Process Flow',
       description: 'Destructive. Deletes a process flow and all nested nodes and edges.',
-      inputSchema: z.object({ process_flow_id: z.string().uuid() }).strict(),
+      inputSchema: z.object({ process_flow_id: z.string().uuid().describe('Process flow UUID to delete') }).strict(),
+      outputSchema: successOutputSchema(deletedRowSchema(processFlowEntitySchema)),
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('processflow_delete', async ({ process_flow_id }) => {
@@ -276,13 +333,36 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
   );
 
   server.registerTool(
+    'processflow_nodes_mutate',
+    {
+      title: 'Batch Mutate Process Flow Nodes',
+      description:
+        'Atomically apply multiple related node creates, updates, or deletes to one process flow. Prefer this batch tool for coordinated graph changes; use the single-node tools for one isolated change.',
+      inputSchema: batchMutateProcessFlowNodesSchema,
+      outputSchema: successOutputSchema(processFlowNodeMutationResultSchema),
+      annotations: batchMutationAnnotations,
+    },
+    withToolErrorBoundary('processflow_nodes_mutate', async (input) => {
+      const supabase = getUserScopedClient();
+      const { data, error } = await batchMutateProcessFlowNodes(supabase, input);
+      if (error || !data) {
+        if (isNotFound(error)) return errorResult('Process flow not found');
+        return errorResult('Failed to mutate process flow nodes', describeDbError(error));
+      }
+
+      return successResult(data);
+    }),
+  );
+
+  server.registerTool(
     'processflow_node_create',
     {
       title: 'Create Process Flow Node',
       description:
-        'Create a node in a process flow. Node data fields include label, owner_role, systems, inputs, outputs, pain_points, notes, automation_opportunity, frequency, estimated_duration, and time_constraint.',
+        'Create one isolated node. Prefer processflow_nodes_mutate for multiple related node changes. Node data fields include label, owner_role, systems, inputs, outputs, pain_points, notes, automation_opportunity, frequency, estimated_duration, and time_constraint.',
       inputSchema: createProcessFlowNodeSchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(processFlowNodeEntitySchema),
+      annotations: createAnnotations,
     },
     withToolErrorBoundary('processflow_node_create', async (input) => {
       const supabase = getUserScopedClient();
@@ -298,9 +378,10 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
     {
       title: 'Update Process Flow Node',
       description:
-        'Update a process flow node. Use this for label, ownership, metadata, position, or node data changes including systems, inputs, outputs, pain_points, notes, automation_opportunity, frequency, estimated_duration, and time_constraint.',
+        'Update one isolated node. Prefer processflow_nodes_mutate for multiple related node changes. Use this for label, ownership, metadata, position, or node data changes including systems, inputs, outputs, pain_points, notes, automation_opportunity, frequency, estimated_duration, and time_constraint.',
       inputSchema: updateProcessFlowNodeToolSchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(processFlowNodeEntitySchema),
+      annotations: updateAnnotations,
     },
     withToolErrorBoundary('processflow_node_update', async ({ process_flow_id, node_id, ...changes }) => {
       const supabase = getUserScopedClient();
@@ -319,7 +400,13 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
     {
       title: 'Delete Process Flow Node',
       description: 'Destructive. Deletes a process flow node and any connected edges removed by cascade.',
-      inputSchema: z.object({ process_flow_id: z.string().uuid(), node_id: z.string().uuid() }).strict(),
+      inputSchema: z
+        .object({
+          process_flow_id: z.string().uuid().describe('UUID of the process flow containing the node'),
+          node_id: z.string().uuid().describe('Process flow node UUID to delete'),
+        })
+        .strict(),
+      outputSchema: successOutputSchema(deletedRowSchema(processFlowNodeEntitySchema)),
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('processflow_node_delete', async ({ process_flow_id, node_id }) => {
@@ -335,12 +422,36 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
   );
 
   server.registerTool(
+    'processflow_edges_mutate',
+    {
+      title: 'Batch Mutate Process Flow Edges',
+      description:
+        'Atomically apply multiple related edge creates, updates, or deletes to one process flow. Prefer this batch tool for coordinated graph changes; use the single-edge tools for one isolated change.',
+      inputSchema: batchMutateProcessFlowEdgesSchema,
+      outputSchema: successOutputSchema(processFlowEdgeMutationResultSchema),
+      annotations: batchMutationAnnotations,
+    },
+    withToolErrorBoundary('processflow_edges_mutate', async (input) => {
+      const supabase = getUserScopedClient();
+      const { data, error } = await batchMutateProcessFlowEdges(supabase, input);
+      if (error || !data) {
+        if (isNotFound(error)) return errorResult('Process flow not found');
+        return errorResult('Failed to mutate process flow edges', describeDbError(error));
+      }
+
+      return successResult(data);
+    }),
+  );
+
+  server.registerTool(
     'processflow_edge_create',
     {
       title: 'Create Process Flow Edge',
-      description: 'Create an edge between two nodes in a process flow. Edge data fields include label and condition.',
+      description:
+        'Create one isolated edge between two nodes. Prefer processflow_edges_mutate for multiple related edge changes. Edge data fields include label and condition.',
       inputSchema: createProcessFlowEdgeSchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(processFlowEdgeEntitySchema),
+      annotations: createAnnotations,
     },
     withToolErrorBoundary('processflow_edge_create', async (input) => {
       const supabase = getUserScopedClient();
@@ -356,9 +467,10 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
     {
       title: 'Update Process Flow Edge',
       description:
-        'Update a process flow edge. Use this for type changes or edge data updates including label and condition.',
+        'Update one isolated edge. Prefer processflow_edges_mutate for multiple related edge changes. Use this for type changes or edge data updates including label and condition.',
       inputSchema: updateProcessFlowEdgeToolSchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(processFlowEdgeEntitySchema),
+      annotations: updateAnnotations,
     },
     withToolErrorBoundary('processflow_edge_update', async ({ process_flow_id, edge_id, ...changes }) => {
       const supabase = getUserScopedClient();
@@ -377,7 +489,13 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
     {
       title: 'Delete Process Flow Edge',
       description: 'Destructive. Deletes a process flow edge.',
-      inputSchema: z.object({ process_flow_id: z.string().uuid(), edge_id: z.string().uuid() }).strict(),
+      inputSchema: z
+        .object({
+          process_flow_id: z.string().uuid().describe('UUID of the process flow containing the edge'),
+          edge_id: z.string().uuid().describe('Process flow edge UUID to delete'),
+        })
+        .strict(),
+      outputSchema: successOutputSchema(deletedRowSchema(processFlowEdgeEntitySchema)),
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('processflow_edge_delete', async ({ process_flow_id, edge_id }) => {
@@ -389,6 +507,28 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       }
 
       return successResult({ deleted: data });
+    }),
+  );
+
+  server.registerTool(
+    'processflow_autolayout',
+    {
+      title: 'Autolayout Process Flow',
+      description:
+        'Deterministically reposition every node in a process flow without changing graph semantics. Use after structural edits; repeating it against the same graph is safe.',
+      inputSchema: processFlowAutolayoutSchema,
+      outputSchema: successOutputSchema(processFlowAutolayoutResultSchema),
+      annotations: updateAnnotations,
+    },
+    withToolErrorBoundary('processflow_autolayout', async ({ process_flow_id }) => {
+      const supabase = getUserScopedClient();
+      const { data, error } = await autolayoutProcessFlow(supabase, process_flow_id);
+      if (error || !data) {
+        if (isNotFound(error)) return errorResult('Process flow not found');
+        return errorResult('Failed to lay out process flow', describeDbError(error));
+      }
+
+      return successResult(data);
     }),
   );
 }

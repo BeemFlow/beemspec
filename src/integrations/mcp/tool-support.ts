@@ -3,7 +3,7 @@ import type { Supabase } from '@/lib/supabase/types';
 import { listTeamsForUser } from '@/lib/teams';
 
 function jsonText(value: unknown): string {
-  return JSON.stringify(value, null, 2);
+  return JSON.stringify(value);
 }
 
 export function successResult<T>(data: T) {
@@ -38,19 +38,8 @@ export function isNotFound(error: unknown): boolean {
 }
 
 export function describeDbError(error: unknown): Record<string, unknown> {
-  if (typeof error !== 'object' || !error) return { message: 'Unknown database error' };
-
-  const message = Reflect.get(error, 'message');
-  const details = Reflect.get(error, 'details');
-  const hint = Reflect.get(error, 'hint');
-  const code = Reflect.get(error, 'code');
-
-  return {
-    ...(typeof message === 'string' ? { message } : {}),
-    ...(typeof details === 'string' ? { details } : {}),
-    ...(typeof hint === 'string' ? { hint } : {}),
-    ...(typeof code === 'string' ? { code } : {}),
-  };
+  const code = dbCode(error);
+  return code ? { code } : {};
 }
 
 type ToolCall<Input> = (args: Input) => Promise<ReturnType<typeof successResult> | ReturnType<typeof errorResult>>;
@@ -73,15 +62,20 @@ export const readAnnotations = {
   openWorldHint: false,
 } as const;
 
-export const mutateAnnotations = {
+export const createAnnotations = {
   readOnlyHint: false,
   idempotentHint: false,
   destructiveHint: false,
   openWorldHint: false,
 } as const;
 
+export const updateAnnotations = {
+  ...createAnnotations,
+  idempotentHint: true,
+} as const;
+
 export const destructiveAnnotations = {
-  ...mutateAnnotations,
+  ...updateAnnotations,
   destructiveHint: true,
 } as const;
 
