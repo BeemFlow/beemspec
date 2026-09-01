@@ -5,19 +5,88 @@ import { updateStoryToolSchema } from '@/domain/story-map/schemas';
 import type { Supabase } from '@/lib/supabase/types';
 import { createStory, deleteStory, getStory, moveStory, reorderStories, updateStory } from '@/storymap/service';
 import { buildMutationGuidance } from '../insights/story-map';
+import {
+  databaseRowSchema,
+  deletedRowSchema,
+  mcpUuidSchema,
+  nonNegativeCountSchema,
+  successOutputSchema,
+} from '../output-schemas';
 import { getStoryContext } from '../queries';
 import {
+  createAnnotations,
   describeDbError,
   destructiveAnnotations,
   errorResult,
   isNotFound,
-  mutateAnnotations,
   readAnnotations,
   successResult,
+  updateAnnotations,
   withToolErrorBoundary,
 } from '../tool-support';
 
 const moveStoryToolSchema = moveStorySchema.extend({ story_id: z.string().uuid() });
+const nullableTextSchema = z.string().nullable();
+const storyContentOutputSchema = z
+  .object({
+    user_story: z.string(),
+    acceptance_criteria: z.string(),
+    figma_link: nullableTextSchema.optional(),
+    edge_cases: nullableTextSchema.optional(),
+    technical_guidelines: nullableTextSchema.optional(),
+  })
+  .passthrough();
+const storyRowSchema = z
+  .object({
+    id: mcpUuidSchema,
+    task_id: mcpUuidSchema,
+    release_id: mcpUuidSchema.nullable(),
+    title: z.string(),
+    status: z.string(),
+    sort_order: z.number().int(),
+    content: storyContentOutputSchema,
+  })
+  .passthrough();
+const mutationGuidanceSchema = z
+  .object({
+    next_recommended_reads: z.array(z.string()),
+    verification_hints: z.array(z.string()),
+    warnings: z.array(z.string()),
+  })
+  .strict();
+const storyContextSchema = z
+  .object({
+    storyId: mcpUuidSchema,
+    storyTitle: z.string(),
+    storyStatus: z.string(),
+    storyMapId: mcpUuidSchema,
+    storyMapName: z.string(),
+    activityId: mcpUuidSchema,
+    activityName: z.string(),
+    taskId: mcpUuidSchema,
+    taskName: z.string(),
+    releaseId: mcpUuidSchema.nullable(),
+    releaseName: nullableTextSchema,
+    userStory: z.string(),
+    acceptanceCriteria: z.string(),
+    personas: z.array(
+      z
+        .object({
+          id: mcpUuidSchema,
+          name: z.string(),
+        })
+        .passthrough(),
+    ),
+    agentGuidance: z
+      .object({
+        riskFlags: z.array(z.string()),
+        missingContext: z.array(z.string()),
+        verificationFocus: z.array(z.string()),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+const storyMutationSchema = storyRowSchema.extend({ agent_guidance: mutationGuidanceSchema });
 
 export function registerStoryTools(server: McpServer, supabase: Supabase): void {
   const getUserScopedClient = () => supabase;
@@ -27,6 +96,7 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
       title: 'Get Story',
       description: 'Load one story by ID when full map context is not required.',
       inputSchema: z.object({ story_id: z.string().uuid() }).strict(),
+      outputSchema: successOutputSchema(storyRowSchema.extend({ agent_context: storyContextSchema.nullable() })),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('story_get', async ({ story_id }) => {
@@ -51,7 +121,8 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
       title: 'Create Story',
       description: 'Create a story in a task/release cell. Requires task_id and structured story content.',
       inputSchema: createStorySchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(storyMutationSchema),
+      annotations: createAnnotations,
     },
     withToolErrorBoundary('story_create', async (input) => {
       const supabase = getUserScopedClient();
@@ -75,9 +146,10 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
     {
       title: 'Update Story',
       description:
-        'Update story fields like title, status, or content. Use story_move for task/release placement changes.',
+        'Update at least one story field such as title, status, or content. Use story_move for placement changes.',
       inputSchema: updateStoryToolSchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(storyMutationSchema),
+      annotations: updateAnnotations,
     },
     withToolErrorBoundary('story_update', async ({ story_id, ...changes }) => {
       const supabase = getUserScopedClient();
@@ -105,6 +177,7 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
       title: 'Delete Story',
       description: 'Destructive. Deletes a story from the map.',
       inputSchema: z.object({ story_id: z.string().uuid() }).strict(),
+      outputSchema: successOutputSchema(deletedRowSchema(databaseRowSchema)),
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('story_delete', async ({ story_id }) => {
@@ -126,7 +199,17 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
       title: 'Reorder Stories',
       description: 'Reorder stories within a specific task+release cell using a full ordered story ID list.',
       inputSchema: reorderStoriesSchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(
+        z
+          .object({
+            reordered: nonNegativeCountSchema,
+            task_id: mcpUuidSchema,
+            release_id: mcpUuidSchema.nullable(),
+            agent_guidance: mutationGuidanceSchema,
+          })
+          .strict(),
+      ),
+      annotations: updateAnnotations,
     },
     withToolErrorBoundary('story_reorder', async ({ task_id, release_id, order }) => {
       const supabase = getUserScopedClient();
@@ -152,7 +235,18 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
       title: 'Move Story',
       description: 'Atomically move a story to another task/release cell and set full target order in one operation.',
       inputSchema: moveStoryToolSchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(
+        z
+          .object({
+            moved: mcpUuidSchema,
+            target_task_id: mcpUuidSchema,
+            target_release_id: mcpUuidSchema.nullable(),
+            target_order_size: nonNegativeCountSchema,
+            agent_guidance: mutationGuidanceSchema,
+          })
+          .strict(),
+      ),
+      annotations: updateAnnotations,
     },
     withToolErrorBoundary('story_move', async ({ story_id, ...input }) => {
       const supabase = getUserScopedClient();
