@@ -1,15 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import {
-  createActivitySchema,
-  createReleaseSchema,
-  createTaskSchema,
-  moveTaskSchema,
-  reorderActivitiesSchema,
-  reorderReleasesSchema,
-  reorderTasksSchema,
-} from '@/domain/story-map';
-import { updateActivityToolSchema, updateReleaseToolSchema, updateTaskToolSchema } from '@/domain/story-map/schemas';
 import type { Supabase } from '@/lib/supabase/types';
 import {
   createActivity,
@@ -26,6 +16,18 @@ import {
   updateRelease,
   updateTask,
 } from '@/storymap/service';
+import {
+  createActivitySchema,
+  createReleaseSchema,
+  createTaskSchema,
+  moveTaskSchema,
+  reorderActivitiesSchema,
+  reorderReleasesSchema,
+  reorderTasksSchema,
+  updateActivityToolSchema,
+  updateReleaseToolSchema,
+  updateTaskToolSchema,
+} from '../input-schemas';
 import { buildMutationGuidance } from '../insights/story-map';
 import { deletedRowSchema, mcpUuidSchema, nonNegativeCountSchema, successOutputSchema } from '../output-schemas';
 import { activityRowSchema, mutationGuidanceSchema, releaseRowSchema, taskRowSchema } from '../story-output-schemas';

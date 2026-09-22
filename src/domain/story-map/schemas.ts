@@ -4,19 +4,14 @@ import { z } from 'zod';
 // Shared primitives
 // ---------------------------------------------------------------------------
 
-const MAX_TEXT_LENGTH = 20_000;
-const MAX_MARKDOWN_LENGTH = 100_000;
-const MAX_ORDER_ITEMS = 1_000;
-
 const uuid = (description: string) => z.string().uuid().describe(description);
-const nullableText = (description: string, max = MAX_TEXT_LENGTH) =>
-  z.string().min(1).max(max).nullable().describe(`${description} Pass null to clear it.`);
+const nullableText = (description: string) =>
+  z.string().min(1).nullable().describe(`${description} Pass null to clear it.`);
 const name = (description: string) => z.string().min(1, 'Required').max(200).describe(description);
 const uniqueUuidOrder = (description: string, itemDescription: string) =>
   z
     .array(uuid(itemDescription))
     .min(1, 'Order array cannot be empty')
-    .max(MAX_ORDER_ITEMS, `Order cannot contain more than ${MAX_ORDER_ITEMS} IDs`)
     .refine((ids) => new Set(ids).size === ids.length, 'Order must not contain duplicate IDs')
     .meta({ uniqueItems: true })
     .describe(`${description} Each ID must appear exactly once.`);
@@ -44,14 +39,12 @@ export const storyContentSchema = z
     user_story: z
       .string()
       .min(1, 'Required')
-      .max(MAX_MARKDOWN_LENGTH)
       .describe('User-centered story statement, including the actor, desired capability, and outcome.'),
     acceptance_criteria: z
       .string()
       .min(1, 'Required')
-      .max(MAX_MARKDOWN_LENGTH)
       .describe('Testable acceptance criteria, preferably as concise Markdown.'),
-    figma_link: z.url().max(2_048).nullable().optional().describe('Related Figma design URL. Pass null to clear it.'),
+    figma_link: z.url().nullable().optional().describe('Related Figma design URL. Pass null to clear it.'),
     edge_cases: nullableText('Known edge cases and exceptional behavior.').optional(),
     technical_guidelines: nullableText('Implementation constraints or technical guidance.').optional(),
   })
@@ -66,10 +59,7 @@ export const storyMapBase = z
     team_id: uuid('Team UUID that owns the story map.'),
     name: name('Human-readable story map name.'),
     description: nullableText('Short story map description.'),
-    context_markdown: nullableText(
-      'Long-form Markdown product context, decisions, constraints, and links for agents.',
-      MAX_MARKDOWN_LENGTH,
-    ),
+    context_markdown: nullableText('Long-form Markdown product context, decisions, constraints, and links for agents.'),
   })
   .strict();
 
@@ -95,10 +85,7 @@ export const releaseBase = z
     story_map_id: uuid('Story map UUID that owns the release.'),
     name: name('Human-readable release name.'),
     description: nullableText('Short release description.'),
-    context_markdown: nullableText(
-      'Long-form Markdown release scope, decisions, constraints, and links for agents.',
-      MAX_MARKDOWN_LENGTH,
-    ),
+    context_markdown: nullableText('Long-form Markdown release scope, decisions, constraints, and links for agents.'),
   })
   .strict();
 

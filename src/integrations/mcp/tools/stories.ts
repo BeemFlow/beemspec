@@ -1,9 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { createStorySchema, moveStorySchema, reorderStoriesSchema } from '@/domain/story-map';
-import { updateStoryToolSchema } from '@/domain/story-map/schemas';
 import type { Supabase } from '@/lib/supabase/types';
 import { createStory, deleteStory, getStory, moveStory, reorderStories, updateStory } from '@/storymap/service';
+import { createStorySchema, moveStorySchema, reorderStoriesSchema, updateStoryToolSchema } from '../input-schemas';
 import { buildMutationGuidance } from '../insights/story-map';
 import {
   databaseRowSchema,

@@ -159,7 +159,7 @@ describe('mcp server', () => {
     }
   });
 
-  it('publishes lookup exclusivity, unique ordering, and replacement semantics to clients', async () => {
+  it('publishes lookup exclusivity, input budgets, unique ordering, and replacement semantics to clients', async () => {
     const response = await handleMcpRequest(
       rpcRequest({ jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} }),
       supabase,
@@ -190,6 +190,22 @@ describe('mcp server', () => {
     const target = { task_id: testIds.task, release_id: null };
     expect(validateOrder({ ...target, order: [testIds.story, testIds.story] }).valid).toBe(false);
     expect(validateOrder({ ...target, order: [testIds.story, testIds.otherStory] }).valid).toBe(true);
+
+    const mapUpdate = schemas.get('storymap_update');
+    if (!mapUpdate) throw new Error('Missing storymap_update schema');
+    const validateMap = validator.getValidator(mapUpdate);
+    expect(validateMap({ story_map_id: testIds.storyMap, description: 'x'.repeat(20_001) }).valid).toBe(false);
+    expect(validateMap({ story_map_id: testIds.storyMap, description: null }).valid).toBe(true);
+    for (const name of ['processflow_nodes_mutate', 'processflow_edges_mutate']) {
+      const schema = schemas.get(name);
+      if (!schema) throw new Error(`Missing ${name} schema`);
+      const validateBatch = validator.getValidator(schema);
+      const mutations = Array.from({ length: 101 }, () => ({ action: 'delete', id: testIds.processNode }));
+      expect(validateBatch({ process_flow_id: testIds.processFlow, mutations }).valid).toBe(false);
+      expect(validateBatch({ process_flow_id: testIds.processFlow, mutations: mutations.slice(0, 100) }).valid).toBe(
+        true,
+      );
+    }
 
     for (const name of ['processflow_node_update', 'processflow_nodes_mutate']) {
       expect(JSON.stringify(schemas.get(name))).toContain('replaces the entire data object');

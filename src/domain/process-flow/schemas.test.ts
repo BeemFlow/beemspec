@@ -37,9 +37,9 @@ describe('process flow model-facing schemas', () => {
   it.each([
     ['node', batchMutateProcessFlowNodesSchema],
     ['edge', batchMutateProcessFlowEdgesSchema],
-  ])('limits %s mutation batches', (_entity, schema) => {
+  ])('allows REST %s mutation batches larger than the MCP budget', (_entity, schema) => {
     const mutations = Array.from({ length: 101 }, (_, index) => ({ action: 'delete' as const, id: id(index + 1) }));
 
-    expect(schema.safeParse({ process_flow_id: id(200), mutations }).success).toBe(false);
+    expect(schema.safeParse({ process_flow_id: id(200), mutations }).success).toBe(true);
   });
 });

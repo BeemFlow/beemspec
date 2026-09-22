@@ -1,7 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { createStoryMapSchema } from '@/domain/story-map';
-import { updateStoryMapToolSchema } from '@/domain/story-map/schemas';
 import type { AuthenticatedUser } from '@/lib/auth';
 import type { Supabase } from '@/lib/supabase/types';
 import {
@@ -11,6 +9,7 @@ import {
   listStoryMaps,
   updateStoryMap,
 } from '@/storymap/service';
+import { createStoryMapSchema, updateStoryMapToolSchema } from '../input-schemas';
 import {
   buildPlanningLanes,
   buildStoryMapInsights,

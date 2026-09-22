@@ -1,20 +1,12 @@
 import { z } from 'zod';
 
-const MAX_TEXT_LENGTH = 20_000;
-const MAX_MARKDOWN_LENGTH = 100_000;
-const MAX_COLLECTION_ITEMS = 200;
-const MAX_BATCH_MUTATIONS = 100;
-
 const uuid = (description: string) => z.string().uuid().describe(description);
-const nullableText = (description: string, max = MAX_TEXT_LENGTH) =>
-  z.string().min(1).max(max).nullable().describe(`${description} Pass null to clear it.`);
+const nullableText = (description: string) =>
+  z.string().min(1).nullable().describe(`${description} Pass null to clear it.`);
 const name = (description: string) => z.string().min(1, 'Required').max(200).describe(description);
 const nonEmptyLabel = (description: string) => z.string().min(1, 'Required').max(200).describe(description);
 const stringList = (description: string, itemDescription: string) =>
-  z
-    .array(z.string().min(1).max(2_000).describe(itemDescription))
-    .max(MAX_COLLECTION_ITEMS, `Collection cannot contain more than ${MAX_COLLECTION_ITEMS} items`)
-    .describe(description);
+  z.array(z.string().min(1).describe(itemDescription)).describe(description);
 
 const atLeastOneField = <T extends Record<string, unknown>>(data: T): boolean =>
   Object.values(data).some((value) => value !== undefined);
@@ -67,7 +59,6 @@ export const processFlowBase = z
     description: nullableText('Short process flow description.'),
     context_markdown: nullableText(
       'Long-form Markdown operational context, decisions, constraints, and links for agents.',
-      MAX_MARKDOWN_LENGTH,
     ),
     viewport: processFlowViewportSchema
       .nullable()
@@ -211,7 +202,6 @@ export const batchMutateProcessFlowNodesSchema = z
     mutations: z
       .array(batchProcessFlowNodeMutationSchema)
       .min(1, 'At least one mutation is required')
-      .max(MAX_BATCH_MUTATIONS, `Batch cannot contain more than ${MAX_BATCH_MUTATIONS} mutations`)
       .describe('Ordered node mutations applied atomically in one transaction.'),
   })
   .strict();
@@ -246,7 +236,6 @@ export const batchMutateProcessFlowEdgesSchema = z
     mutations: z
       .array(batchProcessFlowEdgeMutationSchema)
       .min(1, 'At least one mutation is required')
-      .max(MAX_BATCH_MUTATIONS, `Batch cannot contain more than ${MAX_BATCH_MUTATIONS} mutations`)
       .describe('Ordered edge mutations applied atomically in one transaction.'),
   })
   .strict();

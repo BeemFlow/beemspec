@@ -57,12 +57,52 @@ const publicOperationErrors = new Set([
   'Source and target nodes must belong to the same process flow',
 ]);
 
+const uuidPattern = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const missingFlowEntity = new RegExp(
+  `^Process flow (node|edge) (${uuidPattern}) not found in flow (${uuidPattern})$`,
+  'i',
+);
+const staleFlowLayout = new RegExp(
+  `^Layout update expected [0-9]+ nodes but updated [0-9]+ nodes for flow ${uuidPattern}$`,
+  'i',
+);
+const publicConstraintErrors: Record<string, string> = {
+  '23514:new row for relation "process_flow_edges" violates check constraint "chk_process_flow_edges_source_target_distinct"':
+    'An edge cannot connect a node to itself. Choose distinct source and target nodes.',
+  '23505:duplicate key value violates unique constraint "uq_process_flow_edges_unique_connection"':
+    'An edge with this type, source, and target already exists. Reload with processflow_get and use the existing edge.',
+  '23503:insert or update on table "process_flow_edges" violates foreign key constraint "fk_process_flow_edges_source_in_flow"':
+    'The source node is not available in this process flow. Reload with processflow_get and use a current node ID.',
+  '23503:insert or update on table "process_flow_edges" violates foreign key constraint "fk_process_flow_edges_target_in_flow"':
+    'The target node is not available in this process flow. Reload with processflow_get and use a current node ID.',
+};
+
 export function describeDbError(error: unknown): Record<string, unknown> {
   const code = dbCode(error);
   const details = code ? { code } : {};
   const message = typeof error === 'object' && error ? Reflect.get(error, 'message') : undefined;
-  if (typeof message === 'string' && publicOperationErrors.has(message)) {
-    return { ...details, message };
+  if (typeof message === 'string') {
+    if (publicOperationErrors.has(message)) return { ...details, message };
+
+    if (code === 'P0001') {
+      const missing = missingFlowEntity.exec(message);
+      if (missing) {
+        const [, entity, id, flowId] = missing;
+        return {
+          ...details,
+          message: `Process flow ${entity} ${id} is not available in flow ${flowId}. Reload with processflow_get and retry using current IDs; the batch was not applied.`,
+        };
+      }
+      if (staleFlowLayout.test(message)) {
+        return {
+          ...details,
+          message: 'The process flow changed during layout. Reload with processflow_get and retry autolayout.',
+        };
+      }
+    }
+
+    const constraintMessage = publicConstraintErrors[`${code}:${message}`];
+    if (constraintMessage) return { ...details, message: constraintMessage };
   }
 
   if (error) {

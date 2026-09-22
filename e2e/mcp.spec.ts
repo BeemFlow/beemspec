@@ -1,9 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { expect, test } from '@playwright/test';
 import { z } from 'zod';
 import { resetE2EState } from './helpers';
 import {
   createPublicClient,
+  E2E_EDGE_REVIEW_ID,
+  E2E_NODE_APPROVED_ID,
   E2E_NODE_RECEIVE_ID,
   E2E_OWNER_EMAIL,
   E2E_OWNER_PASSWORD,
@@ -139,6 +142,77 @@ test('serves authenticated MCP tools over the v2 HTTP transport', async ({ baseU
       },
     });
 
+    await test.step('reject oversized MCP batches without applying changes', async () => {
+      for (const [name, id] of [
+        ['processflow_nodes_mutate', E2E_NODE_RECEIVE_ID],
+        ['processflow_edges_mutate', E2E_EDGE_REVIEW_ID],
+      ]) {
+        const result = await client.callTool({
+          name,
+          arguments: {
+            process_flow_id: E2E_PROCESS_FLOW_ID,
+            mutations: Array.from({ length: 101 }, () => ({ action: 'delete', id })),
+          },
+        });
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain('100');
+      }
+    });
+
+    await test.step('report stale records and roll back earlier batch updates', async () => {
+      for (const [name, id, payload] of [
+        ['processflow_nodes_mutate', E2E_NODE_RECEIVE_ID, { data: { label: 'Must roll back' } }],
+        ['processflow_edges_mutate', E2E_EDGE_REVIEW_ID, { data: { label: 'Must roll back' } }],
+      ] as const) {
+        const missingId = randomUUID();
+        const result = await client.callTool({
+          name,
+          arguments: {
+            process_flow_id: E2E_PROCESS_FLOW_ID,
+            mutations: [
+              { action: 'update', id, payload },
+              { action: 'delete', id: missingId },
+            ],
+          },
+        });
+        expect(result.isError).toBe(true);
+        expect(result.structuredContent).toMatchObject({
+          ok: false,
+          details: { code: 'P0001', message: expect.stringContaining(missingId) },
+        });
+        expect(JSON.stringify(result.structuredContent)).toContain('processflow_get');
+        expect(JSON.stringify(result.structuredContent)).toContain('batch was not applied');
+      }
+    });
+
+    await test.step('explain known edge constraints without exposing database diagnostics', async () => {
+      for (const { source, target, code, message } of [
+        { source: E2E_NODE_RECEIVE_ID, target: E2E_NODE_RECEIVE_ID, code: '23514', message: 'cannot connect' },
+        { source: E2E_NODE_RECEIVE_ID, target: E2E_NODE_APPROVED_ID, code: '23505', message: 'already exists' },
+        { source: randomUUID(), target: E2E_NODE_APPROVED_ID, code: '23503', message: 'source node' },
+        { source: E2E_NODE_RECEIVE_ID, target: randomUUID(), code: '23503', message: 'target node' },
+      ]) {
+        const result = await client.callTool({
+          name: 'processflow_edges_mutate',
+          arguments: {
+            process_flow_id: E2E_PROCESS_FLOW_ID,
+            mutations: [
+              {
+                action: 'create',
+                payload: { type: 'flow', source_node_id: source, target_node_id: target },
+              },
+            ],
+          },
+        });
+        expect(result.isError).toBe(true);
+        expect(result.structuredContent).toMatchObject({
+          ok: false,
+          details: { code, message: expect.stringContaining(message) },
+        });
+        expect(JSON.stringify(result.structuredContent)).not.toMatch(/constraint|process_flow_edges|Key \(/);
+      }
+    });
+
     const layoutResult = await client.callTool({
       name: 'processflow_autolayout',
       arguments: { process_flow_id: E2E_PROCESS_FLOW_ID },
@@ -148,6 +222,7 @@ test('serves authenticated MCP tools over the v2 HTTP transport', async ({ baseU
       ok: true,
       data: {
         nodes: expect.arrayContaining([expect.objectContaining({ id: E2E_NODE_RECEIVE_ID, data: updatedNodeData })]),
+        edges: [expect.objectContaining({ id: E2E_EDGE_REVIEW_ID, data: { label: 'Review' } })],
       },
     });
   } finally {
