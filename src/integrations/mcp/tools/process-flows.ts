@@ -35,7 +35,13 @@ import {
   validateProcessFlowGraph,
 } from '@/processflow/service';
 import { buildProcessFlowAgentInsights } from '../insights/process-flow';
-import { deletedRowSchema, mcpUuidSchema, nonNegativeCountSchema, successOutputSchema } from '../output-schemas';
+import { deletedRowSchema, nonNegativeCountSchema, successOutputSchema } from '../output-schemas';
+import {
+  processFlowEdgeEntitySchema,
+  processFlowEntitySchema,
+  processFlowNodeRowSchema,
+  processFlowNodeSchema,
+} from '../process-flow-output-schemas';
 import {
   createAnnotations,
   describeDbError,
@@ -53,38 +59,6 @@ import {
 const createProcessFlowToolSchema = createProcessFlowSchema.extend({
   team_id: z.string().uuid().optional().describe('Team UUID (optional for single-team users)'),
 });
-
-const processFlowEntitySchema = z
-  .object({
-    id: mcpUuidSchema,
-    team_id: mcpUuidSchema,
-    name: z.string(),
-    description: z.string().nullable(),
-    context_markdown: z.string().nullable(),
-    viewport: z.object({ x: z.number(), y: z.number(), zoom: z.number() }).strict().nullable(),
-    schema_version: z.literal(1),
-  })
-  .passthrough();
-
-const processFlowNodeEntitySchema = z
-  .object({
-    id: mcpUuidSchema,
-    process_flow_id: mcpUuidSchema,
-    type: z.enum(['step', 'decision', 'subprocess', 'actor', 'system', 'note']),
-    data: z.object({ label: z.string() }).passthrough(),
-  })
-  .passthrough();
-
-const processFlowEdgeEntitySchema = z
-  .object({
-    id: mcpUuidSchema,
-    process_flow_id: mcpUuidSchema,
-    type: z.enum(['flow', 'handoff', 'exception', 'dependency']),
-    source_node_id: mcpUuidSchema,
-    target_node_id: mcpUuidSchema,
-    data: z.object({}).passthrough().nullable(),
-  })
-  .passthrough();
 
 const processFlowValidationSchema = z
   .object({
@@ -115,7 +89,7 @@ const processFlowInsightsSchema = z
   .strict();
 
 const processFlowContextSchema = processFlowEntitySchema.extend({
-  nodes: z.array(processFlowNodeEntitySchema),
+  nodes: z.array(processFlowNodeSchema),
   edges: z.array(processFlowEdgeEntitySchema),
   agent_insights: processFlowInsightsSchema,
   validation: processFlowValidationSchema,
@@ -123,9 +97,9 @@ const processFlowContextSchema = processFlowEntitySchema.extend({
 
 const processFlowNodeMutationResultSchema = z
   .object({
-    created: z.array(processFlowNodeEntitySchema),
-    updated: z.array(processFlowNodeEntitySchema),
-    deleted: z.array(processFlowNodeEntitySchema),
+    created: z.array(processFlowNodeSchema),
+    updated: z.array(processFlowNodeSchema),
+    deleted: z.array(processFlowNodeSchema),
   })
   .strict();
 
@@ -139,7 +113,7 @@ const processFlowEdgeMutationResultSchema = z
 
 const processFlowAutolayoutResultSchema = z
   .object({
-    nodes: z.array(processFlowNodeEntitySchema),
+    nodes: z.array(processFlowNodeSchema),
     edges: z.array(processFlowEdgeEntitySchema),
   })
   .strict();
@@ -150,7 +124,6 @@ const batchMutationAnnotations = {
 } as const;
 
 export function registerProcessFlowTools(server: McpServer, supabase: Supabase, user: AuthenticatedUser): void {
-  const getUserScopedClient = () => supabase;
   server.registerTool(
     'processflow_list',
     {
@@ -164,7 +137,6 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       annotations: readAnnotations,
     },
     withToolErrorBoundary('processflow_list', async ({ team_id }) => {
-      const supabase = getUserScopedClient();
       const resolvedTeam = await resolveAccessibleTeamId(supabase, user.id, team_id);
       if (!resolvedTeam.ok) return resolvedTeam.response;
 
@@ -203,12 +175,12 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
         .strict()
         .refine(({ process_flow_id, process_flow_name }) => Boolean(process_flow_id) !== Boolean(process_flow_name), {
           message: 'Provide exactly one of process_flow_id or process_flow_name',
-        }),
+        })
+        .meta({ oneOf: [{ required: ['process_flow_id'] }, { required: ['process_flow_name'] }] }),
       outputSchema: successOutputSchema(processFlowContextSchema),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('processflow_get', async ({ process_flow_id, process_flow_name, team_id }) => {
-      const supabase = getUserScopedClient();
       let resolvedProcessFlowId = process_flow_id;
 
       if (!resolvedProcessFlowId && process_flow_name) {
@@ -252,7 +224,6 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       annotations: readAnnotations,
     },
     withToolErrorBoundary('processflow_validation_get', async ({ process_flow_id }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await validateProcessFlowById(supabase, process_flow_id);
       if (error) {
         if (isNotFound(error)) return errorResult('Process flow not found');
@@ -273,7 +244,6 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       annotations: createAnnotations,
     },
     withToolErrorBoundary('processflow_create', async (input) => {
-      const supabase = getUserScopedClient();
       const resolvedTeam = await resolveAccessibleTeamId(supabase, user.id, input.team_id);
       if (!resolvedTeam.ok) return resolvedTeam.response;
 
@@ -300,7 +270,6 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('processflow_update', async ({ process_flow_id, ...changes }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await updateProcessFlow(supabase, process_flow_id, changes);
       if (error) {
         if (isNotFound(error)) return errorResult('Process flow not found');
@@ -321,7 +290,6 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('processflow_delete', async ({ process_flow_id }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await deleteProcessFlow(supabase, process_flow_id);
       if (error) {
         if (isNotFound(error)) return errorResult('Process flow not found');
@@ -343,7 +311,6 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       annotations: batchMutationAnnotations,
     },
     withToolErrorBoundary('processflow_nodes_mutate', async (input) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await batchMutateProcessFlowNodes(supabase, input);
       if (error || !data) {
         if (isNotFound(error)) return errorResult('Process flow not found');
@@ -361,11 +328,10 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       description:
         'Create one isolated node. Prefer processflow_nodes_mutate for multiple related node changes. Node data fields include label, owner_role, systems, inputs, outputs, pain_points, notes, automation_opportunity, frequency, estimated_duration, and time_constraint.',
       inputSchema: createProcessFlowNodeSchema,
-      outputSchema: successOutputSchema(processFlowNodeEntitySchema),
+      outputSchema: successOutputSchema(processFlowNodeRowSchema),
       annotations: createAnnotations,
     },
     withToolErrorBoundary('processflow_node_create', async (input) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await createProcessFlowNode(supabase, input);
       if (error) return errorResult('Failed to create process flow node', describeDbError(error));
 
@@ -380,11 +346,10 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       description:
         'Update one isolated node. Prefer processflow_nodes_mutate for multiple related node changes. Use this for label, ownership, metadata, position, or node data changes including systems, inputs, outputs, pain_points, notes, automation_opportunity, frequency, estimated_duration, and time_constraint.',
       inputSchema: updateProcessFlowNodeToolSchema,
-      outputSchema: successOutputSchema(processFlowNodeEntitySchema),
+      outputSchema: successOutputSchema(processFlowNodeRowSchema),
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('processflow_node_update', async ({ process_flow_id, node_id, ...changes }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await updateProcessFlowNode(supabase, process_flow_id, node_id, changes);
       if (error) {
         if (isNotFound(error)) return errorResult('Process flow node not found');
@@ -406,11 +371,10 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
           node_id: z.string().uuid().describe('Process flow node UUID to delete'),
         })
         .strict(),
-      outputSchema: successOutputSchema(deletedRowSchema(processFlowNodeEntitySchema)),
+      outputSchema: successOutputSchema(deletedRowSchema(processFlowNodeRowSchema)),
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('processflow_node_delete', async ({ process_flow_id, node_id }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await deleteProcessFlowNode(supabase, process_flow_id, node_id);
       if (error) {
         if (isNotFound(error)) return errorResult('Process flow node not found');
@@ -432,7 +396,6 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       annotations: batchMutationAnnotations,
     },
     withToolErrorBoundary('processflow_edges_mutate', async (input) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await batchMutateProcessFlowEdges(supabase, input);
       if (error || !data) {
         if (isNotFound(error)) return errorResult('Process flow not found');
@@ -454,7 +417,6 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       annotations: createAnnotations,
     },
     withToolErrorBoundary('processflow_edge_create', async (input) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await createProcessFlowEdge(supabase, input);
       if (error) return errorResult('Failed to create process flow edge', describeDbError(error));
 
@@ -473,7 +435,6 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('processflow_edge_update', async ({ process_flow_id, edge_id, ...changes }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await updateProcessFlowEdge(supabase, process_flow_id, edge_id, changes);
       if (error) {
         if (isNotFound(error)) return errorResult('Process flow edge not found');
@@ -499,7 +460,6 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('processflow_edge_delete', async ({ process_flow_id, edge_id }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await deleteProcessFlowEdge(supabase, process_flow_id, edge_id);
       if (error) {
         if (isNotFound(error)) return errorResult('Process flow edge not found');
@@ -521,7 +481,6 @@ export function registerProcessFlowTools(server: McpServer, supabase: Supabase, 
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('processflow_autolayout', async ({ process_flow_id }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await autolayoutProcessFlow(supabase, process_flow_id);
       if (error || !data) {
         if (isNotFound(error)) return errorResult('Process flow not found');

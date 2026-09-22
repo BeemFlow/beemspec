@@ -13,6 +13,7 @@ import {
   successOutputSchema,
 } from '../output-schemas';
 import { getStoryContext } from '../queries';
+import { mutationGuidanceSchema, storyContextSchema, storyRowSchema } from '../story-output-schemas';
 import {
   createAnnotations,
   describeDbError,
@@ -26,70 +27,9 @@ import {
 } from '../tool-support';
 
 const moveStoryToolSchema = moveStorySchema.extend({ story_id: z.string().uuid() });
-const nullableTextSchema = z.string().nullable();
-const storyContentOutputSchema = z
-  .object({
-    user_story: z.string(),
-    acceptance_criteria: z.string(),
-    figma_link: nullableTextSchema.optional(),
-    edge_cases: nullableTextSchema.optional(),
-    technical_guidelines: nullableTextSchema.optional(),
-  })
-  .passthrough();
-const storyRowSchema = z
-  .object({
-    id: mcpUuidSchema,
-    task_id: mcpUuidSchema,
-    release_id: mcpUuidSchema.nullable(),
-    title: z.string(),
-    status: z.string(),
-    sort_order: z.number().int(),
-    content: storyContentOutputSchema,
-  })
-  .passthrough();
-const mutationGuidanceSchema = z
-  .object({
-    next_recommended_reads: z.array(z.string()),
-    verification_hints: z.array(z.string()),
-    warnings: z.array(z.string()),
-  })
-  .strict();
-const storyContextSchema = z
-  .object({
-    storyId: mcpUuidSchema,
-    storyTitle: z.string(),
-    storyStatus: z.string(),
-    storyMapId: mcpUuidSchema,
-    storyMapName: z.string(),
-    activityId: mcpUuidSchema,
-    activityName: z.string(),
-    taskId: mcpUuidSchema,
-    taskName: z.string(),
-    releaseId: mcpUuidSchema.nullable(),
-    releaseName: nullableTextSchema,
-    userStory: z.string(),
-    acceptanceCriteria: z.string(),
-    personas: z.array(
-      z
-        .object({
-          id: mcpUuidSchema,
-          name: z.string(),
-        })
-        .passthrough(),
-    ),
-    agentGuidance: z
-      .object({
-        riskFlags: z.array(z.string()),
-        missingContext: z.array(z.string()),
-        verificationFocus: z.array(z.string()),
-      })
-      .passthrough(),
-  })
-  .passthrough();
 const storyMutationSchema = storyRowSchema.extend({ agent_guidance: mutationGuidanceSchema });
 
 export function registerStoryTools(server: McpServer, supabase: Supabase): void {
-  const getUserScopedClient = () => supabase;
   server.registerTool(
     'story_get',
     {
@@ -100,7 +40,6 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
       annotations: readAnnotations,
     },
     withToolErrorBoundary('story_get', async ({ story_id }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await getStory(supabase, story_id);
 
       if (error) {
@@ -125,7 +64,6 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
       annotations: createAnnotations,
     },
     withToolErrorBoundary('story_create', async (input) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await createStory(supabase, input);
 
       if (error) return errorResult('Failed to create story', describeDbError(error));
@@ -152,7 +90,6 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('story_update', async ({ story_id, ...changes }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await updateStory(supabase, story_id, changes);
 
       if (error) {
@@ -181,7 +118,6 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('story_delete', async ({ story_id }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await deleteStory(supabase, story_id);
 
       if (error) {
@@ -212,7 +148,6 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('story_reorder', async ({ task_id, release_id, order }) => {
-      const supabase = getUserScopedClient();
       const { error } = await reorderStories(supabase, { task_id, release_id, order });
 
       if (error) return errorResult('Failed to reorder stories', describeDbError(error));
@@ -249,7 +184,6 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('story_move', async ({ story_id, ...input }) => {
-      const supabase = getUserScopedClient();
       const { error } = await moveStory(supabase, story_id, input);
 
       if (error) return errorResult('Failed to move story', describeDbError(error));

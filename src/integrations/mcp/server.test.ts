@@ -1,3 +1,4 @@
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/client/validators/ajv';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as processflowService from '@/processflow/service';
 import * as storymapService from '@/storymap/service';
@@ -113,7 +114,7 @@ describe('mcp server', () => {
           name: string;
           inputSchema: Record<string, unknown>;
           outputSchema?: Record<string, unknown>;
-          annotations?: { idempotentHint?: boolean };
+          annotations?: { idempotentHint?: boolean; destructiveHint?: boolean };
         }>;
       };
     };
@@ -152,6 +153,48 @@ describe('mcp server', () => {
     expect(byName.get('story_create')?.annotations?.idempotentHint).toBe(false);
     expect(byName.get('story_update')?.annotations?.idempotentHint).toBe(true);
     expect(byName.get('story_delete')?.annotations?.idempotentHint).toBe(true);
+    expect(byName.get('story_create')?.annotations?.destructiveHint).toBe(false);
+    for (const name of ['story_update', 'story_delete', 'processflow_node_update', 'processflow_nodes_mutate']) {
+      expect(byName.get(name)?.annotations?.destructiveHint).toBe(true);
+    }
+  });
+
+  it('publishes lookup exclusivity, unique ordering, and replacement semantics to clients', async () => {
+    const response = await handleMcpRequest(
+      rpcRequest({ jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} }),
+      supabase,
+      user,
+    );
+    const payload = (await response.json()) as {
+      result: { tools: Array<{ name: string; inputSchema: Record<string, unknown> }> };
+    };
+    const validator = new AjvJsonSchemaValidator();
+    const schemas = new Map(payload.result.tools.map((tool) => [tool.name, tool.inputSchema]));
+
+    for (const [tool, idKey, nameKey] of [
+      ['storymap_get', 'story_map_id', 'story_map_name'],
+      ['processflow_get', 'process_flow_id', 'process_flow_name'],
+    ]) {
+      const schema = schemas.get(tool);
+      if (!schema) throw new Error(`Missing schema for ${tool}`);
+      const validate = validator.getValidator(schema);
+      expect(validate({}).valid).toBe(false);
+      expect(validate({ [idKey]: testIds.storyMap, [nameKey]: 'Example' }).valid).toBe(false);
+      expect(validate({ [idKey]: testIds.storyMap }).valid).toBe(true);
+      expect(validate({ [nameKey]: 'Example', team_id: testIds.team }).valid).toBe(true);
+    }
+
+    const reorderSchema = schemas.get('story_reorder');
+    if (!reorderSchema) throw new Error('Missing story_reorder schema');
+    const validateOrder = validator.getValidator(reorderSchema);
+    const target = { task_id: testIds.task, release_id: null };
+    expect(validateOrder({ ...target, order: [testIds.story, testIds.story] }).valid).toBe(false);
+    expect(validateOrder({ ...target, order: [testIds.story, testIds.otherStory] }).valid).toBe(true);
+
+    for (const name of ['processflow_node_update', 'processflow_nodes_mutate']) {
+      expect(JSON.stringify(schemas.get(name))).toContain('replaces the entire data object');
+    }
+    expect(JSON.stringify(schemas.get('story_update'))).toContain('replaces the entire content object');
   });
 
   it('documents new process flow metadata fields in tool descriptions', async () => {
@@ -217,8 +260,10 @@ describe('mcp server', () => {
             id: testIds.processNode,
             process_flow_id: testIds.processFlow,
             type: 'step',
-            position: { x: 0, y: 0 },
-            size: null,
+            position_x: 0,
+            position_y: 0,
+            width: null,
+            height: null,
             data: {
               label: 'Receive invoice',
               owner_role: 'AP Clerk',
@@ -231,8 +276,10 @@ describe('mcp server', () => {
             id: testIds.otherProcessNode,
             process_flow_id: testIds.processFlow,
             type: 'decision',
-            position: { x: 100, y: 0 },
-            size: null,
+            position_x: 100,
+            position_y: 0,
+            width: null,
+            height: null,
             data: { label: 'High value?' },
           },
         ],
@@ -859,6 +906,39 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.data.agent_guidance.verification_hints.join(' ')).toContain(
       'destination lane',
     );
+  });
+
+  it('returns actionable ordering failures without leaking database diagnostics', async () => {
+    vi.spyOn(storymapService, 'reorderStories').mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: 'P0001',
+        message: 'Order array must contain all sibling ids',
+        details: 'private row data',
+        hint: 'private function',
+      },
+    } as never);
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 8,
+        method: 'tools/call',
+        params: {
+          name: 'story_reorder',
+          arguments: { task_id: testIds.task, release_id: null, order: [testIds.story] },
+        },
+      }),
+      supabase,
+      user,
+    );
+
+    const payload = await response.json();
+    expect(payload.result.isError).toBe(true);
+    expect(payload.result.structuredContent).toEqual({
+      ok: false,
+      error: 'Failed to reorder stories',
+      details: { code: 'P0001', message: 'Order array must contain all sibling ids' },
+    });
   });
 
   it('calls task_move through shared service path', async () => {

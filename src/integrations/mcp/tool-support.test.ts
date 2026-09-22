@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createAnnotations,
   describeDbError,
@@ -6,9 +6,12 @@ import {
   errorResult,
   successResult,
   updateAnnotations,
+  withToolErrorBoundary,
 } from './tool-support';
 
 describe('MCP tool support', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it('returns compact structured and text success content', () => {
     const result = successResult({ id: 'item-1' });
 
@@ -28,6 +31,7 @@ describe('MCP tool support', () => {
   });
 
   it('does not expose raw database diagnostics', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(
       describeDbError({
         code: '23505',
@@ -37,11 +41,44 @@ describe('MCP tool support', () => {
       }),
     ).toEqual({ code: '23505' });
     expect(describeDbError(new Error('connection string leaked'))).toEqual({});
+    expect(describeDbError({ code: 'P0001', message: 'Unexpected private_table exception' })).toEqual({
+      code: 'P0001',
+    });
+    expect(log).toHaveBeenCalledTimes(3);
   });
 
-  it('accurately distinguishes create, update, and destructive idempotence', () => {
+  it.each([
+    'Order array must contain all sibling ids',
+    'Order array includes ids outside target siblings',
+    'Target order must include moved story id',
+    'Story target task must belong to the same story map',
+  ])('preserves the safe recovery message: %s', (message) => {
+    expect(describeDbError({ code: 'P0001', message, details: 'private row data', hint: 'private function' })).toEqual({
+      code: 'P0001',
+      message,
+    });
+  });
+
+  it('preserves known service validation failures without exposing arbitrary Error messages', () => {
+    const message = 'Source and target nodes must belong to the same process flow';
+    expect(describeDbError(new Error(message))).toEqual({ message });
+  });
+
+  it('logs unexpected exceptions once without exposing their contents', async () => {
+    const error = new Error('private connection details');
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const tool = withToolErrorBoundary('test_tool', async () => {
+      throw error;
+    });
+
+    const result = await tool({});
+    expect(result).toEqual(errorResult('Unexpected server error'));
+    expect(log).toHaveBeenCalledExactlyOnceWith('[mcp] test_tool failed', error);
+  });
+
+  it('distinguishes additive creates from idempotent overwrites and deletes', () => {
     expect(createAnnotations).toMatchObject({ idempotentHint: false, destructiveHint: false });
-    expect(updateAnnotations).toMatchObject({ idempotentHint: true, destructiveHint: false });
+    expect(updateAnnotations).toMatchObject({ idempotentHint: true, destructiveHint: true });
     expect(destructiveAnnotations).toMatchObject({ idempotentHint: true, destructiveHint: true });
   });
 });

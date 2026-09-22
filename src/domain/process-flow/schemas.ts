@@ -69,7 +69,12 @@ export const processFlowBase = z
       'Long-form Markdown operational context, decisions, constraints, and links for agents.',
       MAX_MARKDOWN_LENGTH,
     ),
-    viewport: processFlowViewportSchema.nullable().optional().describe('Saved canvas viewport. Pass null to clear it.'),
+    viewport: processFlowViewportSchema
+      .nullable()
+      .optional()
+      .describe(
+        'Complete saved viewport. On update, replaces all viewport values. Pass null to clear it; omit to keep it.',
+      ),
   })
   .strict();
 
@@ -109,8 +114,12 @@ export const processFlowNodeBase = z
       .strict()
       .nullable()
       .optional()
-      .describe('Optional rendered node dimensions. Pass null to clear them.'),
-    data: processFlowNodeDataSchema.describe('Operational content displayed by and associated with this node.'),
+      .describe(
+        'Complete node dimensions. On update, replaces both dimensions; omitted width or height is cleared. Pass null to clear both; omit size to keep them.',
+      ),
+    data: processFlowNodeDataSchema.describe(
+      'Complete node data. On update, replaces the entire data object; include every field to retain, such as owner_role and systems. Read the node first; omit data to leave it unchanged.',
+    ),
   })
   .strict();
 
@@ -141,7 +150,12 @@ export const processFlowEdgeBase = z
     type: processFlowEdgeTypeSchema,
     source_node_id: uuid('Node UUID where the directed edge starts.'),
     target_node_id: uuid('Node UUID where the directed edge ends.'),
-    data: processFlowEdgeDataSchema.nullable().optional().describe('Optional edge label and routing condition.'),
+    data: processFlowEdgeDataSchema
+      .nullable()
+      .optional()
+      .describe(
+        'Complete edge data. On update, replaces the entire data object; include both label and condition to retain them. Pass null to clear it; omit data to keep it.',
+      ),
   })
   .strict();
 

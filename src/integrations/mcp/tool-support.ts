@@ -37,9 +37,39 @@ export function isNotFound(error: unknown): boolean {
   return dbCode(error) === DbErrorCode.NOT_FOUND;
 }
 
+// Exact, application-owned messages only; never return arbitrary database diagnostics.
+const publicOperationErrors = new Set([
+  'Order array cannot be empty',
+  'Order array contains duplicate ids',
+  'Order array must contain all sibling ids',
+  'Order array includes ids outside target siblings',
+  'Target order must include moved task id',
+  'Target order must include moved story id',
+  'Task not found',
+  'Story not found',
+  'Target activity not found',
+  'Target task not found',
+  'Task for story not found',
+  'Release for story not found',
+  'Task target activity must belong to the same story map',
+  'Story target task must belong to the same story map',
+  'Story task and release must belong to the same story map',
+  'Source and target nodes must belong to the same process flow',
+]);
+
 export function describeDbError(error: unknown): Record<string, unknown> {
   const code = dbCode(error);
-  return code ? { code } : {};
+  const details = code ? { code } : {};
+  const message = typeof error === 'object' && error ? Reflect.get(error, 'message') : undefined;
+  if (typeof message === 'string' && publicOperationErrors.has(message)) {
+    return { ...details, message };
+  }
+
+  if (error) {
+    // biome-ignore lint/suspicious/noConsole: retain private diagnostics only in server logs
+    console.error('[mcp] Database operation failed', error);
+  }
+  return details;
 }
 
 type ToolCall<Input> = (args: Input) => Promise<ReturnType<typeof successResult> | ReturnType<typeof errorResult>>;
@@ -51,7 +81,7 @@ export function withToolErrorBoundary<Input>(name: string, handler: ToolCall<Inp
     } catch (error) {
       // biome-ignore lint/suspicious/noConsole: MCP tool runtime error logging
       console.error(`[mcp] ${name} failed`, error);
-      return errorResult('Unexpected server error', describeDbError(error));
+      return errorResult('Unexpected server error');
     }
   };
 }
@@ -72,12 +102,10 @@ export const createAnnotations = {
 export const updateAnnotations = {
   ...createAnnotations,
   idempotentHint: true,
-} as const;
-
-export const destructiveAnnotations = {
-  ...updateAnnotations,
   destructiveHint: true,
 } as const;
+
+export const destructiveAnnotations = updateAnnotations;
 
 export async function resolveAccessibleTeamId(
   supabase: Supabase,

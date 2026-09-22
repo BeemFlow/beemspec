@@ -19,6 +19,14 @@ import {
 } from '../insights/story-map';
 import { mcpUuidSchema, successOutputSchema } from '../output-schemas';
 import {
+  activityRowSchema,
+  personaSummarySchema,
+  releaseRowSchema,
+  storyMapRowSchema,
+  storyRowSchema,
+  taskRowSchema,
+} from '../story-output-schemas';
+import {
   createAnnotations,
   describeDbError,
   errorResult,
@@ -35,63 +43,15 @@ const createStoryMapToolSchema = createStoryMapSchema.extend({
   team_id: z.string().uuid().optional().describe('Team UUID (optional for single-team users)'),
 });
 
-const nullableTextSchema = z.string().nullable();
-const storyMapRowSchema = z
-  .object({
-    id: mcpUuidSchema,
-    name: z.string(),
-    description: nullableTextSchema.optional(),
-    context_markdown: nullableTextSchema.optional(),
-  })
-  .passthrough();
-const releaseRowSchema = z
-  .object({
-    id: mcpUuidSchema,
-    story_map_id: mcpUuidSchema,
-    name: z.string(),
-    description: nullableTextSchema,
-    context_markdown: nullableTextSchema,
-    sort_order: z.number().int(),
-  })
-  .passthrough();
-const personaRowSchema = z
-  .object({
-    id: mcpUuidSchema,
-    name: z.string(),
-    description: nullableTextSchema.optional(),
-    goals: nullableTextSchema.optional(),
-  })
-  .passthrough();
-const storyPlanningRefSchema = z
-  .object({
-    id: mcpUuidSchema,
-    title: z.string(),
-    status: z.string(),
-    release_id: mcpUuidSchema.nullable(),
+const storyPlanningRefSchema = storyRowSchema
+  .pick({ id: true, title: true, status: true, release_id: true })
+  .extend({
     has_figma_link: z.boolean(),
     has_edge_cases: z.boolean(),
   })
   .strict();
-const taskContextSchema = z
-  .object({
-    id: mcpUuidSchema,
-    activity_id: mcpUuidSchema,
-    name: z.string(),
-    description: nullableTextSchema,
-    sort_order: z.number().int(),
-    stories: z.array(storyPlanningRefSchema),
-  })
-  .passthrough();
-const activityContextSchema = z
-  .object({
-    id: mcpUuidSchema,
-    story_map_id: mcpUuidSchema,
-    name: z.string(),
-    description: nullableTextSchema,
-    sort_order: z.number().int(),
-    tasks: z.array(taskContextSchema),
-  })
-  .passthrough();
+const taskContextSchema = taskRowSchema.extend({ stories: z.array(storyPlanningRefSchema) });
+const activityContextSchema = activityRowSchema.extend({ tasks: z.array(taskContextSchema) });
 const storyMapInsightsSchema = z
   .object({
     map_summary: z
@@ -103,8 +63,25 @@ const storyMapInsightsSchema = z
         releaseCount: z.number().int().nonnegative(),
         personaCount: z.number().int().nonnegative(),
         storyCount: z.number().int().nonnegative(),
+        backlogStoryCount: z.number().int().nonnegative(),
+        storiesWithFigmaCount: z.number().int().nonnegative(),
+        storiesMissingEdgeCasesCount: z.number().int().nonnegative(),
+        statusCounts: z.record(z.string(), z.number().int().nonnegative()),
       })
       .passthrough(),
+    release_summaries: z.array(
+      z.strictObject({
+        releaseId: mcpUuidSchema.nullable(),
+        releaseName: z.string(),
+        storyCount: z.number().int().nonnegative(),
+        unfinishedCount: z.number().int().nonnegative(),
+        storiesWithFigmaCount: z.number().int().nonnegative(),
+        hasContext: z.boolean().optional(),
+      }),
+    ),
+    persona_summary: z.array(
+      z.strictObject({ personaId: mcpUuidSchema, name: z.string(), goals: z.string().nullable() }),
+    ),
     top_risk_flags: z.array(z.string()),
     story_mapping_warnings: z.array(z.string()),
     recommended_next_actions: z.array(z.string()),
@@ -121,7 +98,7 @@ const storyMapContextSchema = storyMapRowSchema.extend({
       })
       .strict(),
   ),
-  personas: z.array(personaRowSchema),
+  personas: z.array(personaSummarySchema),
   agent_insights: storyMapInsightsSchema,
 });
 const releaseContextSchema = z
@@ -159,10 +136,10 @@ const storyMapLookupSchema = z
   .strict()
   .refine((input) => Boolean(input.story_map_id) !== Boolean(input.story_map_name), {
     message: 'Provide exactly one of story_map_id or story_map_name',
-  });
+  })
+  .meta({ oneOf: [{ required: ['story_map_id'] }, { required: ['story_map_name'] }] });
 
 export function registerStoryMapTools(server: McpServer, supabase: Supabase, user: AuthenticatedUser): void {
-  const getUserScopedClient = () => supabase;
   server.registerTool(
     'storymap_list',
     {
@@ -176,7 +153,6 @@ export function registerStoryMapTools(server: McpServer, supabase: Supabase, use
       annotations: readAnnotations,
     },
     withToolErrorBoundary('storymap_list', async ({ team_id }) => {
-      const supabase = getUserScopedClient();
       const resolvedTeam = await resolveAccessibleTeamId(supabase, user.id, team_id);
       if (!resolvedTeam.ok) return resolvedTeam.response;
 
@@ -201,7 +177,6 @@ export function registerStoryMapTools(server: McpServer, supabase: Supabase, use
       annotations: readAnnotations,
     },
     withToolErrorBoundary('storymap_get', async ({ story_map_id, story_map_name, team_id }) => {
-      const supabase = getUserScopedClient();
       let resolvedStoryMapId = story_map_id;
 
       if (!resolvedStoryMapId && story_map_name) {
@@ -276,7 +251,6 @@ export function registerStoryMapTools(server: McpServer, supabase: Supabase, use
       annotations: readAnnotations,
     },
     withToolErrorBoundary('release_get', async ({ release_id }) => {
-      const supabase = getUserScopedClient();
       const { releaseResult, mapResult, activitiesResult } = await getReleaseMcpContext(supabase, release_id);
 
       if (releaseResult.error) {
@@ -332,7 +306,6 @@ export function registerStoryMapTools(server: McpServer, supabase: Supabase, use
       annotations: createAnnotations,
     },
     withToolErrorBoundary('storymap_create', async (input) => {
-      const supabase = getUserScopedClient();
       const resolvedTeam = await resolveAccessibleTeamId(supabase, user.id, input.team_id);
       if (!resolvedTeam.ok) return resolvedTeam.response;
 
@@ -359,7 +332,6 @@ export function registerStoryMapTools(server: McpServer, supabase: Supabase, use
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('storymap_update', async ({ story_map_id, ...changes }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await updateStoryMap(supabase, story_map_id, changes);
 
       if (error) {

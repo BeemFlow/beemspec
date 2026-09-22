@@ -1,57 +1,15 @@
+import type { z } from 'zod';
 import type { SupabaseLike } from '@/lib/supabase/types';
+import type { storyContextSchema } from './story-output-schemas';
 
-interface StoryContext {
-  storyId: string;
-  storyTitle: string;
-  storyStatus: string;
-  storySortOrder: number;
-  storyMapId: string;
-  storyMapName: string;
-  storyMapDescription: string | null;
-  storyMapContextMarkdown: string | null;
-  activityId: string;
-  activityName: string;
-  activityDescription: string | null;
-  activitySortOrder: number;
-  taskId: string;
-  taskName: string;
-  taskDescription: string | null;
-  taskSortOrder: number;
-  releaseId: string | null;
-  releaseName: string | null;
-  releaseDescription: string | null;
-  releaseContextMarkdown: string | null;
-  releaseSortOrder: number | null;
-  userStory: string;
-  acceptanceCriteria: string;
-  edgeCases: string | null;
-  technicalGuidelines: string | null;
-  figmaLink: string | null;
-  personas: Array<{
-    id: string;
-    name: string;
-    description: string | null;
-    goals: string | null;
-  }>;
-  agentGuidance: {
-    riskFlags: string[];
-    missingContext: string[];
-    verificationFocus: string[];
-    figma: {
-      hasFigmaLink: boolean;
-      figmaLink: string | null;
-      recommendedNextStep: string | null;
-      recommendedTools: string[];
-    };
-  };
-}
+type StoryContext = z.infer<typeof storyContextSchema>;
 
 interface StoryContextRow {
   id: string;
   task_id: string;
   release_id: string | null;
   sort_order: number;
-  status: string;
+  status: StoryContext['storyStatus'];
   title: string;
   content: {
     user_story?: string;
@@ -93,13 +51,6 @@ interface StoryMapRow {
   context_markdown: string | null;
 }
 
-interface PersonaRow {
-  id: string;
-  name: string;
-  description: string | null;
-  goals: string | null;
-}
-
 interface SingleRowTable<T> {
   select(columns: string): {
     eq(column: string, value: string): { single(): Promise<{ data: T | null; error: unknown }> };
@@ -112,7 +63,7 @@ interface PersonaTable {
       column: string,
       value: string,
     ): {
-      order(column: string): Promise<{ data: PersonaRow[] | null; error: unknown }>;
+      order(column: string): Promise<{ data: StoryContext['personas'] | null; error: unknown }>;
     };
   };
 }

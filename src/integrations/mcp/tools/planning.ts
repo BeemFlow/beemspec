@@ -28,6 +28,7 @@ import {
 } from '@/storymap/service';
 import { buildMutationGuidance } from '../insights/story-map';
 import { deletedRowSchema, mcpUuidSchema, nonNegativeCountSchema, successOutputSchema } from '../output-schemas';
+import { activityRowSchema, mutationGuidanceSchema, releaseRowSchema, taskRowSchema } from '../story-output-schemas';
 import {
   createAnnotations,
   describeDbError,
@@ -40,42 +41,6 @@ import {
 } from '../tool-support';
 
 const moveTaskToolSchema = moveTaskSchema.extend({ task_id: z.string().uuid() });
-const nullableTextSchema = z.string().nullable();
-const mutationGuidanceSchema = z
-  .object({
-    next_recommended_reads: z.array(z.string()),
-    verification_hints: z.array(z.string()),
-    warnings: z.array(z.string()),
-  })
-  .strict();
-const activityRowSchema = z
-  .object({
-    id: mcpUuidSchema,
-    story_map_id: mcpUuidSchema,
-    name: z.string(),
-    description: nullableTextSchema,
-    sort_order: z.number().int(),
-  })
-  .passthrough();
-const taskRowSchema = z
-  .object({
-    id: mcpUuidSchema,
-    activity_id: mcpUuidSchema,
-    name: z.string(),
-    description: nullableTextSchema,
-    sort_order: z.number().int(),
-  })
-  .passthrough();
-const releaseRowSchema = z
-  .object({
-    id: mcpUuidSchema,
-    story_map_id: mcpUuidSchema,
-    name: z.string(),
-    description: nullableTextSchema,
-    context_markdown: nullableTextSchema,
-    sort_order: z.number().int(),
-  })
-  .passthrough();
 const activityMutationSchema = activityRowSchema.extend({ agent_guidance: mutationGuidanceSchema });
 const taskMutationSchema = taskRowSchema.extend({ agent_guidance: mutationGuidanceSchema });
 const releaseMutationSchema = releaseRowSchema.extend({ agent_guidance: mutationGuidanceSchema });
@@ -87,7 +52,6 @@ const reorderedOutputSchema = z
   .passthrough();
 
 export function registerPlanningTools(server: McpServer, supabase: Supabase): void {
-  const getUserScopedClient = () => supabase;
   server.registerTool(
     'activity_create',
     {
@@ -98,7 +62,6 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
       annotations: createAnnotations,
     },
     withToolErrorBoundary('activity_create', async (input) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await createActivity(supabase, input);
 
       if (error) return errorResult('Failed to create activity', describeDbError(error));
@@ -124,7 +87,6 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('activity_update', async ({ activity_id, ...changes }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await updateActivity(supabase, activity_id, changes);
 
       if (error) {
@@ -152,7 +114,6 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('activity_delete', async ({ activity_id }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await deleteActivity(supabase, activity_id);
 
       if (error) {
@@ -173,7 +134,6 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('activity_reorder', async ({ story_map_id, order }) => {
-      const supabase = getUserScopedClient();
       const { error } = await reorderActivities(supabase, { story_map_id, order });
 
       if (error) return errorResult('Failed to reorder activities', describeDbError(error));
@@ -198,7 +158,6 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
       annotations: createAnnotations,
     },
     withToolErrorBoundary('task_create', async (input) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await createTask(supabase, input);
 
       if (error) return errorResult('Failed to create task', describeDbError(error));
@@ -224,7 +183,6 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('task_update', async ({ task_id, ...changes }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await updateTask(supabase, task_id, changes);
 
       if (error) {
@@ -252,7 +210,6 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('task_delete', async ({ task_id }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await deleteTask(supabase, task_id);
 
       if (error) {
@@ -273,7 +230,6 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('task_reorder', async ({ activity_id, order }) => {
-      const supabase = getUserScopedClient();
       const { error } = await reorderTasks(supabase, { activity_id, order });
 
       if (error) return errorResult('Failed to reorder tasks', describeDbError(error));
@@ -307,7 +263,6 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('task_move', async ({ task_id, ...input }) => {
-      const supabase = getUserScopedClient();
       const { error } = await moveTask(supabase, task_id, input);
 
       if (error) return errorResult('Failed to move task', describeDbError(error));
@@ -334,7 +289,6 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
       annotations: createAnnotations,
     },
     withToolErrorBoundary('release_create', async (input) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await createRelease(supabase, input);
 
       if (error) return errorResult('Failed to create release', describeDbError(error));
@@ -360,7 +314,6 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('release_update', async ({ release_id, ...changes }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await updateRelease(supabase, release_id, changes);
 
       if (error) {
@@ -388,7 +341,6 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
       annotations: destructiveAnnotations,
     },
     withToolErrorBoundary('release_delete', async ({ release_id }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await deleteRelease(supabase, release_id);
 
       if (error) {
@@ -409,7 +361,6 @@ export function registerPlanningTools(server: McpServer, supabase: Supabase): vo
       annotations: updateAnnotations,
     },
     withToolErrorBoundary('release_reorder', async ({ story_map_id, order }) => {
-      const supabase = getUserScopedClient();
       const { error } = await reorderReleases(supabase, { story_map_id, order });
 
       if (error) return errorResult('Failed to reorder releases', describeDbError(error));

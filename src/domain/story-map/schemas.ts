@@ -18,7 +18,8 @@ const uniqueUuidOrder = (description: string, itemDescription: string) =>
     .min(1, 'Order array cannot be empty')
     .max(MAX_ORDER_ITEMS, `Order cannot contain more than ${MAX_ORDER_ITEMS} IDs`)
     .refine((ids) => new Set(ids).size === ids.length, 'Order must not contain duplicate IDs')
-    .describe(description);
+    .meta({ uniqueItems: true })
+    .describe(`${description} Each ID must appear exactly once.`);
 
 const atLeastOneField = <T extends Record<string, unknown>>(data: T): boolean =>
   Object.values(data).some((value) => value !== undefined);
@@ -213,7 +214,9 @@ export const storyBase = z
     task_id: uuid('Task UUID that owns the story.'),
     release_id: uuid('Release UUID for the story; null places it in the backlog.').nullable(),
     title: z.string().min(1, 'Required').max(500).describe('Concise story title.'),
-    content: storyContentSchema.describe('Structured implementation specification for the story.'),
+    content: storyContentSchema.describe(
+      'Complete story specification. On update, replaces the entire content object; include every field to retain, including links and optional guidance. Omit content to leave it unchanged.',
+    ),
     status: storyStatus,
   })
   .strict();

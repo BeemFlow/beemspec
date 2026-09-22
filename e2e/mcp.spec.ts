@@ -1,5 +1,6 @@
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { expect, test } from '@playwright/test';
+import { z } from 'zod';
 import { resetE2EState } from './helpers';
 import {
   createPublicClient,
@@ -102,6 +103,16 @@ test('serves authenticated MCP tools over the v2 HTTP transport', async ({ baseU
       data: { id: E2E_PROCESS_FLOW_ID },
     });
 
+    const flowData = z
+      .object({
+        data: z.object({ nodes: z.array(z.object({ id: z.string(), data: z.looseObject({ label: z.string() }) })) }),
+      })
+      .parse(processFlow.structuredContent).data;
+    const receiveNode = flowData.nodes.find((node) => node.id === E2E_NODE_RECEIVE_ID);
+    if (!receiveNode) throw new Error('Seeded receive-invoice node is missing');
+    expect(receiveNode.data.owner_role).toBe('Operations');
+    const updatedNodeData = { ...receiveNode.data, label: 'Receive and validate invoice' };
+
     const batchResult = await client.callTool({
       name: 'processflow_nodes_mutate',
       arguments: {
@@ -110,7 +121,7 @@ test('serves authenticated MCP tools over the v2 HTTP transport', async ({ baseU
           {
             action: 'update',
             id: E2E_NODE_RECEIVE_ID,
-            payload: { data: { label: 'Receive and validate invoice' } },
+            payload: { data: updatedNodeData },
           },
         ],
       },
@@ -122,7 +133,7 @@ test('serves authenticated MCP tools over the v2 HTTP transport', async ({ baseU
         updated: [
           {
             id: E2E_NODE_RECEIVE_ID,
-            data: { label: 'Receive and validate invoice' },
+            data: updatedNodeData,
           },
         ],
       },
@@ -136,7 +147,7 @@ test('serves authenticated MCP tools over the v2 HTTP transport', async ({ baseU
     expect(layoutResult.structuredContent).toMatchObject({
       ok: true,
       data: {
-        nodes: expect.arrayContaining([expect.objectContaining({ id: E2E_NODE_RECEIVE_ID })]),
+        nodes: expect.arrayContaining([expect.objectContaining({ id: E2E_NODE_RECEIVE_ID, data: updatedNodeData })]),
       },
     });
   } finally {
