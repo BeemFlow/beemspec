@@ -1,9 +1,25 @@
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/client/validators/ajv';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as processflowService from '@/processflow/service';
 import * as storymapService from '@/storymap/service';
 
 import { createMcpAuthInfo } from './auth';
 import { createBeemspecMcpHandler } from './server';
+
+const testIds = {
+  team: '10000000-0000-4000-8000-000000000000',
+  processFlow: '10000000-0000-4000-8000-000000000008',
+  processNode: '10000000-0000-4000-8000-000000000009',
+  otherProcessNode: '10000000-0000-4000-8000-000000000010',
+  processEdge: '10000000-0000-4000-8000-000000000011',
+  storyMap: '10000000-0000-4000-8000-000000000001',
+  activity: '10000000-0000-4000-8000-000000000002',
+  task: '10000000-0000-4000-8000-000000000003',
+  story: '10000000-0000-4000-8000-000000000004',
+  otherStory: '10000000-0000-4000-8000-000000000005',
+  release: '10000000-0000-4000-8000-000000000006',
+  persona: '10000000-0000-4000-8000-000000000007',
+} as const;
 
 const handler = createBeemspecMcpHandler();
 
@@ -64,6 +80,9 @@ describe('mcp server', () => {
     );
 
     expect(initializeResponse.status).toBe(200);
+    const initializePayload = (await initializeResponse.json()) as { result: { instructions?: string } };
+    expect(initializePayload.result.instructions).toContain('storymap_get before structural edits');
+    expect(initializePayload.result.instructions).toContain('processflow_nodes_mutate');
 
     const initializedResponse = await handleMcpRequest(
       rpcRequest({
@@ -91,13 +110,19 @@ describe('mcp server', () => {
 
     const payload = (await listResponse.json()) as {
       result: {
-        tools: Array<{ name: string }>;
+        tools: Array<{
+          name: string;
+          description?: string;
+          inputSchema: Record<string, unknown>;
+          outputSchema?: Record<string, unknown>;
+          annotations?: { idempotentHint?: boolean; destructiveHint?: boolean; openWorldHint?: boolean };
+        }>;
       };
     };
     const toolNames = new Set(payload.result.tools.map((tool) => tool.name));
 
-    expect(toolNames.has('storymap_workflow_guide')).toBe(true);
-    expect(toolNames.has('processflow_workflow_guide')).toBe(true);
+    expect(toolNames.has('storymap_workflow_guide')).toBe(false);
+    expect(toolNames.has('processflow_workflow_guide')).toBe(false);
     expect(toolNames.has('storymap_list')).toBe(true);
     expect(toolNames.has('processflow_list')).toBe(true);
     expect(toolNames.has('storymap_get')).toBe(true);
@@ -105,6 +130,9 @@ describe('mcp server', () => {
     expect(toolNames.has('processflow_validation_get')).toBe(true);
     expect(toolNames.has('processflow_create')).toBe(true);
     expect(toolNames.has('processflow_update')).toBe(true);
+    expect(toolNames.has('processflow_nodes_mutate')).toBe(true);
+    expect(toolNames.has('processflow_edges_mutate')).toBe(true);
+    expect(toolNames.has('processflow_autolayout')).toBe(true);
     expect(toolNames.has('processflow_node_create')).toBe(true);
     expect(toolNames.has('processflow_edge_create')).toBe(true);
     expect(toolNames.has('release_get')).toBe(true);
@@ -120,114 +148,123 @@ describe('mcp server', () => {
     expect(toolNames.has('story_mark_blocked')).toBe(false);
     expect(toolNames.has('story')).toBe(false);
     expect(toolNames.has('blocked')).toBe(false);
+    expect(payload.result.tools.every((tool) => tool.outputSchema)).toBe(true);
+
+    const byName = new Map(payload.result.tools.map((tool) => [tool.name, tool]));
+    expect(byName.get('story_create')?.annotations?.idempotentHint).toBe(false);
+    expect(byName.get('story_update')?.annotations?.idempotentHint).toBe(true);
+    expect(byName.get('story_delete')?.annotations?.idempotentHint).toBe(true);
+    expect(byName.get('story_create')?.annotations?.destructiveHint).toBe(false);
+    for (const name of ['story_update', 'story_delete', 'processflow_node_update', 'processflow_nodes_mutate']) {
+      expect(byName.get(name)?.annotations?.destructiveHint).toBe(true);
+    }
+    const linearTools = ['story_create', 'story_update', 'story_delete'];
+    for (const tool of payload.result.tools) {
+      expect(tool.annotations?.openWorldHint, tool.name).toBe(linearTools.includes(tool.name));
+    }
+    for (const name of linearTools) {
+      expect(byName.get(name)?.description).toMatch(/asynchronously.*Linear.*when configured/i);
+    }
+    expect(byName.get('story_delete')?.description).toContain('deletes its linked Linear issue');
   });
 
-  it('returns workflow guide content for planning sequence', async () => {
+  it('publishes shared validation, mutation batch limits, and replacement semantics to clients', async () => {
     const response = await handleMcpRequest(
-      rpcRequest({
-        jsonrpc: '2.0',
-        id: 3,
-        method: 'tools/call',
-        params: {
-          name: 'storymap_workflow_guide',
-          arguments: {},
-        },
-      }),
+      rpcRequest({ jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} }),
       supabase,
       user,
     );
-
-    expect(response.status).toBe(200);
-
     const payload = (await response.json()) as {
-      result: {
-        structuredContent: {
-          ok: boolean;
-          data: {
-            operating_mode: string[];
-            clarification_policy: string[];
-            tool_sequence: string[];
-            tool_usage_rules: string[];
-            implementation_principles: string[];
-            update_policy: string[];
-            safe_vs_unsafe_inference: {
-              safe_to_infer: string[];
-              unsafe_to_infer: string[];
-            };
-            story_quality_principles: string[];
-          };
-        };
-      };
+      result: { tools: Array<{ name: string; inputSchema: Record<string, unknown> }> };
     };
+    const validator = new AjvJsonSchemaValidator();
+    const schemas = new Map(payload.result.tools.map((tool) => [tool.name, tool.inputSchema]));
 
-    expect(payload.result.structuredContent.ok).toBe(true);
-    expect(payload.result.structuredContent.data.operating_mode[0]).toContain('product-minded implementation partner');
-    expect(payload.result.structuredContent.data.clarification_policy[0]).toContain('materially change');
-    expect(payload.result.structuredContent.data.tool_sequence[0]).toContain('storymap_list');
-    expect(payload.result.structuredContent.data.tool_sequence[1]).toContain('storymap_get');
-    expect(payload.result.structuredContent.data.tool_sequence[2]).toContain('release_get');
-    expect(payload.result.structuredContent.data.tool_usage_rules.join(' ')).toContain('story map context markdown');
-    expect(payload.result.structuredContent.data.clarification_policy.join(' ')).toContain('context markdown');
-    expect(payload.result.structuredContent.data.safe_vs_unsafe_inference.unsafe_to_infer[0]).toContain(
-      'New product scope',
+    for (const [tool, idKey, nameKey] of [
+      ['storymap_get', 'story_map_id', 'story_map_name'],
+      ['processflow_get', 'process_flow_id', 'process_flow_name'],
+    ]) {
+      const schema = schemas.get(tool);
+      if (!schema) throw new Error(`Missing schema for ${tool}`);
+      const validate = validator.getValidator(schema);
+      expect(validate({}).valid).toBe(false);
+      expect(validate({ [idKey]: testIds.storyMap, [nameKey]: 'Example' }).valid).toBe(false);
+      expect(validate({ [idKey]: testIds.storyMap }).valid).toBe(true);
+      expect(validate({ [nameKey]: 'Example', team_id: testIds.team }).valid).toBe(true);
+    }
+
+    const reorderSchema = schemas.get('story_reorder');
+    if (!reorderSchema) throw new Error('Missing story_reorder schema');
+    const validateOrder = validator.getValidator(reorderSchema);
+    const target = { task_id: testIds.task, release_id: null };
+    expect(validateOrder({ ...target, order: [testIds.story, testIds.story] }).valid).toBe(false);
+    expect(validateOrder({ ...target, order: [testIds.story, testIds.otherStory] }).valid).toBe(true);
+    expect(
+      validateOrder({
+        ...target,
+        order: Array.from({ length: 1_001 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`),
+      }).valid,
+    ).toBe(true);
+
+    const mapUpdate = schemas.get('storymap_update');
+    if (!mapUpdate) throw new Error('Missing storymap_update schema');
+    const validateMap = validator.getValidator(mapUpdate);
+    expect(
+      validateMap({
+        story_map_id: testIds.storyMap,
+        description: 'x'.repeat(20_001),
+        context_markdown: 'x'.repeat(100_001),
+      }).valid,
+    ).toBe(true);
+    expect(validateMap({ story_map_id: testIds.storyMap, description: null }).valid).toBe(true);
+    expect(validateMap({ story_map_id: testIds.storyMap, name: 'x'.repeat(201) }).valid).toBe(false);
+
+    const storyUpdate = schemas.get('story_update');
+    if (!storyUpdate) throw new Error('Missing story_update schema');
+    const validateStory = validator.getValidator(storyUpdate);
+    const content = {
+      user_story: 'x'.repeat(100_001),
+      acceptance_criteria: 'x'.repeat(100_001),
+      edge_cases: 'x'.repeat(20_001),
+      technical_guidelines: 'x'.repeat(20_001),
+      figma_link: `https://figma.com/${'x'.repeat(2_049)}`,
+    };
+    expect(validateStory({ story_id: testIds.story, content }).valid).toBe(true);
+    expect(validateStory({ story_id: testIds.story, content: { ...content, figma_link: 'not a URL' } }).valid).toBe(
+      false,
     );
-    expect(payload.result.structuredContent.data.implementation_principles.join(' ')).toContain('Figma MCP server');
-    expect(payload.result.structuredContent.data.story_quality_principles[0]).toContain('user-visible value');
-    expect(payload.result.structuredContent.data.update_policy.join(' ')).toContain('metrics');
-    expect(payload.result.structuredContent.data.update_policy.join(' ')).toContain('architecture document');
-    expect(payload.result.structuredContent.data.update_policy.join(' ')).toContain('technical guidelines');
-  });
 
-  it('returns process flow workflow guide content for modeling sequence', async () => {
-    const response = await handleMcpRequest(
-      rpcRequest({
-        jsonrpc: '2.0',
-        id: 300,
-        method: 'tools/call',
-        params: {
-          name: 'processflow_workflow_guide',
-          arguments: {},
+    const nodeUpdate = schemas.get('processflow_node_update');
+    if (!nodeUpdate) throw new Error('Missing processflow_node_update schema');
+    const validateNode = validator.getValidator(nodeUpdate);
+    expect(
+      validateNode({
+        process_flow_id: testIds.processFlow,
+        node_id: testIds.processNode,
+        data: {
+          label: 'Step',
+          notes: 'x'.repeat(20_001),
+          systems: Array(201).fill('x'.repeat(2_001)),
+          inputs: Array(201).fill('Input'),
+          outputs: Array(201).fill('Output'),
         },
-      }),
-      supabase,
-      user,
-    );
+      }).valid,
+    ).toBe(true);
+    for (const name of ['processflow_nodes_mutate', 'processflow_edges_mutate']) {
+      const schema = schemas.get(name);
+      if (!schema) throw new Error(`Missing ${name} schema`);
+      const validateBatch = validator.getValidator(schema);
+      const mutations = Array.from({ length: 101 }, () => ({ action: 'delete', id: testIds.processNode }));
+      expect(validateBatch({ process_flow_id: testIds.processFlow, mutations }).valid).toBe(false);
+      expect(validateBatch({ process_flow_id: testIds.processFlow, mutations: mutations.slice(0, 100) }).valid).toBe(
+        true,
+      );
+    }
 
-    expect(response.status).toBe(200);
-
-    const payload = (await response.json()) as {
-      result: {
-        structuredContent: {
-          ok: boolean;
-          data: {
-            tool_sequence: string[];
-            process_modeling_principles: string[];
-            operating_mode: string[];
-            safe_vs_unsafe_inference: {
-              safe_to_infer: string[];
-              unsafe_to_infer: string[];
-            };
-          };
-        };
-      };
-    };
-
-    expect(payload.result.structuredContent.ok).toBe(true);
-    expect(payload.result.structuredContent.data.tool_sequence[0]).toContain('processflow_list');
-    expect(payload.result.structuredContent.data.tool_sequence[1]).toContain('processflow_get');
-    expect(payload.result.structuredContent.data.tool_sequence[3]).toContain('processflow_validation_get');
-    expect(payload.result.structuredContent.data.process_modeling_principles.join(' ')).toContain('step nodes');
-    expect(payload.result.structuredContent.data.process_modeling_principles.join(' ')).toContain(
-      'Frequency times duration',
-    );
-    expect(payload.result.structuredContent.data.process_modeling_principles.join(' ')).toContain('condition field');
-    expect(payload.result.structuredContent.data.safe_vs_unsafe_inference.safe_to_infer.join(' ')).toContain(
-      'high volume, multiple times per day',
-    );
-    expect(payload.result.structuredContent.data.safe_vs_unsafe_inference.unsafe_to_infer.join(' ')).toContain(
-      'do not invent compliance requirements',
-    );
-    expect(payload.result.structuredContent.data.operating_mode[2]).toContain('operational reality');
+    for (const name of ['processflow_node_update', 'processflow_nodes_mutate']) {
+      expect(JSON.stringify(schemas.get(name))).toContain('replaces the entire data object');
+    }
+    expect(JSON.stringify(schemas.get('story_update'))).toContain('replaces the entire content object');
   });
 
   it('documents new process flow metadata fields in tool descriptions', async () => {
@@ -277,8 +314,8 @@ describe('mcp server', () => {
     vi.spyOn(processflowService, 'getProcessFlowMcpContext').mockResolvedValue({
       flowResult: {
         data: {
-          id: 'flow-1',
-          team_id: 'team-1',
+          id: testIds.processFlow,
+          team_id: testIds.team,
           name: 'Accounts Payable',
           description: 'Invoice intake and approval',
           context_markdown: null,
@@ -290,11 +327,13 @@ describe('mcp server', () => {
       nodesResult: {
         data: [
           {
-            id: 'node-1',
-            process_flow_id: 'flow-1',
+            id: testIds.processNode,
+            process_flow_id: testIds.processFlow,
             type: 'step',
-            position: { x: 0, y: 0 },
-            size: null,
+            position_x: 0,
+            position_y: 0,
+            width: null,
+            height: null,
             data: {
               label: 'Receive invoice',
               owner_role: 'AP Clerk',
@@ -304,11 +343,13 @@ describe('mcp server', () => {
             },
           },
           {
-            id: 'node-2',
-            process_flow_id: 'flow-1',
+            id: testIds.otherProcessNode,
+            process_flow_id: testIds.processFlow,
             type: 'decision',
-            position: { x: 100, y: 0 },
-            size: null,
+            position_x: 100,
+            position_y: 0,
+            width: null,
+            height: null,
             data: { label: 'High value?' },
           },
         ],
@@ -317,11 +358,11 @@ describe('mcp server', () => {
       edgesResult: {
         data: [
           {
-            id: 'edge-1',
-            process_flow_id: 'flow-1',
+            id: testIds.processEdge,
+            process_flow_id: testIds.processFlow,
             type: 'flow',
-            source_node_id: 'node-1',
-            target_node_id: 'node-2',
+            source_node_id: testIds.processNode,
+            target_node_id: testIds.otherProcessNode,
             data: { label: 'Review', condition: 'amount > $10,000' },
           },
         ],
@@ -371,6 +412,126 @@ describe('mcp server', () => {
         conditionedEdges: 1,
       }),
     );
+  });
+
+  it('runs atomic process flow node batches through the MCP contract', async () => {
+    const deletedNode = {
+      id: testIds.processNode,
+      process_flow_id: testIds.processFlow,
+      type: 'step' as const,
+      position: { x: 0, y: 0 },
+      size: null,
+      data: { label: 'Old step' },
+    };
+    const mutateSpy = vi.spyOn(processflowService, 'batchMutateProcessFlowNodes').mockResolvedValue({
+      data: { created: [], updated: [], deleted: [deletedNode] },
+      error: null,
+    });
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 104,
+        method: 'tools/call',
+        params: {
+          name: 'processflow_nodes_mutate',
+          arguments: {
+            process_flow_id: testIds.processFlow,
+            mutations: [{ action: 'delete', id: testIds.processNode }],
+          },
+        },
+      }),
+      supabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mutateSpy).toHaveBeenCalledWith(supabase, {
+      process_flow_id: testIds.processFlow,
+      mutations: [{ action: 'delete', id: testIds.processNode }],
+    });
+    const payload = (await response.json()) as {
+      result: { structuredContent: { ok: boolean; data: { deleted: Array<{ id: string }> } } };
+    };
+    expect(payload.result.structuredContent).toMatchObject({
+      ok: true,
+      data: { deleted: [{ id: testIds.processNode }] },
+    });
+  });
+
+  it('runs atomic process flow edge batches through the MCP contract', async () => {
+    const mutateSpy = vi.spyOn(processflowService, 'batchMutateProcessFlowEdges').mockResolvedValue({
+      data: {
+        created: [],
+        updated: [],
+        deleted: [
+          {
+            id: testIds.processEdge,
+            process_flow_id: testIds.processFlow,
+            type: 'flow',
+            source_node_id: testIds.processNode,
+            target_node_id: testIds.otherProcessNode,
+            data: null,
+          },
+        ],
+      },
+      error: null,
+    });
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 105,
+        method: 'tools/call',
+        params: {
+          name: 'processflow_edges_mutate',
+          arguments: {
+            process_flow_id: testIds.processFlow,
+            mutations: [{ action: 'delete', id: testIds.processEdge }],
+          },
+        },
+      }),
+      supabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mutateSpy).toHaveBeenCalledWith(supabase, {
+      process_flow_id: testIds.processFlow,
+      mutations: [{ action: 'delete', id: testIds.processEdge }],
+    });
+    const payload = (await response.json()) as {
+      result: { structuredContent: { ok: boolean; data: { deleted: Array<{ id: string }> } } };
+    };
+    expect(payload.result.structuredContent.data.deleted[0].id).toBe(testIds.processEdge);
+  });
+
+  it('autolayouts a process flow through the MCP contract', async () => {
+    const layoutSpy = vi.spyOn(processflowService, 'autolayoutProcessFlow').mockResolvedValue({
+      data: { nodes: [], edges: [] },
+      error: null,
+    });
+
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 106,
+        method: 'tools/call',
+        params: {
+          name: 'processflow_autolayout',
+          arguments: { process_flow_id: testIds.processFlow },
+        },
+      }),
+      supabase,
+      user,
+    );
+
+    expect(response.status).toBe(200);
+    expect(layoutSpy).toHaveBeenCalledWith(supabase, testIds.processFlow);
+    const payload = (await response.json()) as {
+      result: { structuredContent: { ok: boolean; data: { nodes: unknown[]; edges: unknown[] } } };
+    };
+    expect(payload.result.structuredContent).toEqual({ ok: true, data: { nodes: [], edges: [] } });
   });
 
   it('rejects processflow_node_update without process_flow_id', async () => {
@@ -427,27 +588,27 @@ describe('mcp server', () => {
   it('returns story map insights with warnings and recommendations', async () => {
     vi.spyOn(storymapService, 'getStoryMapMcpContext').mockResolvedValue({
       mapResult: {
-        data: { id: 'map-1', name: 'Core Product', description: 'Primary map', context_markdown: null },
+        data: { id: testIds.storyMap, name: 'Core Product', description: 'Primary map', context_markdown: null },
         error: null,
       },
       activitiesResult: {
         data: [
           {
-            id: 'activity-1',
-            story_map_id: 'map-1',
+            id: testIds.activity,
+            story_map_id: testIds.storyMap,
             name: 'Frontend',
             description: null,
             sort_order: 0,
             tasks: [
               {
-                id: 'task-1',
-                activity_id: 'activity-1',
+                id: testIds.task,
+                activity_id: testIds.activity,
                 name: 'API integration',
                 description: null,
                 sort_order: 0,
                 stories: [
                   {
-                    id: 'story-1',
+                    id: testIds.story,
                     title: 'Build API endpoint',
                     status: 'backlog',
                     release_id: null,
@@ -466,12 +627,19 @@ describe('mcp server', () => {
       },
       releasesResult: {
         data: [
-          { id: 'release-1', story_map_id: 'map-1', name: 'Release 1', description: null, context_markdown: null },
+          {
+            id: testIds.release,
+            story_map_id: testIds.storyMap,
+            name: 'Release 1',
+            description: null,
+            context_markdown: null,
+            sort_order: 0,
+          },
         ],
         error: null,
       },
       personasResult: {
-        data: [{ id: 'persona-1', name: 'Admin', goals: 'Ship safely' }],
+        data: [{ id: testIds.persona, name: 'Admin', goals: 'Ship safely' }],
         error: null,
       },
     } as never);
@@ -508,7 +676,7 @@ describe('mcp server', () => {
       releaseResult: {
         data: {
           id: releaseId,
-          story_map_id: 'map-1',
+          story_map_id: testIds.storyMap,
           name: 'Release 1',
           description: 'Core scope',
           context_markdown: '## Focus\nShip activation',
@@ -517,27 +685,32 @@ describe('mcp server', () => {
         error: null,
       },
       mapResult: {
-        data: { id: 'map-1', name: 'Core Product', description: 'Primary map', context_markdown: '## Goal' },
+        data: {
+          id: testIds.storyMap,
+          name: 'Core Product',
+          description: 'Primary map',
+          context_markdown: '## Goal',
+        },
         error: null,
       },
       activitiesResult: {
         data: [
           {
-            id: 'activity-1',
-            story_map_id: 'map-1',
+            id: testIds.activity,
+            story_map_id: testIds.storyMap,
             name: 'Browse',
             description: null,
             sort_order: 0,
             tasks: [
               {
-                id: 'task-1',
-                activity_id: 'activity-1',
+                id: testIds.task,
+                activity_id: testIds.activity,
                 name: 'View rates',
                 description: null,
                 sort_order: 0,
                 stories: [
                   {
-                    id: 'story-1',
+                    id: testIds.story,
                     title: 'Show featured rates',
                     status: 'todo',
                     release_id: releaseId,
@@ -545,7 +718,7 @@ describe('mcp server', () => {
                     content: { edge_cases: null, figma_link: null },
                   },
                   {
-                    id: 'story-2',
+                    id: testIds.otherStory,
                     title: 'Backlog story',
                     status: 'backlog',
                     release_id: null,
@@ -590,7 +763,7 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.ok).toBe(true);
     expect(payload.result.structuredContent.data.summary.storyCount).toBe(1);
     expect(payload.result.structuredContent.data.activities[0].tasks[0].stories).toEqual([
-      expect.objectContaining({ id: 'story-1' }),
+      expect.objectContaining({ id: testIds.story }),
     ]);
   });
 
@@ -657,7 +830,7 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.data).toHaveLength(1);
   });
 
-  it('calls story_create and returns structured story payload', async () => {
+  it('calls story_create with shared defaults and returns structured story payload', async () => {
     const fakeSupabase = { from: vi.fn(), rpc: vi.fn() } as never;
 
     const createStorySpy = vi.spyOn(storymapService, 'createStory').mockResolvedValue({
@@ -665,12 +838,14 @@ describe('mcp server', () => {
         id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
         title: 'Implement sign-in',
         status: 'backlog',
-        task_id: 'task-1',
+        task_id: testIds.task,
         release_id: null,
         content: {
+          user_story: 'User can sign in',
           acceptance_criteria: '- [ ] Sign in succeeds',
           figma_link: 'https://figma.com/design/abc/Test?node-id=1-2',
         },
+        sort_order: 0,
       },
       error: null,
     } as never);
@@ -689,7 +864,6 @@ describe('mcp server', () => {
               user_story: 'User can sign in',
               acceptance_criteria: '- [ ] Sign in succeeds',
             },
-            status: 'backlog',
           },
         },
       }),
@@ -702,6 +876,12 @@ describe('mcp server', () => {
       fakeSupabase,
       expect.objectContaining({
         title: 'Implement sign-in',
+        status: 'backlog',
+        content: {
+          _version: 1,
+          user_story: 'User can sign in',
+          acceptance_criteria: '- [ ] Sign in succeeds',
+        },
       }),
     );
 
@@ -801,6 +981,39 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.data.agent_guidance.verification_hints.join(' ')).toContain(
       'destination lane',
     );
+  });
+
+  it('returns actionable ordering failures without leaking database diagnostics', async () => {
+    vi.spyOn(storymapService, 'reorderStories').mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: 'P0001',
+        message: 'Order array must contain all sibling ids',
+        details: 'private row data',
+        hint: 'private function',
+      },
+    } as never);
+    const response = await handleMcpRequest(
+      rpcRequest({
+        jsonrpc: '2.0',
+        id: 8,
+        method: 'tools/call',
+        params: {
+          name: 'story_reorder',
+          arguments: { task_id: testIds.task, release_id: null, order: [testIds.story] },
+        },
+      }),
+      supabase,
+      user,
+    );
+
+    const payload = await response.json();
+    expect(payload.result.isError).toBe(true);
+    expect(payload.result.structuredContent).toEqual({
+      ok: false,
+      error: 'Failed to reorder stories',
+      details: { code: 'P0001', message: 'Order array must contain all sibling ids' },
+    });
   });
 
   it('calls task_move through shared service path', async () => {
@@ -968,7 +1181,7 @@ describe('mcp server', () => {
                 single: vi.fn().mockResolvedValue({
                   data: {
                     id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
-                    task_id: 'task-1',
+                    task_id: testIds.task,
                     title: 'Backlog story',
                     status: 'backlog',
                     sort_order: 3,
@@ -993,8 +1206,8 @@ describe('mcp server', () => {
               eq: vi.fn().mockReturnValue({
                 single: vi.fn().mockResolvedValue({
                   data: {
-                    id: 'task-1',
-                    activity_id: 'activity-1',
+                    id: testIds.task,
+                    activity_id: testIds.activity,
                     name: 'Review backlog item',
                     description: 'Review the story before development',
                     sort_order: 2,
@@ -1011,8 +1224,8 @@ describe('mcp server', () => {
               eq: vi.fn().mockReturnValue({
                 single: vi.fn().mockResolvedValue({
                   data: {
-                    id: 'activity-1',
-                    story_map_id: 'map-1',
+                    id: testIds.activity,
+                    story_map_id: testIds.storyMap,
                     name: 'Plan work',
                     description: 'Plan the release',
                     sort_order: 1,
@@ -1029,7 +1242,7 @@ describe('mcp server', () => {
               eq: vi.fn().mockReturnValue({
                 single: vi.fn().mockResolvedValue({
                   data: {
-                    id: 'map-1',
+                    id: testIds.storyMap,
                     name: 'Core Product',
                     description: 'Primary planning map',
                     context_markdown: '## Goals\nImprove conversion',
@@ -1047,7 +1260,7 @@ describe('mcp server', () => {
                 order: vi.fn().mockResolvedValue({
                   data: [
                     {
-                      id: 'persona-1',
+                      id: testIds.persona,
                       name: 'Workspace Admin',
                       description: 'Manages the rollout',
                       goals: 'Ship safely',
@@ -1184,7 +1397,7 @@ describe('mcp server', () => {
                 single: vi.fn().mockResolvedValue({
                   data: {
                     id: storyId,
-                    task_id: 'task-1',
+                    task_id: testIds.task,
                     title: 'Release story',
                     status: 'todo',
                     sort_order: 0,
@@ -1205,7 +1418,13 @@ describe('mcp server', () => {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
                 single: vi.fn().mockResolvedValue({
-                  data: { id: 'task-1', activity_id: 'activity-1', name: 'Checkout', description: null, sort_order: 0 },
+                  data: {
+                    id: testIds.task,
+                    activity_id: testIds.activity,
+                    name: 'Checkout',
+                    description: null,
+                    sort_order: 0,
+                  },
                   error: null,
                 }),
               }),
@@ -1218,8 +1437,8 @@ describe('mcp server', () => {
               eq: vi.fn().mockReturnValue({
                 single: vi.fn().mockResolvedValue({
                   data: {
-                    id: 'activity-1',
-                    story_map_id: 'map-1',
+                    id: testIds.activity,
+                    story_map_id: testIds.storyMap,
                     name: 'Buy',
                     description: null,
                     sort_order: 0,
@@ -1236,7 +1455,7 @@ describe('mcp server', () => {
               eq: vi.fn().mockReturnValue({
                 single: vi.fn().mockResolvedValue({
                   data: {
-                    id: 'map-1',
+                    id: testIds.storyMap,
                     name: 'Core Product',
                     description: null,
                     context_markdown: '## Product goal',

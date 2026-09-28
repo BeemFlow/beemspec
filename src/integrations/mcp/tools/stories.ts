@@ -1,36 +1,49 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { createStorySchema, moveStorySchema, reorderStoriesSchema } from '@/domain/story-map';
-import { updateStoryToolSchema } from '@/domain/story-map/schemas';
+import {
+  createStorySchema,
+  moveStorySchema,
+  reorderStoriesSchema,
+  updateStoryToolSchema,
+} from '@/domain/story-map/schemas';
 import type { Supabase } from '@/lib/supabase/types';
 import { createStory, deleteStory, getStory, moveStory, reorderStories, updateStory } from '@/storymap/service';
 import { buildMutationGuidance } from '../insights/story-map';
-import { getStoryContext } from '../queries';
 import {
+  databaseRowSchema,
+  deletedRowSchema,
+  mcpUuidSchema,
+  nonNegativeCountSchema,
+  successOutputSchema,
+} from '../output-schemas';
+import { getStoryContext } from '../queries';
+import { mutationGuidanceSchema, storyContextSchema, storyRowSchema } from '../story-output-schemas';
+import {
+  createAnnotations,
   describeDbError,
   destructiveAnnotations,
   errorResult,
   isNotFound,
-  mutateAnnotations,
   readAnnotations,
   successResult,
+  updateAnnotations,
   withToolErrorBoundary,
 } from '../tool-support';
 
 const moveStoryToolSchema = moveStorySchema.extend({ story_id: z.string().uuid() });
+const storyMutationSchema = storyRowSchema.extend({ agent_guidance: mutationGuidanceSchema });
 
 export function registerStoryTools(server: McpServer, supabase: Supabase): void {
-  const getUserScopedClient = () => supabase;
   server.registerTool(
     'story_get',
     {
       title: 'Get Story',
       description: 'Load one story by ID when full map context is not required.',
       inputSchema: z.object({ story_id: z.string().uuid() }).strict(),
+      outputSchema: successOutputSchema(storyRowSchema.extend({ agent_context: storyContextSchema.nullable() })),
       annotations: readAnnotations,
     },
     withToolErrorBoundary('story_get', async ({ story_id }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await getStory(supabase, story_id);
 
       if (error) {
@@ -49,12 +62,13 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
     'story_create',
     {
       title: 'Create Story',
-      description: 'Create a story in a task/release cell. Requires task_id and structured story content.',
+      description:
+        'Create a story in a task/release cell. Requires task_id and structured story content. Asynchronously synchronizes to Linear when configured.',
       inputSchema: createStorySchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(storyMutationSchema),
+      annotations: { ...createAnnotations, openWorldHint: true },
     },
     withToolErrorBoundary('story_create', async (input) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await createStory(supabase, input);
 
       if (error) return errorResult('Failed to create story', describeDbError(error));
@@ -75,12 +89,12 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
     {
       title: 'Update Story',
       description:
-        'Update story fields like title, status, or content. Use story_move for task/release placement changes.',
+        'Update at least one story field such as title, status, or content. Use story_move for placement changes. Asynchronously synchronizes to Linear when configured.',
       inputSchema: updateStoryToolSchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(storyMutationSchema),
+      annotations: { ...updateAnnotations, openWorldHint: true },
     },
     withToolErrorBoundary('story_update', async ({ story_id, ...changes }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await updateStory(supabase, story_id, changes);
 
       if (error) {
@@ -103,12 +117,13 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
     'story_delete',
     {
       title: 'Delete Story',
-      description: 'Destructive. Deletes a story from the map.',
+      description:
+        'Destructive. Deletes a story from the map and asynchronously deletes its linked Linear issue when configured.',
       inputSchema: z.object({ story_id: z.string().uuid() }).strict(),
-      annotations: destructiveAnnotations,
+      outputSchema: successOutputSchema(deletedRowSchema(databaseRowSchema)),
+      annotations: { ...destructiveAnnotations, openWorldHint: true },
     },
     withToolErrorBoundary('story_delete', async ({ story_id }) => {
-      const supabase = getUserScopedClient();
       const { data, error } = await deleteStory(supabase, story_id);
 
       if (error) {
@@ -126,10 +141,19 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
       title: 'Reorder Stories',
       description: 'Reorder stories within a specific task+release cell using a full ordered story ID list.',
       inputSchema: reorderStoriesSchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(
+        z
+          .object({
+            reordered: nonNegativeCountSchema,
+            task_id: mcpUuidSchema,
+            release_id: mcpUuidSchema.nullable(),
+            agent_guidance: mutationGuidanceSchema,
+          })
+          .strict(),
+      ),
+      annotations: updateAnnotations,
     },
     withToolErrorBoundary('story_reorder', async ({ task_id, release_id, order }) => {
-      const supabase = getUserScopedClient();
       const { error } = await reorderStories(supabase, { task_id, release_id, order });
 
       if (error) return errorResult('Failed to reorder stories', describeDbError(error));
@@ -152,10 +176,20 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
       title: 'Move Story',
       description: 'Atomically move a story to another task/release cell and set full target order in one operation.',
       inputSchema: moveStoryToolSchema,
-      annotations: mutateAnnotations,
+      outputSchema: successOutputSchema(
+        z
+          .object({
+            moved: mcpUuidSchema,
+            target_task_id: mcpUuidSchema,
+            target_release_id: mcpUuidSchema.nullable(),
+            target_order_size: nonNegativeCountSchema,
+            agent_guidance: mutationGuidanceSchema,
+          })
+          .strict(),
+      ),
+      annotations: updateAnnotations,
     },
     withToolErrorBoundary('story_move', async ({ story_id, ...input }) => {
-      const supabase = getUserScopedClient();
       const { error } = await moveStory(supabase, story_id, input);
 
       if (error) return errorResult('Failed to move story', describeDbError(error));
