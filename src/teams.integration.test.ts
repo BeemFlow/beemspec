@@ -12,7 +12,7 @@ import {
   resetLocalAppState,
 } from '../e2e/local-fixtures';
 
-describe.sequential('team membership integration', () => {
+describe('team membership integration', { concurrent: false }, () => {
   beforeEach(async () => {
     await resetLocalAppState();
   });

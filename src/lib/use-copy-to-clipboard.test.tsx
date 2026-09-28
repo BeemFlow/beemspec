@@ -19,6 +19,7 @@ describe('useCopyToClipboard', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
@@ -26,11 +27,9 @@ describe('useCopyToClipboard', () => {
     vi.useFakeTimers();
     const writeText = vi.fn().mockResolvedValue(undefined);
 
-    Object.assign(globalThis, {
-      navigator: {
-        clipboard: {
-          writeText,
-        },
+    vi.stubGlobal('navigator', {
+      clipboard: {
+        writeText,
       },
     });
 
@@ -55,11 +54,7 @@ describe('useCopyToClipboard', () => {
   it('fails safely when clipboard access is unavailable', async () => {
     const user = userEvent.setup();
 
-    Object.assign(globalThis, {
-      navigator: {
-        clipboard: undefined,
-      },
-    });
+    vi.stubGlobal('navigator', { clipboard: undefined });
 
     render(<CopyHarness />);
 

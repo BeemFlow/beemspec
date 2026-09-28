@@ -20,7 +20,7 @@ import {
 
 const supabase = createLocalSupabaseAdminClient();
 
-describe.sequential('processflow service integration', () => {
+describe('processflow service integration', { concurrent: false }, () => {
   beforeEach(async () => {
     await resetLocalAppState();
   });
