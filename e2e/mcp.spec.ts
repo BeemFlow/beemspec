@@ -1,8 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import {
+  CLIENT_CAPABILITIES_META_KEY,
+  CLIENT_INFO_META_KEY,
+  DEFAULT_MAX_REQUEST_BODY_SIZE,
+  PROTOCOL_VERSION_META_KEY,
+  ProtocolErrorCode,
+} from '@modelcontextprotocol/server';
 import { expect, test } from '@playwright/test';
 import { z } from 'zod';
-import { resetE2EState } from './helpers';
+import { loginAsOwner, resetE2EState } from './helpers';
 import {
   createPublicClient,
   E2E_EDGE_REVIEW_ID,
@@ -19,7 +26,7 @@ test.beforeEach(async () => {
   await resetE2EState();
 });
 
-test('serves authenticated MCP tools over the v2 HTTP transport', async ({ baseURL, request }) => {
+test('serves authenticated MCP tools over the v2 HTTP transport', async ({ baseURL, request, page }) => {
   if (!baseURL) throw new Error('Playwright baseURL is required for the MCP end-to-end test');
 
   const unauthorizedResponse = await request.post('/api/mcp', {
@@ -73,6 +80,54 @@ test('serves authenticated MCP tools over the v2 HTTP transport', async ({ baseU
     expect(toolNames.has('processflow_autolayout')).toBe(true);
     expect(tools.every((tool) => tool.outputSchema)).toBe(true);
 
+    await test.step('reject invalid HTTP requests before applying mutations', async () => {
+      const headers = {
+        authorization: `Bearer ${data.session?.access_token}`,
+        accept: 'application/json, text/event-stream',
+        'content-type': 'application/json',
+        origin: 'https://claude.ai',
+      };
+      const deletion = {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: {
+          name: 'processflow_node_delete',
+          arguments: { process_flow_id: E2E_PROCESS_FLOW_ID, node_id: E2E_NODE_RECEIVE_ID },
+        },
+      };
+      const envelope = {
+        [PROTOCOL_VERSION_META_KEY]: '2026-07-28',
+        [CLIENT_INFO_META_KEY]: { name: 'beemspec-e2e', version: '1.0.0' },
+        [CLIENT_CAPABILITIES_META_KEY]: {},
+      };
+      const modernHeaders = { ...headers, 'Mcp-Method': deletion.method, 'Mcp-Name': deletion.params.name };
+      const missingHeader = await request.post('/api/mcp', {
+        headers: modernHeaders,
+        data: { ...deletion, params: { ...deletion.params, _meta: envelope } },
+      });
+      expect(missingHeader.status()).toBe(400);
+      expect(await missingHeader.json()).toMatchObject({ id: 1, error: { code: -32020 } });
+      expect(missingHeader.headers()['access-control-allow-origin']).toBe('https://claude.ai');
+
+      const oversized = await request.post('/api/mcp', {
+        headers: { ...modernHeaders, 'MCP-Protocol-Version': '2026-07-28' },
+        data: {
+          ...deletion,
+          params: { ...deletion.params, _meta: { ...envelope, padding: 'x'.repeat(DEFAULT_MAX_REQUEST_BODY_SIZE) } },
+        },
+      });
+      expect(oversized.status()).toBe(413);
+      expect(oversized.headers()['access-control-allow-origin']).toBe('https://claude.ai');
+
+      const batch = await request.post('/api/mcp', {
+        headers,
+        data: Array.from({ length: 101 }, (_, id) => ({ ...deletion, id })),
+      });
+      expect(batch.status()).toBe(400);
+      expect(await batch.json()).toMatchObject({ error: { code: ProtocolErrorCode.InvalidRequest } });
+    });
+
     const teamList = await client.callTool({ name: 'team_list', arguments: {} });
     expect(teamList.isError).not.toBe(true);
     expect(teamList.structuredContent).toMatchObject({
@@ -106,15 +161,36 @@ test('serves authenticated MCP tools over the v2 HTTP transport', async ({ baseU
       data: { id: E2E_PROCESS_FLOW_ID },
     });
 
-    const flowData = z
-      .object({
-        data: z.object({ nodes: z.array(z.object({ id: z.string(), data: z.looseObject({ label: z.string() }) })) }),
-      })
-      .parse(processFlow.structuredContent).data;
+    const flowReadSchema = z.object({
+      data: z.object({ nodes: z.array(z.object({ id: z.string(), data: z.looseObject({ label: z.string() }) })) }),
+    });
+    const flowData = flowReadSchema.parse(processFlow.structuredContent).data;
     const receiveNode = flowData.nodes.find((node) => node.id === E2E_NODE_RECEIVE_ID);
     if (!receiveNode) throw new Error('Seeded receive-invoice node is missing');
     expect(receiveNode.data.owner_role).toBe('Operations');
-    const updatedNodeData = { ...receiveNode.data, label: 'Receive and validate invoice' };
+    const updatedNodeData = await test.step('read and preserve long REST-authored node metadata', async () => {
+      await loginAsOwner(page);
+      const restData = {
+        ...receiveNode.data,
+        notes: 'n'.repeat(20_001),
+        systems: Array(201).fill('s'.repeat(2_001)),
+      };
+      const written = await page.request.put(`/api/process-flows/${E2E_PROCESS_FLOW_ID}/nodes`, {
+        data: { mutations: [{ action: 'update', id: E2E_NODE_RECEIVE_ID, payload: { data: restData } }] },
+      });
+      expect(written.ok()).toBe(true);
+      const reloaded = await client.callTool({
+        name: 'processflow_get',
+        arguments: { process_flow_id: E2E_PROCESS_FLOW_ID },
+      });
+      expect(reloaded.isError).not.toBe(true);
+      const node = flowReadSchema
+        .parse(reloaded.structuredContent)
+        .data.nodes.find(({ id }) => id === E2E_NODE_RECEIVE_ID);
+      if (!node) throw new Error('REST-updated receive-invoice node is missing');
+      expect(node.data).toEqual(restData);
+      return { ...node.data, label: 'Receive and validate invoice' };
+    });
 
     const batchResult = await client.callTool({
       name: 'processflow_nodes_mutate',

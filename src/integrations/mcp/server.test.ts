@@ -112,9 +112,10 @@ describe('mcp server', () => {
       result: {
         tools: Array<{
           name: string;
+          description?: string;
           inputSchema: Record<string, unknown>;
           outputSchema?: Record<string, unknown>;
-          annotations?: { idempotentHint?: boolean; destructiveHint?: boolean };
+          annotations?: { idempotentHint?: boolean; destructiveHint?: boolean; openWorldHint?: boolean };
         }>;
       };
     };
@@ -157,9 +158,17 @@ describe('mcp server', () => {
     for (const name of ['story_update', 'story_delete', 'processflow_node_update', 'processflow_nodes_mutate']) {
       expect(byName.get(name)?.annotations?.destructiveHint).toBe(true);
     }
+    const linearTools = ['story_create', 'story_update', 'story_delete'];
+    for (const tool of payload.result.tools) {
+      expect(tool.annotations?.openWorldHint, tool.name).toBe(linearTools.includes(tool.name));
+    }
+    for (const name of linearTools) {
+      expect(byName.get(name)?.description).toMatch(/asynchronously.*Linear.*when configured/i);
+    }
+    expect(byName.get('story_delete')?.description).toContain('deletes its linked Linear issue');
   });
 
-  it('publishes lookup exclusivity, input budgets, unique ordering, and replacement semantics to clients', async () => {
+  it('publishes shared validation, mutation batch limits, and replacement semantics to clients', async () => {
     const response = await handleMcpRequest(
       rpcRequest({ jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} }),
       supabase,
@@ -190,12 +199,57 @@ describe('mcp server', () => {
     const target = { task_id: testIds.task, release_id: null };
     expect(validateOrder({ ...target, order: [testIds.story, testIds.story] }).valid).toBe(false);
     expect(validateOrder({ ...target, order: [testIds.story, testIds.otherStory] }).valid).toBe(true);
+    expect(
+      validateOrder({
+        ...target,
+        order: Array.from({ length: 1_001 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`),
+      }).valid,
+    ).toBe(true);
 
     const mapUpdate = schemas.get('storymap_update');
     if (!mapUpdate) throw new Error('Missing storymap_update schema');
     const validateMap = validator.getValidator(mapUpdate);
-    expect(validateMap({ story_map_id: testIds.storyMap, description: 'x'.repeat(20_001) }).valid).toBe(false);
+    expect(
+      validateMap({
+        story_map_id: testIds.storyMap,
+        description: 'x'.repeat(20_001),
+        context_markdown: 'x'.repeat(100_001),
+      }).valid,
+    ).toBe(true);
     expect(validateMap({ story_map_id: testIds.storyMap, description: null }).valid).toBe(true);
+    expect(validateMap({ story_map_id: testIds.storyMap, name: 'x'.repeat(201) }).valid).toBe(false);
+
+    const storyUpdate = schemas.get('story_update');
+    if (!storyUpdate) throw new Error('Missing story_update schema');
+    const validateStory = validator.getValidator(storyUpdate);
+    const content = {
+      user_story: 'x'.repeat(100_001),
+      acceptance_criteria: 'x'.repeat(100_001),
+      edge_cases: 'x'.repeat(20_001),
+      technical_guidelines: 'x'.repeat(20_001),
+      figma_link: `https://figma.com/${'x'.repeat(2_049)}`,
+    };
+    expect(validateStory({ story_id: testIds.story, content }).valid).toBe(true);
+    expect(validateStory({ story_id: testIds.story, content: { ...content, figma_link: 'not a URL' } }).valid).toBe(
+      false,
+    );
+
+    const nodeUpdate = schemas.get('processflow_node_update');
+    if (!nodeUpdate) throw new Error('Missing processflow_node_update schema');
+    const validateNode = validator.getValidator(nodeUpdate);
+    expect(
+      validateNode({
+        process_flow_id: testIds.processFlow,
+        node_id: testIds.processNode,
+        data: {
+          label: 'Step',
+          notes: 'x'.repeat(20_001),
+          systems: Array(201).fill('x'.repeat(2_001)),
+          inputs: Array(201).fill('Input'),
+          outputs: Array(201).fill('Output'),
+        },
+      }).valid,
+    ).toBe(true);
     for (const name of ['processflow_nodes_mutate', 'processflow_edges_mutate']) {
       const schema = schemas.get(name);
       if (!schema) throw new Error(`Missing ${name} schema`);
@@ -776,7 +830,7 @@ describe('mcp server', () => {
     expect(payload.result.structuredContent.data).toHaveLength(1);
   });
 
-  it('calls story_create and returns structured story payload', async () => {
+  it('calls story_create with shared defaults and returns structured story payload', async () => {
     const fakeSupabase = { from: vi.fn(), rpc: vi.fn() } as never;
 
     const createStorySpy = vi.spyOn(storymapService, 'createStory').mockResolvedValue({
@@ -810,7 +864,6 @@ describe('mcp server', () => {
               user_story: 'User can sign in',
               acceptance_criteria: '- [ ] Sign in succeeds',
             },
-            status: 'backlog',
           },
         },
       }),
@@ -823,6 +876,12 @@ describe('mcp server', () => {
       fakeSupabase,
       expect.objectContaining({
         title: 'Implement sign-in',
+        status: 'backlog',
+        content: {
+          _version: 1,
+          user_story: 'User can sign in',
+          acceptance_criteria: '- [ ] Sign in succeeds',
+        },
       }),
     );
 

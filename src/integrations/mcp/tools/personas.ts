@@ -1,8 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
+import { createPersonaSchema, updatePersonaToolSchema } from '@/domain/story-map/schemas';
 import type { Supabase } from '@/lib/supabase/types';
 import { createPersona, deletePersona, listPersonas, updatePersona } from '@/storymap/service';
-import { createPersonaSchema, updatePersonaToolSchema } from '../input-schemas';
 import { deletedRowSchema, successOutputSchema } from '../output-schemas';
 import { getStoryContext } from '../queries';
 import { personaRowSchema, storyContextSchema } from '../story-output-schemas';

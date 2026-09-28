@@ -32,13 +32,14 @@ Legend:
 | Task delete | Yes (`task_delete`) | Yes (`DELETE /api/tasks/[id]`) | Currently exposed in both. |
 | Release create/update/reorder | Yes (`release_create/update/reorder`) | Yes (`POST /api/releases`, `PUT /api/releases/[id]`, `PUT /api/releases`) | Parity for writes, including `context_markdown`; MCP adds `release_get` as a read helper. |
 | Release delete | Yes (`release_delete`) | Yes (`DELETE /api/releases/[id]`) | Currently exposed in both. |
-| Story get/create/update/reorder | Yes (`story_get/create/update/reorder`) | Yes (`GET /api/stories/[id]`, `POST /api/stories`, `PUT /api/stories/[id]`, `PUT /api/stories`) | Parity. |
+| Story get/create/update/reorder | Yes (`story_get/create/update/reorder`) | Yes (`GET /api/stories/[id]`, `POST /api/stories`, `PUT /api/stories/[id]`, `PUT /api/stories`) | Parity. Create/update asynchronously synchronize to Linear when configured. |
 | Story move | Yes (`story_move`) | Yes (`PUT /api/stories/[id]/move`) | Parity. |
-| Story delete | Yes (`story_delete`) | Yes (`DELETE /api/stories/[id]`) | Currently exposed in both. |
+| Story delete | Yes (`story_delete`) | Yes (`DELETE /api/stories/[id]`) | Deletes the story and asynchronously deletes its linked Linear issue when configured. |
 | Persona list/create/update | Yes (`persona_list/create/update`) | Partial (`POST /api/personas`, `PUT /api/personas/[id]`) | REST has no dedicated persona list route. |
 | Persona delete | Yes (`persona_delete`) | Yes (`DELETE /api/personas/[id]`) | Parity. |
-| Agent workflow guide | Yes (`storymap_workflow_guide`) | No | MCP-only agent helper. |
+| Agent workflow guidance | MCP server instructions (not a tool) | No | Supplied by the server; directs agents to focused read and mutation tools. |
 | Agent coding context | Yes (`story_context_get`) | No equivalent | MCP-only story implementation helper; now includes story map context markdown, release context markdown when present, workflow placement, personas, and Figma hints. |
+| Process-flow node/edge batches | Yes (`processflow_nodes_mutate`, `processflow_edges_mutate`) | Yes (`PUT /api/process-flows/[id]/nodes`, `PUT /api/process-flows/[id]/edges`) | Atomic ordered mutations; MCP caps each call at 100 operations, while REST has no operation-count cap. |
 | Team admin (members/invites/settings/delete team) | No | Yes (`/api/teams/[id]/*`) | API-only operational/admin surface. |
 | Linear OAuth/webhook/sync management | No | Yes (`/api/integrations/linear/*`, `/api/story-maps/[id]/integrations/linear/*`) | API-only integration surface. |
 | MCP OAuth endpoints | Transport/auth support | N/A | Uses Supabase OAuth server (`https://<project-ref>.supabase.co/auth/v1`) discovered via protected-resource metadata. Consent UI is app-hosted at `/oauth/consent` and submits decisions to `/oauth/decision`. |
@@ -76,3 +77,6 @@ Legend:
 
 - Keep story map delete disabled on MCP to reduce accidental destructive actions by agents.
 - Keep destructive operations that require stronger human intent on REST-only routes where applicable.
+- Story create/update/delete tools declare `openWorldHint: true` because they can synchronize changes to Linear.
+- MCP tool inputs reuse domain validation, including complete ordering and nested-object replacement semantics; there are no separate per-field text or collection budgets.
+- The MCP SDK bounds HTTP request bodies to 4 MiB and JSON-RPC envelope batches to 100 messages. Separately, process-flow mutation tools accept at most 100 operations per call to bound database work; this application-level cap does not apply to REST batches.

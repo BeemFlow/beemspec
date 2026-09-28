@@ -1,8 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
+import {
+  createStorySchema,
+  moveStorySchema,
+  reorderStoriesSchema,
+  updateStoryToolSchema,
+} from '@/domain/story-map/schemas';
 import type { Supabase } from '@/lib/supabase/types';
 import { createStory, deleteStory, getStory, moveStory, reorderStories, updateStory } from '@/storymap/service';
-import { createStorySchema, moveStorySchema, reorderStoriesSchema, updateStoryToolSchema } from '../input-schemas';
 import { buildMutationGuidance } from '../insights/story-map';
 import {
   databaseRowSchema,
@@ -57,10 +62,11 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
     'story_create',
     {
       title: 'Create Story',
-      description: 'Create a story in a task/release cell. Requires task_id and structured story content.',
+      description:
+        'Create a story in a task/release cell. Requires task_id and structured story content. Asynchronously synchronizes to Linear when configured.',
       inputSchema: createStorySchema,
       outputSchema: successOutputSchema(storyMutationSchema),
-      annotations: createAnnotations,
+      annotations: { ...createAnnotations, openWorldHint: true },
     },
     withToolErrorBoundary('story_create', async (input) => {
       const { data, error } = await createStory(supabase, input);
@@ -83,10 +89,10 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
     {
       title: 'Update Story',
       description:
-        'Update at least one story field such as title, status, or content. Use story_move for placement changes.',
+        'Update at least one story field such as title, status, or content. Use story_move for placement changes. Asynchronously synchronizes to Linear when configured.',
       inputSchema: updateStoryToolSchema,
       outputSchema: successOutputSchema(storyMutationSchema),
-      annotations: updateAnnotations,
+      annotations: { ...updateAnnotations, openWorldHint: true },
     },
     withToolErrorBoundary('story_update', async ({ story_id, ...changes }) => {
       const { data, error } = await updateStory(supabase, story_id, changes);
@@ -111,10 +117,11 @@ export function registerStoryTools(server: McpServer, supabase: Supabase): void 
     'story_delete',
     {
       title: 'Delete Story',
-      description: 'Destructive. Deletes a story from the map.',
+      description:
+        'Destructive. Deletes a story from the map and asynchronously deletes its linked Linear issue when configured.',
       inputSchema: z.object({ story_id: z.string().uuid() }).strict(),
       outputSchema: successOutputSchema(deletedRowSchema(databaseRowSchema)),
-      annotations: destructiveAnnotations,
+      annotations: { ...destructiveAnnotations, openWorldHint: true },
     },
     withToolErrorBoundary('story_delete', async ({ story_id }) => {
       const { data, error } = await deleteStory(supabase, story_id);

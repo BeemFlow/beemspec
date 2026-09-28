@@ -1,6 +1,14 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { processFlowAutolayoutSchema } from '@/domain/process-flow';
+import {
+  createProcessFlowEdgeSchema,
+  createProcessFlowNodeSchema,
+  createProcessFlowSchema,
+  processFlowAutolayoutSchema,
+  updateProcessFlowEdgeToolSchema,
+  updateProcessFlowNodeToolSchema,
+  updateProcessFlowToolSchema,
+} from '@/domain/process-flow/schemas';
 import type { AuthenticatedUser } from '@/lib/auth';
 import type { Supabase } from '@/lib/supabase/types';
 import {
@@ -22,16 +30,7 @@ import {
   validateProcessFlowById,
   validateProcessFlowGraph,
 } from '@/processflow/service';
-import {
-  batchMutateProcessFlowEdgesSchema,
-  batchMutateProcessFlowNodesSchema,
-  createProcessFlowEdgeSchema,
-  createProcessFlowNodeSchema,
-  createProcessFlowSchema,
-  updateProcessFlowEdgeToolSchema,
-  updateProcessFlowNodeToolSchema,
-  updateProcessFlowToolSchema,
-} from '../input-schemas';
+import { batchMutateProcessFlowEdgesSchema, batchMutateProcessFlowNodesSchema } from '../input-schemas';
 import { buildProcessFlowAgentInsights } from '../insights/process-flow';
 import { deletedRowSchema, nonNegativeCountSchema, successOutputSchema } from '../output-schemas';
 import {
