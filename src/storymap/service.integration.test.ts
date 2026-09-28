@@ -38,7 +38,7 @@ async function mustSucceed(resultPromise: PromiseLike<{ error: unknown }>, messa
   }
 }
 
-describe.sequential('storymap service integration', () => {
+describe('storymap service integration', { concurrent: false }, () => {
   afterEach(async () => {
     while (createdTeamIds.length > 0) {
       const teamId = createdTeamIds.pop();

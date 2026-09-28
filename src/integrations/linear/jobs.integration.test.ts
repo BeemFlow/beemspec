@@ -28,7 +28,7 @@ async function deleteMessage(messageId: number) {
   await mustSucceed(admin.rpc('delete_linear_sync_job', { p_message_id: messageId }), 'Failed to delete queue message');
 }
 
-describe.sequential('durable Linear sync database integration', () => {
+describe('durable Linear sync database integration', { concurrent: false }, () => {
   beforeAll(async () => {
     const email = `linear-queue-${crypto.randomUUID()}@example.com`;
     const password = `local-${crypto.randomUUID()}`;

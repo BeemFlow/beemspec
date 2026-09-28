@@ -48,6 +48,7 @@ describe('ProcessFlowSettingsDialog', () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
   });
 
   it('saves changed process flow settings and closes', async () => {
@@ -85,11 +86,9 @@ describe('ProcessFlowSettingsDialog', () => {
     const onOpenChange = vi.fn();
     const writeText = vi.fn().mockResolvedValue(undefined);
 
-    Object.assign(globalThis, {
-      navigator: {
-        clipboard: {
-          writeText,
-        },
+    vi.stubGlobal('navigator', {
+      clipboard: {
+        writeText,
       },
     });
 
