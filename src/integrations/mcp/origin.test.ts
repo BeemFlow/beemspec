@@ -62,6 +62,10 @@ describe('mcp origin', () => {
 
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://claude.ai');
     expect(response.headers.get('Access-Control-Allow-Headers')).toContain('Authorization');
+    expect(response.headers.get('Access-Control-Allow-Headers')).toContain('MCP-Protocol-Version');
+    expect(response.headers.get('Access-Control-Allow-Headers')).toContain('Mcp-Method');
+    expect(response.headers.get('Access-Control-Allow-Headers')).toContain('Mcp-Name');
+    expect(response.headers.get('Access-Control-Expose-Headers')).toContain('MCP-Protocol-Version');
     expect(response.headers.get('Vary')).toContain('Origin');
   });
 });

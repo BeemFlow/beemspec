@@ -14,7 +14,7 @@ export function buildReleaseKickoffPrompt(input: {
 }): string {
   return [
     'Working in BeemSpec via MCP.',
-    'Call `storymap_workflow_guide` first and treat it as the operating standard for planning, clarification, and implementation behavior.',
+    'Follow the BeemSpec MCP server instructions. Call `release_get` with the target release_id below before planning this release.',
     `Start with story_map_id: ${input.storyMapId}`,
     `Story map: ${input.storyMapName}`,
     `Target release_id: ${input.releaseId}`,
@@ -25,7 +25,7 @@ export function buildReleaseKickoffPrompt(input: {
 export function buildStoryKickoffPrompt(input: { storyMapId: string; storyMapName: string; story: Story }): string {
   return [
     'Working in BeemSpec via MCP.',
-    'Call `storymap_workflow_guide` first and treat it as the operating standard for planning, clarification, and implementation behavior.',
+    'Follow the BeemSpec MCP server instructions. Call `story_context_get` with the target story_id below before implementing or refining this story.',
     `Start with story_map_id: ${input.storyMapId}`,
     `Story map: ${input.storyMapName}`,
     `Target story_id: ${input.story.id}`,

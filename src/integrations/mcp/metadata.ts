@@ -1,9 +1,8 @@
-import { getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import {
+  getOAuthProtectedResourceMetadataUrl,
   type OAuthProtectedResourceMetadata,
-  OAuthProtectedResourceMetadataSchema,
-} from '@modelcontextprotocol/sdk/shared/auth.js';
-import { resourceUrlFromServerUrl } from '@modelcontextprotocol/sdk/shared/auth-utils.js';
+  resourceUrlFromServerUrl,
+} from '@modelcontextprotocol/server';
 import { env } from '@/lib/env';
 
 export const MCP_DEFAULT_RESOURCE_PATH = '/api/mcp';
@@ -15,8 +14,7 @@ function buildSupabaseOAuthIssuer(originFallback?: string): string {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL for MCP OAuth metadata');
   }
 
-  const issuer = new URL('/auth/v1', supabaseUrl);
-  return issuer.toString().replace(/\/+$/, '');
+  return new URL('/auth/v1', supabaseUrl).toString().replace(/\/+$/, '');
 }
 
 function normalizePath(pathname: string): string {
@@ -31,22 +29,26 @@ export function buildMcpResourceUrl(origin: string, resourcePath = MCP_DEFAULT_R
 }
 
 export function buildProtectedResourceMetadataPath(resourcePath = MCP_DEFAULT_RESOURCE_PATH): string {
-  const metadataUrl = getOAuthProtectedResourceMetadataUrl(new URL(`https://local.test${normalizePath(resourcePath)}`));
-  return new URL(metadataUrl).pathname;
+  return new URL(buildProtectedResourceMetadataUrl('https://local.test', resourcePath)).pathname;
 }
 
 export function buildProtectedResourceMetadataUrl(origin: string, resourcePath = MCP_DEFAULT_RESOURCE_PATH): string {
   return getOAuthProtectedResourceMetadataUrl(new URL(buildMcpResourceUrl(origin, resourcePath)));
 }
 
-export function buildProtectedResourceMetadata(origin: string, resourcePath = MCP_DEFAULT_RESOURCE_PATH) {
-  const issuer = buildSupabaseOAuthIssuer(origin);
+export function buildProtectedResourceMetadata(
+  origin: string,
+  resourcePath = MCP_DEFAULT_RESOURCE_PATH,
+): OAuthProtectedResourceMetadata {
   const metadata: OAuthProtectedResourceMetadata = {
     resource: buildMcpResourceUrl(origin, resourcePath),
-    authorization_servers: [issuer],
+    authorization_servers: [buildSupabaseOAuthIssuer(origin)],
     bearer_methods_supported: ['header'],
-    ...(MCP_DEFAULT_SCOPES.length > 0 ? { scopes_supported: MCP_DEFAULT_SCOPES } : {}),
   };
 
-  return OAuthProtectedResourceMetadataSchema.parse(metadata);
+  if (MCP_DEFAULT_SCOPES.length > 0) {
+    metadata.scopes_supported = MCP_DEFAULT_SCOPES;
+  }
+
+  return metadata;
 }
