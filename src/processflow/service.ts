@@ -1,108 +1,34 @@
 import ELK from 'elkjs/lib/elk.bundled.js';
 import type {
-  BatchMutateProcessFlowEdges,
-  BatchMutateProcessFlowNodes,
   CreateProcessFlow,
-  CreateProcessFlowEdge,
-  CreateProcessFlowNode,
+  ProcessFlowDiagramMetadata,
+  ProcessFlowDocument,
   ProcessFlowEdge,
   ProcessFlowFull,
   ProcessFlowNode,
   ProcessFlowValidationResult,
   ProcessFlowValidationWarning,
+  ProcessFlowView,
   UpdateProcessFlow,
-  UpdateProcessFlowEdge,
-  UpdateProcessFlowNode,
 } from '@/domain/process-flow';
 import type { Supabase } from '@/lib/supabase/types';
 import { pickDefined } from '@/lib/validations';
+import {
+  type DiagramDirection,
+  EMPTY_MERMAID,
+  layoutDirection,
+  ProcessFlowDocumentError,
+  patchDiagramMetadata,
+  readDiagramDirection,
+  readMermaid,
+  serializeMermaid,
+} from './document';
 
-type ProcessFlowRow = {
-  id: string;
-  team_id: string;
-  name: string;
-  description: string | null;
-  context_markdown: string | null;
-  viewport: { x: number; y: number; zoom: number } | null;
-  schema_version: 1;
-  created_at?: string;
-  updated_at?: string;
-};
-
-type ProcessFlowNodeRow = {
-  id: string;
-  process_flow_id: string;
-  type: ProcessFlowNode['type'];
-  position_x: number;
-  position_y: number;
-  width: number | null;
-  height: number | null;
-  data: ProcessFlowNode['data'];
-  created_at?: string;
-  updated_at?: string;
-};
-
-type ProcessFlowEdgeRow = {
-  id: string;
-  process_flow_id: string;
-  type: ProcessFlowEdge['type'];
-  source_node_id: string;
-  target_node_id: string;
-  data: ProcessFlowEdge['data'] | null;
-  created_at?: string;
-  updated_at?: string;
-};
-
-type DbResult<T> = { data: T | null; error: unknown };
-
-type RpcMutationResult<T> = {
-  created: T[];
-  updated: T[];
-  deleted: T[];
-};
-
-function mapProcessFlowRow(row: ProcessFlowRow) {
-  return {
-    id: row.id,
-    team_id: row.team_id,
-    name: row.name,
-    description: row.description,
-    context_markdown: row.context_markdown,
-    viewport: row.viewport,
-    schema_version: row.schema_version,
-  };
-}
-
-function mapProcessFlowNodeRow(row: ProcessFlowNodeRow): ProcessFlowNode {
-  return {
-    id: row.id,
-    process_flow_id: row.process_flow_id,
-    type: row.type,
-    position: {
-      x: row.position_x,
-      y: row.position_y,
-    },
-    size:
-      row.width == null && row.height == null
-        ? null
-        : {
-            ...(row.width == null ? {} : { width: row.width }),
-            ...(row.height == null ? {} : { height: row.height }),
-          },
-    data: row.data,
-  };
-}
-
-function mapProcessFlowEdgeRow(row: ProcessFlowEdgeRow): ProcessFlowEdge {
-  return {
-    id: row.id,
-    process_flow_id: row.process_flow_id,
-    type: row.type,
-    source_node_id: row.source_node_id,
-    target_node_id: row.target_node_id,
-    data: row.data,
-  };
-}
+const flowSummaryFields =
+  'id, team_id, name, description, context_markdown, viewport, schema_version, created_at, updated_at';
+const emptyMetadata: ProcessFlowDiagramMetadata = { nodes: {}, edges: {} };
+const revisionConflict = () =>
+  new ProcessFlowDocumentError('This process flow changed. Reload it and retry with the current revision.', 409);
 
 function defaultNodeSize(type: ProcessFlowNode['type']) {
   switch (type) {
@@ -121,7 +47,7 @@ function defaultNodeSize(type: ProcessFlowNode['type']) {
 }
 
 function buildNodeLevelWarnings(
-  flow: ProcessFlowFull,
+  flow: FlowGraph,
   incoming: Map<string, ProcessFlowEdge[]>,
   outgoing: Map<string, ProcessFlowEdge[]>,
   labelGroups: Map<string, string[]>,
@@ -202,7 +128,7 @@ function buildDuplicateLabelWarnings(
 }
 
 function buildEdgeLevelWarnings(
-  flow: ProcessFlowFull,
+  flow: FlowGraph,
   nodeMap: Map<string, ProcessFlowNode>,
 ): ProcessFlowValidationWarning[] {
   const warnings: ProcessFlowValidationWarning[] = [];
@@ -225,255 +151,7 @@ function buildEdgeLevelWarnings(
   return warnings;
 }
 
-async function assertNodesBelongToFlow(
-  supabase: Supabase,
-  processFlowId: string,
-  nodeIds: string[],
-): Promise<{ ok: true } | { ok: false; error: Error }> {
-  const uniqueNodeIds = [...new Set(nodeIds)];
-  const { data, error } = await supabase
-    .from('process_flow_nodes')
-    .select('id, process_flow_id')
-    .eq('process_flow_id', processFlowId)
-    .in('id', uniqueNodeIds);
-
-  if (error) return { ok: false, error: new Error('Failed to validate edge nodes') };
-  if ((data ?? []).length !== uniqueNodeIds.length) {
-    return { ok: false, error: new Error('Source and target nodes must belong to the same process flow') };
-  }
-
-  return { ok: true };
-}
-
-export async function listProcessFlows(supabase: Supabase, teamId: string) {
-  return supabase.from('process_flows').select('*').eq('team_id', teamId).order('updated_at', { ascending: false });
-}
-
-export async function getProcessFlowGraph(supabase: Supabase, processFlowId: string) {
-  const [flowResult, nodesResult, edgesResult] = await Promise.all([
-    supabase.from('process_flows').select('*').eq('id', processFlowId).single(),
-    supabase.from('process_flow_nodes').select('*').eq('process_flow_id', processFlowId).order('created_at'),
-    supabase.from('process_flow_edges').select('*').eq('process_flow_id', processFlowId).order('created_at'),
-  ]);
-
-  return {
-    flowResult,
-    nodesResult,
-    edgesResult,
-  };
-}
-
-export async function getProcessFlowMcpContext(supabase: Supabase, processFlowId: string) {
-  const [flowResult, nodesResult, edgesResult] = await Promise.all([
-    supabase
-      .from('process_flows')
-      .select('id, team_id, name, description, context_markdown, viewport, schema_version')
-      .eq('id', processFlowId)
-      .single(),
-    supabase
-      .from('process_flow_nodes')
-      .select('id, process_flow_id, type, position_x, position_y, width, height, data')
-      .eq('process_flow_id', processFlowId)
-      .order('created_at'),
-    supabase
-      .from('process_flow_edges')
-      .select('id, process_flow_id, type, source_node_id, target_node_id, data')
-      .eq('process_flow_id', processFlowId)
-      .order('created_at'),
-  ]);
-
-  return {
-    flowResult,
-    nodesResult,
-    edgesResult,
-  };
-}
-
-export async function createProcessFlow(supabase: Supabase, input: CreateProcessFlow) {
-  return supabase
-    .from('process_flows')
-    .insert({
-      team_id: input.team_id,
-      name: input.name,
-      description: input.description ?? null,
-      context_markdown: input.context_markdown ?? null,
-      viewport: input.viewport ?? null,
-      schema_version: 1,
-    })
-    .select()
-    .single();
-}
-
-export async function updateProcessFlow(supabase: Supabase, processFlowId: string, changes: UpdateProcessFlow) {
-  return supabase.from('process_flows').update(pickDefined(changes)).eq('id', processFlowId).select().single();
-}
-
-export async function deleteProcessFlow(supabase: Supabase, processFlowId: string) {
-  return supabase.from('process_flows').delete().eq('id', processFlowId).select().single();
-}
-
-export async function createProcessFlowNode(supabase: Supabase, input: CreateProcessFlowNode) {
-  return supabase
-    .from('process_flow_nodes')
-    .insert({
-      process_flow_id: input.process_flow_id,
-      type: input.type,
-      position_x: input.position.x,
-      position_y: input.position.y,
-      width: input.size?.width ?? null,
-      height: input.size?.height ?? null,
-      data: input.data,
-    })
-    .select()
-    .single();
-}
-
-export async function updateProcessFlowNode(
-  supabase: Supabase,
-  processFlowId: string,
-  nodeId: string,
-  changes: UpdateProcessFlowNode,
-) {
-  const dbChanges = pickDefined({
-    type: changes.type,
-    position_x: changes.position?.x,
-    position_y: changes.position?.y,
-    width: changes.size === undefined ? undefined : (changes.size?.width ?? null),
-    height: changes.size === undefined ? undefined : (changes.size?.height ?? null),
-    data: changes.data,
-  });
-
-  return supabase
-    .from('process_flow_nodes')
-    .update(dbChanges)
-    .eq('id', nodeId)
-    .eq('process_flow_id', processFlowId)
-    .select()
-    .single();
-}
-
-export async function deleteProcessFlowNode(supabase: Supabase, processFlowId: string, nodeId: string) {
-  return supabase
-    .from('process_flow_nodes')
-    .delete()
-    .eq('id', nodeId)
-    .eq('process_flow_id', processFlowId)
-    .select()
-    .single();
-}
-
-export async function createProcessFlowEdge(
-  supabase: Supabase,
-  input: CreateProcessFlowEdge,
-): Promise<DbResult<ProcessFlowEdgeRow>> {
-  const validation = await assertNodesBelongToFlow(supabase, input.process_flow_id, [
-    input.source_node_id,
-    input.target_node_id,
-  ]);
-  if (!validation.ok) {
-    return { data: null, error: validation.error };
-  }
-
-  return supabase
-    .from('process_flow_edges')
-    .insert({
-      process_flow_id: input.process_flow_id,
-      type: input.type,
-      source_node_id: input.source_node_id,
-      target_node_id: input.target_node_id,
-      data: input.data ?? null,
-    })
-    .select()
-    .single();
-}
-
-export async function updateProcessFlowEdge(
-  supabase: Supabase,
-  processFlowId: string,
-  edgeId: string,
-  changes: UpdateProcessFlowEdge,
-) {
-  return supabase
-    .from('process_flow_edges')
-    .update(
-      pickDefined({
-        type: changes.type,
-        data: changes.data,
-      }),
-    )
-    .eq('id', edgeId)
-    .eq('process_flow_id', processFlowId)
-    .select()
-    .single();
-}
-
-export async function deleteProcessFlowEdge(supabase: Supabase, processFlowId: string, edgeId: string) {
-  return supabase
-    .from('process_flow_edges')
-    .delete()
-    .eq('id', edgeId)
-    .eq('process_flow_id', processFlowId)
-    .select()
-    .single();
-}
-
-export async function batchMutateProcessFlowNodes(supabase: Supabase, input: BatchMutateProcessFlowNodes) {
-  const { data, error } = await supabase.rpc('batch_mutate_process_flow_nodes', {
-    p_process_flow_id: input.process_flow_id,
-    p_mutations: input.mutations,
-  });
-
-  if (error || !data) {
-    return { data: null, error };
-  }
-
-  const mutationResult = data as RpcMutationResult<ProcessFlowNodeRow>;
-
-  return {
-    data: {
-      created: (mutationResult.created ?? []).map(mapProcessFlowNodeRow),
-      updated: (mutationResult.updated ?? []).map(mapProcessFlowNodeRow),
-      deleted: (mutationResult.deleted ?? []).map(mapProcessFlowNodeRow),
-    },
-    error: null,
-  };
-}
-
-export async function batchMutateProcessFlowEdges(supabase: Supabase, input: BatchMutateProcessFlowEdges) {
-  const { data, error } = await supabase.rpc('batch_mutate_process_flow_edges', {
-    p_process_flow_id: input.process_flow_id,
-    p_mutations: input.mutations,
-  });
-
-  if (error || !data) {
-    return { data: null, error };
-  }
-
-  const mutationResult = data as RpcMutationResult<ProcessFlowEdgeRow>;
-
-  return {
-    data: {
-      created: (mutationResult.created ?? []).map(mapProcessFlowEdgeRow),
-      updated: (mutationResult.updated ?? []).map(mapProcessFlowEdgeRow),
-      deleted: (mutationResult.deleted ?? []).map(mapProcessFlowEdgeRow),
-    },
-    error: null,
-  };
-}
-
-export function buildProcessFlowFull(
-  flow: ProcessFlowRow,
-  nodes: ProcessFlowNodeRow[],
-  edges: ProcessFlowEdgeRow[],
-): ProcessFlowFull {
-  return {
-    ...mapProcessFlowRow(flow),
-    nodes: nodes.map(mapProcessFlowNodeRow),
-    edges: edges.map(mapProcessFlowEdgeRow),
-  };
-}
-
-export function validateProcessFlowGraph(flow: ProcessFlowFull): ProcessFlowValidationResult {
+export function validateProcessFlowGraph(flow: FlowGraph): ProcessFlowValidationResult {
   const warnings: ProcessFlowValidationWarning[] = [];
   const nodeMap = new Map(flow.nodes.map((node) => [node.id, node]));
   const outgoing = new Map<string, ProcessFlowEdge[]>();
@@ -505,103 +183,172 @@ export function validateProcessFlowGraph(flow: ProcessFlowFull): ProcessFlowVali
   return { warnings };
 }
 
-export async function validateProcessFlowById(supabase: Supabase, processFlowId: string) {
-  const { flowResult, nodesResult, edgesResult } = await getProcessFlowGraph(supabase, processFlowId);
+type FlowGraph = Pick<ProcessFlowFull, 'nodes' | 'edges'>;
 
-  if (flowResult.error || !flowResult.data) {
-    return { data: null, error: flowResult.error };
-  }
-  if (nodesResult.error) return { data: null, error: nodesResult.error };
-  if (edgesResult.error) return { data: null, error: edgesResult.error };
+function validatedGraph(graph: FlowGraph) {
+  return { nodes: graph.nodes, edges: graph.edges, validation: validateProcessFlowGraph(graph) };
+}
 
-  const flow = buildProcessFlowFull(
-    flowResult.data as ProcessFlowRow,
-    (nodesResult.data ?? []) as ProcessFlowNodeRow[],
-    (edgesResult.data ?? []) as ProcessFlowEdgeRow[],
-  );
+function toView(document: ProcessFlowDocument, graph: ReturnType<typeof validatedGraph>): ProcessFlowView {
+  return { ...document, ...graph };
+}
 
+function nodeBounds(node: ProcessFlowNode) {
+  const defaults = defaultNodeSize(node.type);
   return {
-    data: validateProcessFlowGraph(flow),
-    error: null,
+    ...node.position,
+    width: Math.max(1, node.size?.width ?? defaults.width),
+    height: Math.max(1, node.size?.height ?? defaults.height),
   };
 }
 
-export async function autolayoutProcessFlow(supabase: Supabase, processFlowId: string) {
-  const { flowResult, nodesResult, edgesResult } = await getProcessFlowGraph(supabase, processFlowId);
-
-  if (flowResult.error || !flowResult.data) {
-    return { data: null, error: flowResult.error };
-  }
-  if (nodesResult.error) return { data: null, error: nodesResult.error };
-  if (edgesResult.error) return { data: null, error: edgesResult.error };
-
-  const nodes = ((nodesResult.data ?? []) as ProcessFlowNodeRow[]).map(mapProcessFlowNodeRow);
-  const edges = ((edgesResult.data ?? []) as ProcessFlowEdgeRow[]).map(mapProcessFlowEdgeRow);
-
-  if (nodes.length === 0) {
-    return {
-      data: {
-        nodes: [],
-        edges,
-      },
-      error: null,
-    };
-  }
-
-  const elk = new ELK();
-  const layout = await elk.layout({
-    id: processFlowId,
+async function placeNodes(
+  graph: FlowGraph,
+  direction: DiagramDirection,
+  shouldPlace: (node: ProcessFlowNode) => boolean,
+) {
+  if (!graph.nodes.some(shouldPlace)) return;
+  const layout = await new ELK().layout({
+    id: 'flow',
     layoutOptions: {
       'elk.algorithm': 'layered',
-      'elk.direction': 'RIGHT',
+      'elk.direction': layoutDirection(direction),
       'elk.layered.spacing.nodeNodeBetweenLayers': '120',
       'elk.spacing.nodeNode': '60',
       'elk.edgeRouting': 'ORTHOGONAL',
     },
-    children: nodes.map((node) => {
-      const size = node.size ?? defaultNodeSize(node.type);
-      return {
-        id: node.id,
-        width: size.width ?? defaultNodeSize(node.type).width,
-        height: size.height ?? defaultNodeSize(node.type).height,
-      };
+    children: graph.nodes.map((node) => {
+      const defaults = defaultNodeSize(node.type);
+      return { id: node.id, width: node.size?.width ?? defaults.width, height: node.size?.height ?? defaults.height };
     }),
-    edges: edges.map((edge) => ({
+    edges: graph.edges.map((edge) => ({
       id: edge.id,
       sources: [edge.source_node_id],
       targets: [edge.target_node_id],
     })),
   });
-
-  const layoutedNodes = nodes.map((node) => {
-    const layoutNode = layout.children?.find((child: { id?: string; x?: number; y?: number }) => child.id === node.id);
-    return {
-      ...node,
-      position: {
-        x: layoutNode?.x ?? node.position.x,
-        y: layoutNode?.y ?? node.position.y,
-      },
-    };
-  });
-
-  const { error } = await supabase.rpc('apply_process_flow_layout', {
-    p_process_flow_id: processFlowId,
-    p_positions: layoutedNodes.map((node) => ({
-      id: node.id,
-      x: node.position.x,
-      y: node.position.y,
-    })),
-  });
-
-  if (error) {
-    return { data: null, error };
+  const positions = new Map(layout.children?.map(({ id, x, y }) => [id, { x, y }]));
+  const occupied = graph.nodes.filter((node) => !shouldPlace(node)).map(nodeBounds);
+  const horizontal = direction === 'LR' || direction === 'RL';
+  for (const node of graph.nodes.filter(shouldPlace)) {
+    const position = positions.get(node.id);
+    if (position?.x !== undefined && position.y !== undefined) {
+      const candidate = { ...nodeBounds(node), x: position.x, y: position.y };
+      // ELK places the whole graph. Retained manual positions are obstacles in
+      // that layout, so move only new nodes past collisions on the cross axis.
+      while (true) {
+        const collision = occupied.find(
+          (box) =>
+            candidate.x < box.x + box.width + 60 &&
+            candidate.x + candidate.width + 60 > box.x &&
+            candidate.y < box.y + box.height + 60 &&
+            candidate.y + candidate.height + 60 > box.y,
+        );
+        if (!collision) break;
+        if (horizontal) candidate.y = collision.y + collision.height + 60;
+        else candidate.x = collision.x + collision.width + 60;
+      }
+      node.position = { x: candidate.x, y: candidate.y };
+      occupied.push(candidate);
+    }
   }
+}
 
+async function prepareDiagram(
+  flowId: string,
+  source: string,
+  metadata: ProcessFlowDiagramMetadata,
+  patch: UpdateProcessFlow['diagram_metadata'],
+  autoLayout: boolean,
+) {
+  const direction = readDiagramDirection(source);
+  const patchedMetadata = patchDiagramMetadata(metadata, patch);
+  const graph = readMermaid(source, flowId, patchedMetadata, true);
+  const nodeIds = new Set(graph.nodes.map((node) => node.id));
+  const edgeIds = new Set(graph.edges.map((edge) => edge.id));
+  if (
+    Object.keys(patch?.nodes ?? {}).some((id) => !nodeIds.has(id)) ||
+    Object.keys(patch?.edges ?? {}).some((id) => !edgeIds.has(id))
+  ) {
+    throw new ProcessFlowDocumentError('Metadata must refer to a node or edge ID in the Mermaid document.');
+  }
+  await placeNodes(
+    graph,
+    direction,
+    (node) => autoLayout || !Object.hasOwn(patchedMetadata.nodes, node.id) || !patchedMetadata.nodes[node.id]?.position,
+  );
+  return { graph, diagram: serializeMermaid(graph, direction) };
+}
+
+export async function listProcessFlows(supabase: Supabase, teamId: string) {
+  return supabase
+    .from('process_flows')
+    .select(flowSummaryFields)
+    .eq('team_id', teamId)
+    .order('updated_at', { ascending: false });
+}
+
+export async function getProcessFlow(supabase: Supabase, flowId: string) {
+  const { data, error } = await supabase.from('process_flows').select('*').eq('id', flowId).single();
+  if (error || !data) return { data: null, error };
+  const document: ProcessFlowDocument = data;
   return {
-    data: {
-      nodes: layoutedNodes,
-      edges,
-    },
+    data: toView(document, validatedGraph(readMermaid(document.mermaid_source, flowId, document.diagram_metadata))),
     error: null,
   };
+}
+
+export async function createProcessFlow(supabase: Supabase, input: CreateProcessFlow) {
+  const { mermaid_source, diagram_metadata, ...settings } = input;
+  const id = crypto.randomUUID();
+  const { graph, diagram } = await prepareDiagram(
+    id,
+    mermaid_source ?? EMPTY_MERMAID,
+    emptyMetadata,
+    diagram_metadata,
+    false,
+  );
+  const view = validatedGraph(graph);
+  const { data, error } = await supabase
+    .from('process_flows')
+    .insert({ ...settings, id, ...diagram })
+    .select()
+    .single();
+  return { data: data ? toView(data, view) : null, error };
+}
+
+export async function updateProcessFlow(supabase: Supabase, flowId: string, input: UpdateProcessFlow) {
+  const { expected_revision, mermaid_source, diagram_metadata, layout, canvas, ...settings } = input;
+  const current = await getProcessFlow(supabase, flowId);
+  if (!current.data) return current;
+  if (current.data.diagram_revision !== expected_revision) throw revisionConflict();
+
+  const source = mermaid_source ?? current.data.mermaid_source;
+  const canvasDocument = canvas ? serializeMermaid(canvas, readDiagramDirection(source)) : null;
+  const prepared =
+    canvas || mermaid_source !== undefined || diagram_metadata || layout
+      ? await prepareDiagram(
+          flowId,
+          canvasDocument?.mermaid_source ?? source,
+          canvasDocument?.diagram_metadata ?? current.data.diagram_metadata,
+          diagram_metadata,
+          layout === 'auto',
+        )
+      : null;
+
+  const view = validatedGraph(prepared?.graph ?? current.data);
+  const { data, error } = await supabase
+    .from('process_flows')
+    .update({ ...pickDefined(settings), ...prepared?.diagram, diagram_revision: expected_revision + 1 })
+    .eq('id', flowId)
+    .eq('diagram_revision', expected_revision)
+    .select()
+    .maybeSingle();
+  if (error) return { data: null, error };
+  if (!data) throw revisionConflict();
+  return { data: toView(data, view), error: null };
+}
+
+export async function deleteProcessFlow(supabase: Supabase, flowId: string) {
+  return supabase.from('process_flows').delete().eq('id', flowId).select('id').single();
 }

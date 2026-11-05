@@ -1,5 +1,6 @@
 export type {
   ProcessFlow,
+  ProcessFlowDocument,
   ProcessFlowEdge,
   ProcessFlowEdgeData,
   ProcessFlowEdgeType,
@@ -9,6 +10,7 @@ export type {
   ProcessFlowNodeType,
   ProcessFlowValidationResult,
   ProcessFlowValidationWarning,
+  ProcessFlowView,
   ProcessFlowViewport,
 } from '@/domain/process-flow';
 

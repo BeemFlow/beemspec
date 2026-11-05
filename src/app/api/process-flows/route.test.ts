@@ -106,12 +106,12 @@ describe('process flows route', () => {
 
     expect(response.status).toBe(200);
     expect(insert).toHaveBeenCalledWith({
+      id: expect.any(String),
       team_id: TEAM_ID,
       name: 'AP Intake',
-      description: null,
       context_markdown: 'Interview notes',
-      viewport: null,
-      schema_version: 1,
+      mermaid_source: 'flowchart LR',
+      diagram_metadata: { nodes: {}, edges: {} },
     });
   });
 });

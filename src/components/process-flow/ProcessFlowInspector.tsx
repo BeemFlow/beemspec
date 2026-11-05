@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { nonCredentialFieldProps } from '@/components/ui/non-credential-fields';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import type { ProcessFlowEdge, ProcessFlowNode } from '@/types';
 import type { ProcessFlowCanvasEdge, ProcessFlowCanvasNode } from './adapters';
 
 type InspectorSelection =
@@ -18,9 +19,9 @@ type InspectorSelection =
 
 interface ProcessFlowInspectorProps {
   selection: InspectorSelection;
-  onSaveNode: (nodeId: string, changes: Record<string, unknown>) => Promise<void>;
+  onSaveNode: (nodeId: string, changes: Pick<ProcessFlowNode, 'type' | 'data'>) => Promise<void>;
   onDeleteNode: (nodeId: string) => Promise<void>;
-  onSaveEdge: (edgeId: string, changes: Record<string, unknown>) => Promise<void>;
+  onSaveEdge: (edgeId: string, changes: Pick<ProcessFlowEdge, 'type' | 'data'>) => Promise<void>;
   onDeleteEdge: (edgeId: string) => Promise<void>;
 }
 
@@ -59,7 +60,7 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
     if (props.selection.kind !== 'node') return null;
     const node = props.selection.node;
     return {
-      type: node.type,
+      type: node.data.nodeType,
       label: node.data.label,
       owner_role: node.data.owner_role ?? '',
       systems: arrayToText(node.data.systems),
@@ -95,6 +96,8 @@ export function ProcessFlowInspector(props: ProcessFlowInspectorProps) {
     setIsSaving(true);
     try {
       await action();
+    } catch {
+      // The editor displays the save error.
     } finally {
       setIsSaving(false);
     }

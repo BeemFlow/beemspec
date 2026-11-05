@@ -1,17 +1,13 @@
 import { z } from 'zod';
 
 const uuid = (description: string) => z.string().uuid().describe(description);
-const nullableText = (description: string) =>
-  z.string().min(1).nullable().describe(`${description} Pass null to clear it.`);
+const nullableText = (description: string, minimumLength = 1) =>
+  z.string().min(minimumLength).nullable().describe(`${description} Pass null to clear it.`);
 const name = (description: string) => z.string().min(1, 'Required').max(200).describe(description);
 const nonEmptyLabel = (description: string) => z.string().min(1, 'Required').max(200).describe(description);
+const metadataText = (description: string) => nullableText(description, 0);
 const stringList = (description: string, itemDescription: string) =>
-  z.array(z.string().min(1).describe(itemDescription)).describe(description);
-
-const atLeastOneField = <T extends Record<string, unknown>>(data: T): boolean =>
-  Object.values(data).some((value) => value !== undefined);
-const atLeastOneFieldMessage = { message: 'At least one field must be provided' };
-const updateDescription = (entity: string) => `Fields to change for the ${entity}; at least one change is required.`;
+  z.array(z.string().describe(itemDescription)).describe(description);
 
 export const processFlowViewportSchema = z
   .object({
@@ -32,23 +28,23 @@ export const processFlowEdgeTypeSchema = z
 export const processFlowNodeDataSchema = z
   .object({
     label: nonEmptyLabel('Short text displayed inside the node.'),
-    owner_role: nullableText('Role accountable for this step.').optional(),
+    owner_role: metadataText('Role accountable for this step.').optional(),
     systems: stringList('Systems or applications involved in this step.', 'System or application name.').optional(),
     inputs: stringList('Information or artifacts consumed by this step.', 'Input name or description.').optional(),
     outputs: stringList('Information or artifacts produced by this step.', 'Output name or description.').optional(),
-    pain_points: nullableText('Known friction, failures, or user pain at this step.').optional(),
-    notes: nullableText('Additional operational notes for this step.').optional(),
-    automation_opportunity: nullableText('Potential automation or improvement opportunity.').optional(),
-    frequency: nullableText('How often this step occurs, expressed in natural language.').optional(),
-    estimated_duration: nullableText('Typical elapsed or active duration, including units.').optional(),
-    time_constraint: nullableText('Deadline, timing window, or service-level constraint.').optional(),
+    pain_points: metadataText('Known friction, failures, or user pain at this step.').optional(),
+    notes: metadataText('Additional operational notes for this step.').optional(),
+    automation_opportunity: metadataText('Potential automation or improvement opportunity.').optional(),
+    frequency: metadataText('How often this step occurs, expressed in natural language.').optional(),
+    estimated_duration: metadataText('Typical elapsed or active duration, including units.').optional(),
+    time_constraint: metadataText('Deadline, timing window, or service-level constraint.').optional(),
   })
   .strict();
 
 export const processFlowEdgeDataSchema = z
   .object({
-    label: nullableText('Short text displayed on the connection.').optional(),
-    condition: nullableText('Rule or event that determines when this path is taken.').optional(),
+    label: metadataText('Short text displayed on the connection.').optional(),
+    condition: metadataText('Rule or event that determines when this path is taken.').optional(),
   })
   .strict();
 
@@ -69,209 +65,87 @@ export const processFlowBase = z
   })
   .strict();
 
-export const createProcessFlowSchema = processFlowBase.partial({
-  description: true,
-  context_markdown: true,
-  viewport: true,
+const mermaidSource = z
+  .string()
+  .min(1)
+  .max(200_000)
+  .describe('Mermaid flowchart source. Preserve existing node and edge IDs when editing.');
+const mermaidId = z
+  .string()
+  .regex(/^[A-Za-z_][A-Za-z0-9_-]*$/)
+  .describe('Stable Mermaid node or edge ID.');
+const position = z.strictObject({ x: z.number().finite(), y: z.number().finite() });
+const size = z.strictObject({ width: z.number().finite().optional(), height: z.number().finite().optional() });
+const nodeMetadataPatch = z.strictObject({
+  position: position.optional(),
+  size: size.nullable().optional(),
+  data: processFlowNodeDataSchema.omit({ label: true }).optional(),
+});
+const edgeMetadataPatch = z.strictObject({
+  type: z
+    .literal('dependency')
+    .nullable()
+    .optional()
+    .describe('Set dependency semantics or clear them to use the Mermaid arrow type.'),
+  data: processFlowEdgeDataSchema.omit({ label: true }).optional(),
+});
+const diagramMetadataPatch = z.strictObject({
+  nodes: z.record(mermaidId, nodeMetadataPatch).optional(),
+  edges: z.record(mermaidId, edgeMetadataPatch).optional(),
 });
 
-const updateProcessFlowFieldsSchema = processFlowBase.omit({ team_id: true }).partial().strict();
+const settings = processFlowBase.omit({ team_id: true }).partial();
+const documentFields = {
+  mermaid_source: mermaidSource.optional(),
+  diagram_metadata: diagramMetadataPatch
+    .optional()
+    .describe('Patch metadata by stable ID. Omitted fields are preserved.'),
+};
 
-export const updateProcessFlowSchema = updateProcessFlowFieldsSchema
-  .refine(atLeastOneField, atLeastOneFieldMessage)
-  .describe(updateDescription('process flow'));
+export const createProcessFlowSchema = processFlowBase
+  .partial({ description: true, context_markdown: true, viewport: true })
+  .extend(documentFields);
 
-export const updateProcessFlowToolSchema = updateProcessFlowFieldsSchema
+const revision = z.number().int().positive().describe('Current diagram_revision from processflow_get.');
+const updateFields = settings.extend({
+  ...documentFields,
+  expected_revision: revision,
+  layout: z.literal('auto').optional().describe('Recompute all positions. Omit to keep saved positions.'),
+});
+
+function hasChanges({ expected_revision: _revision, ...changes }: z.infer<typeof updateFields>) {
+  return Object.values(changes).some((value) => value !== undefined);
+}
+
+export const updateProcessFlowToolSchema = updateFields
   .extend({ process_flow_id: uuid('Process flow UUID to update.') })
-  .refine(({ process_flow_id: _processFlowId, ...changes }) => atLeastOneField(changes), atLeastOneFieldMessage)
-  .describe(updateDescription('process flow'));
+  .refine(({ process_flow_id: _flowId, ...changes }) => hasChanges(changes), 'At least one change is required.');
 
-export const processFlowNodeBase = z
-  .object({
-    process_flow_id: uuid('Process flow UUID that owns the node.'),
-    type: processFlowNodeTypeSchema,
-    position: z
-      .object({
-        x: z.number().finite().describe('Horizontal canvas coordinate in pixels.'),
-        y: z.number().finite().describe('Vertical canvas coordinate in pixels.'),
-      })
-      .strict()
-      .describe('Absolute node position on the process-flow canvas.'),
-    size: z
-      .object({
-        width: z.number().finite().positive().optional().describe('Rendered node width in pixels.'),
-        height: z.number().finite().positive().optional().describe('Rendered node height in pixels.'),
-      })
-      .strict()
-      .nullable()
-      .optional()
-      .describe(
-        'Complete node dimensions. On update, replaces both dimensions; omitted width or height is cleared. Pass null to clear both; omit size to keep them.',
-      ),
-    data: processFlowNodeDataSchema.describe(
-      'Complete node data. On update, replaces the entire data object; include every field to retain, such as owner_role and systems. Read the node first; omit data to leave it unchanged.',
-    ),
-  })
-  .strict();
-
-export const createProcessFlowNodeSchema = processFlowNodeBase;
-
-const updateProcessFlowNodeFieldsSchema = processFlowNodeBase.omit({ process_flow_id: true }).partial().strict();
-
-export const updateProcessFlowNodeSchema = updateProcessFlowNodeFieldsSchema
-  .refine(atLeastOneField, atLeastOneFieldMessage)
-  .describe(updateDescription('process flow node'));
-
-export const updateProcessFlowNodeToolSchema = updateProcessFlowNodeFieldsSchema
-  .extend({
-    process_flow_id: uuid('Process flow UUID that owns the node.'),
-    node_id: uuid('Node UUID to update.'),
-  })
+// The canvas submits its derived graph to the same document writer. Its loose
+// data schemas validate known fields and preserve unknown fields from older rows.
+const canvasNode = z.strictObject({
+  id: mermaidId,
+  process_flow_id: uuid('Process flow UUID.'),
+  type: processFlowNodeTypeSchema,
+  position,
+  size: size.nullable().optional(),
+  data: processFlowNodeDataSchema.loose().extend({ label: z.string() }),
+});
+const canvasEdge = z.strictObject({
+  id: mermaidId,
+  process_flow_id: uuid('Process flow UUID.'),
+  type: processFlowEdgeTypeSchema,
+  source_node_id: mermaidId,
+  target_node_id: mermaidId,
+  data: processFlowEdgeDataSchema.loose().nullable().optional(),
+});
+export const updateProcessFlowSchema = updateFields
+  .extend({ canvas: z.strictObject({ nodes: z.array(canvasNode), edges: z.array(canvasEdge) }).optional() })
   .refine(
-    ({ process_flow_id: _processFlowId, node_id: _nodeId, ...changes }) => atLeastOneField(changes),
-    atLeastOneFieldMessage,
+    (input) => !input.canvas || (input.mermaid_source === undefined && input.diagram_metadata === undefined),
+    'Provide either canvas changes or Mermaid and metadata changes.',
   )
-  .describe(updateDescription('process flow node'));
-
-export const createProcessFlowNodeBodySchema = processFlowNodeBase.omit({ process_flow_id: true });
-
-export const processFlowEdgeBase = z
-  .object({
-    process_flow_id: uuid('Process flow UUID that owns the edge.'),
-    type: processFlowEdgeTypeSchema,
-    source_node_id: uuid('Node UUID where the directed edge starts.'),
-    target_node_id: uuid('Node UUID where the directed edge ends.'),
-    data: processFlowEdgeDataSchema
-      .nullable()
-      .optional()
-      .describe(
-        'Complete edge data. On update, replaces the entire data object; include both label and condition to retain them. Pass null to clear it; omit data to keep it.',
-      ),
-  })
-  .strict();
-
-export const createProcessFlowEdgeSchema = processFlowEdgeBase;
-
-const updateProcessFlowEdgeFieldsSchema = processFlowEdgeBase
-  .omit({ process_flow_id: true, source_node_id: true, target_node_id: true })
-  .partial()
-  .strict();
-
-export const updateProcessFlowEdgeSchema = updateProcessFlowEdgeFieldsSchema
-  .refine(atLeastOneField, atLeastOneFieldMessage)
-  .describe(updateDescription('process flow edge'));
-
-export const updateProcessFlowEdgeToolSchema = updateProcessFlowEdgeFieldsSchema
-  .extend({
-    process_flow_id: uuid('Process flow UUID that owns the edge.'),
-    edge_id: uuid('Edge UUID to update.'),
-  })
-  .refine(
-    ({ process_flow_id: _processFlowId, edge_id: _edgeId, ...changes }) => atLeastOneField(changes),
-    atLeastOneFieldMessage,
-  )
-  .describe(updateDescription('process flow edge'));
-
-export const createProcessFlowEdgeBodySchema = processFlowEdgeBase.omit({ process_flow_id: true });
-
-export const batchProcessFlowNodeMutationSchema = z.discriminatedUnion('action', [
-  z
-    .object({
-      action: z.literal('create').describe('Create a new node.'),
-      payload: createProcessFlowNodeBodySchema.describe('Complete new node definition.'),
-    })
-    .strict(),
-  z
-    .object({
-      action: z.literal('update').describe('Update an existing node.'),
-      id: uuid('Node UUID to update.'),
-      payload: updateProcessFlowNodeSchema.describe('Node changes; at least one change is required.'),
-    })
-    .strict(),
-  z
-    .object({
-      action: z.literal('delete').describe('Delete an existing node.'),
-      id: uuid('Node UUID to delete.'),
-    })
-    .strict(),
-]);
-
-export const batchMutateProcessFlowNodesSchema = z
-  .object({
-    process_flow_id: uuid('Process flow UUID whose nodes will be mutated.'),
-    mutations: z
-      .array(batchProcessFlowNodeMutationSchema)
-      .min(1, 'At least one mutation is required')
-      .describe('Ordered node mutations applied atomically in one transaction.'),
-  })
-  .strict();
-
-export const batchProcessFlowNodesBodySchema = batchMutateProcessFlowNodesSchema.omit({ process_flow_id: true });
-
-export const batchProcessFlowEdgeMutationSchema = z.discriminatedUnion('action', [
-  z
-    .object({
-      action: z.literal('create').describe('Create a new edge.'),
-      payload: createProcessFlowEdgeBodySchema.describe('Complete new edge definition.'),
-    })
-    .strict(),
-  z
-    .object({
-      action: z.literal('update').describe('Update an existing edge.'),
-      id: uuid('Edge UUID to update.'),
-      payload: updateProcessFlowEdgeSchema.describe('Edge changes; at least one change is required.'),
-    })
-    .strict(),
-  z
-    .object({
-      action: z.literal('delete').describe('Delete an existing edge.'),
-      id: uuid('Edge UUID to delete.'),
-    })
-    .strict(),
-]);
-
-export const batchMutateProcessFlowEdgesSchema = z
-  .object({
-    process_flow_id: uuid('Process flow UUID whose edges will be mutated.'),
-    mutations: z
-      .array(batchProcessFlowEdgeMutationSchema)
-      .min(1, 'At least one mutation is required')
-      .describe('Ordered edge mutations applied atomically in one transaction.'),
-  })
-  .strict();
-
-export const batchProcessFlowEdgesBodySchema = batchMutateProcessFlowEdgesSchema.omit({ process_flow_id: true });
-
-export const processFlowAutolayoutSchema = z
-  .object({
-    process_flow_id: uuid('Process flow UUID to lay out deterministically.'),
-  })
-  .strict();
-
-export const processFlowValidationRequestSchema = z
-  .object({
-    process_flow_id: uuid('Process flow UUID to validate.'),
-  })
-  .strict();
+  .refine(hasChanges, 'At least one change is required.');
 
 export type CreateProcessFlow = z.infer<typeof createProcessFlowSchema>;
 export type UpdateProcessFlow = z.infer<typeof updateProcessFlowSchema>;
-
-export type CreateProcessFlowNode = z.infer<typeof createProcessFlowNodeSchema>;
-export type UpdateProcessFlowNode = z.infer<typeof updateProcessFlowNodeSchema>;
-export type CreateProcessFlowNodeBody = z.infer<typeof createProcessFlowNodeBodySchema>;
-
-export type CreateProcessFlowEdge = z.infer<typeof createProcessFlowEdgeSchema>;
-export type UpdateProcessFlowEdge = z.infer<typeof updateProcessFlowEdgeSchema>;
-export type CreateProcessFlowEdgeBody = z.infer<typeof createProcessFlowEdgeBodySchema>;
-
-export type BatchProcessFlowNodeMutation = z.infer<typeof batchProcessFlowNodeMutationSchema>;
-export type BatchMutateProcessFlowNodes = z.infer<typeof batchMutateProcessFlowNodesSchema>;
-export type BatchProcessFlowNodesBody = z.infer<typeof batchProcessFlowNodesBodySchema>;
-
-export type BatchProcessFlowEdgeMutation = z.infer<typeof batchProcessFlowEdgeMutationSchema>;
-export type BatchMutateProcessFlowEdges = z.infer<typeof batchMutateProcessFlowEdgesSchema>;
-export type BatchProcessFlowEdgesBody = z.infer<typeof batchProcessFlowEdgesBodySchema>;
-
-export type ProcessFlowAutolayoutRequest = z.infer<typeof processFlowAutolayoutSchema>;
-export type ProcessFlowValidationRequest = z.infer<typeof processFlowValidationRequestSchema>;
