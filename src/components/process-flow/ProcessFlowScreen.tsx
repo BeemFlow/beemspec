@@ -14,7 +14,13 @@ import { useRouteRefresh } from '@/components/use-route-refresh';
 import type { UpdateProcessFlow } from '@/domain/process-flow';
 import { fetchJson } from '@/lib/http';
 import type { ProcessFlowEdge, ProcessFlowFull, ProcessFlowNode, ProcessFlowView } from '@/types';
-import { type ProcessFlowCanvasEdge, type ProcessFlowCanvasNode, toCanvasFlow } from './adapters';
+import {
+  type ProcessFlowCanvasEdge,
+  type ProcessFlowCanvasNode,
+  toCanvasEdge,
+  toCanvasFlow,
+  toCanvasNode,
+} from './adapters';
 
 type Selection = { kind: 'flow' } | { kind: 'node'; id: string } | { kind: 'edge'; id: string };
 
@@ -37,13 +43,20 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
   const [contextOpen, setContextOpen] = useState(false);
   const [mcpSetupOpen, setMcpSetupOpen] = useState(false);
 
-  const showFlow = useCallback((flow: ProcessFlowView) => {
-    currentFlow.current = flow;
-    setProcessFlow(flow);
+  const showCanvas = useCallback((flow: ProcessFlowView) => {
     const canvas = toCanvasFlow(flow);
     setNodes(canvas.nodes);
     setEdges(canvas.edges);
   }, []);
+
+  const showFlow = useCallback(
+    (flow: ProcessFlowView) => {
+      currentFlow.current = flow;
+      setProcessFlow(flow);
+      showCanvas(flow);
+    },
+    [showCanvas],
+  );
 
   useEffect(() => {
     if (
@@ -55,19 +68,20 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
     }
   }, [initialProcessFlow, showFlow]);
 
+  // Only changes to the saved flow or selection should reset inspector fields.
   const selected = useMemo(() => {
     if (selection.kind === 'node') {
-      const node = nodes.find((item) => item.id === selection.id);
-      return node ? ({ kind: 'node', node } as const) : ({ kind: 'flow' } as const);
+      const node = processFlow.nodes.find((item) => item.id === selection.id);
+      return node ? ({ kind: 'node', node: toCanvasNode(node) } as const) : ({ kind: 'flow' } as const);
     }
 
     if (selection.kind === 'edge') {
-      const edge = edges.find((item) => item.id === selection.id);
-      return edge ? ({ kind: 'edge', edge } as const) : ({ kind: 'flow' } as const);
+      const edge = processFlow.edges.find((item) => item.id === selection.id);
+      return edge ? ({ kind: 'edge', edge: toCanvasEdge(edge) } as const) : ({ kind: 'flow' } as const);
     }
 
     return { kind: 'flow' } as const;
-  }, [selection, nodes, edges]);
+  }, [selection, processFlow]);
 
   const request = useCallback(async <T,>(input: RequestInfo | URL, init: RequestInit | undefined, fallback: string) => {
     setUiError(null);
@@ -98,14 +112,14 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
             showFlow(updated);
           }
         } catch (error) {
-          if (currentFlow.current.id === flow.id) showFlow(currentFlow.current);
+          if (currentFlow.current.id === flow.id) showCanvas(currentFlow.current);
           throw error;
         }
       });
       pendingSave.current = save.catch(() => {});
       return save;
     },
-    [request, showFlow],
+    [request, showCanvas, showFlow],
   );
 
   const saveGraph = (edit: (flow: ProcessFlowView) => Graph) => saveFlow((flow) => ({ canvas: edit(flow) }));

@@ -161,6 +161,32 @@ describe('ProcessFlowScreen', () => {
     });
   });
 
+  it.each([
+    { kind: 'Node', field: 'Label', draft: 'Review invoice', savedLabel: 'node-labels:Review invoice' },
+    { kind: 'Edge', field: 'Label', draft: 'Requires review', savedLabel: 'edge-labels:Requires review' },
+  ])(
+    'keeps a $kind inspector draft after a failed save and lets it be retried',
+    async ({ kind, field, draft, savedLabel }) => {
+      const user = userEvent.setup();
+      fetchJsonMock.mockRejectedValueOnce(new Error('Connection interrupted'));
+
+      render(<ProcessFlowScreen initialProcessFlow={createFlow()} />);
+      await user.click(screen.getByRole('button', { name: `Select ${kind}` }));
+      const input = screen.getByLabelText<HTMLInputElement>(field);
+      await user.clear(input);
+      await user.type(input, draft);
+
+      const save = screen.getByRole('button', { name: `Save ${kind}` });
+      await user.click(save);
+      await screen.findByText('Connection interrupted');
+      expect(input.value).toBe(draft);
+
+      await user.click(save);
+      await screen.findByText(savedLabel);
+      expect(screen.queryByText('Connection interrupted')).toBeNull();
+    },
+  );
+
   it('updates local screen state for connect, save, delete, drag, and selection flows', async () => {
     const user = userEvent.setup();
 
