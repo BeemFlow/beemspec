@@ -39,7 +39,7 @@ Legend:
 | Persona delete | Yes (`persona_delete`) | Yes (`DELETE /api/personas/[id]`) | Parity. |
 | Agent workflow guidance | MCP server instructions (not a tool) | No | Supplied by the server; directs agents to focused read and mutation tools. |
 | Agent coding context | Yes (`story_context_get`) | No equivalent | MCP-only story implementation helper; now includes story map context markdown, release context markdown when present, workflow placement, personas, and Figma hints. |
-| Process-flow node/edge batches | Yes (`processflow_nodes_mutate`, `processflow_edges_mutate`) | Yes (`PUT /api/process-flows/[id]/nodes`, `PUT /api/process-flows/[id]/edges`) | Atomic ordered mutations; MCP caps each call at 100 operations, while REST has no operation-count cap. |
+| Process flow documents | Yes (`processflow_list/get/create/update/delete`) | Yes (`/api/process-flows`, `/api/process-flows/[id]`) | Read and write one Mermaid document per flow. Saves check the revision and return validation. |
 | Team admin (members/invites/settings/delete team) | No | Yes (`/api/teams/[id]/*`) | API-only operational/admin surface. |
 | Linear OAuth/webhook/sync management | No | Yes (`/api/integrations/linear/*`, `/api/story-maps/[id]/integrations/linear/*`) | API-only integration surface. |
 | MCP OAuth endpoints | Transport/auth support | N/A | Uses Supabase OAuth server (`https://<project-ref>.supabase.co/auth/v1`) discovered via protected-resource metadata. Consent UI is app-hosted at `/oauth/consent` and submits decisions to `/oauth/decision`. |
@@ -79,4 +79,4 @@ Legend:
 - Keep destructive operations that require stronger human intent on REST-only routes where applicable.
 - Story create/update/delete tools declare `openWorldHint: true` because they can synchronize changes to Linear.
 - MCP tool inputs reuse domain validation, including complete ordering and nested-object replacement semantics; there are no separate per-field text or collection budgets.
-- The MCP SDK bounds HTTP request bodies to 4 MiB and JSON-RPC envelope batches to 100 messages. Separately, process-flow mutation tools accept at most 100 operations per call to bound database work; this application-level cap does not apply to REST batches.
+- The MCP SDK bounds HTTP request bodies to 4 MiB and JSON-RPC envelope batches to 100 messages. Process-flow saves use the revision from the last read and preserve metadata for surviving Mermaid IDs.

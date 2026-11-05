@@ -18,9 +18,9 @@ const E2E_RELEASE_ID = '10000000-0000-4000-8000-000000000031';
 const E2E_STORY_ID = '10000000-0000-4000-8000-000000000041';
 
 export const E2E_PROCESS_FLOW_ID = '20000000-0000-4000-8000-000000000001';
-export const E2E_NODE_RECEIVE_ID = '20000000-0000-4000-8000-000000000011';
-export const E2E_NODE_APPROVED_ID = '20000000-0000-4000-8000-000000000021';
-export const E2E_EDGE_REVIEW_ID = '20000000-0000-4000-8000-000000000031';
+export const E2E_NODE_RECEIVE_ID = 'n_20000000-0000-4000-8000-000000000011';
+export const E2E_NODE_APPROVED_ID = 'n_20000000-0000-4000-8000-000000000021';
+export const E2E_EDGE_REVIEW_ID = 'e_20000000-0000-4000-8000-000000000031';
 
 type AuthUser = {
   id: string;
@@ -216,56 +216,20 @@ export async function resetLocalAppState(scenario: ResetScenario = 'default') {
     name: 'Accounts Payable',
     description: 'Invoice intake and approval flow',
     context_markdown: 'Seeded local Supabase fixture for process flow testing.',
-    viewport: null,
-    schema_version: 1,
+    mermaid_source: [
+      'flowchart LR',
+      `  ${E2E_NODE_RECEIVE_ID}["Receive invoice"]`,
+      `  ${E2E_NODE_APPROVED_ID}{"Approved?"}`,
+      ...(scenario === 'malformed' ? ['  n_empty["#0;"]'] : []),
+      `  ${E2E_NODE_RECEIVE_ID} ${E2E_EDGE_REVIEW_ID}@-->|"Review"| ${E2E_NODE_APPROVED_ID}`,
+    ].join('\n'),
+    diagram_metadata: {
+      nodes: {
+        [E2E_NODE_RECEIVE_ID]: { position: { x: 120, y: 140 }, data: { owner_role: 'Operations' } },
+        [E2E_NODE_APPROVED_ID]: { position: { x: 420, y: 140 }, data: { owner_role: 'Finance' } },
+      },
+      edges: {},
+    },
   });
   if (flowError) throw new Error(`Failed to seed process flow: ${flowError.message}`);
-
-  const { error: nodesError } = await admin.from('process_flow_nodes').insert([
-    {
-      id: E2E_NODE_RECEIVE_ID,
-      process_flow_id: E2E_PROCESS_FLOW_ID,
-      type: 'step',
-      position_x: 120,
-      position_y: 140,
-      width: null,
-      height: null,
-      data: { label: 'Receive invoice', owner_role: 'Operations' },
-    },
-    {
-      id: E2E_NODE_APPROVED_ID,
-      process_flow_id: E2E_PROCESS_FLOW_ID,
-      type: 'decision',
-      position_x: 420,
-      position_y: 140,
-      width: null,
-      height: null,
-      data: { label: 'Approved?', owner_role: 'Finance' },
-    },
-    ...(scenario === 'malformed'
-      ? [
-          {
-            id: '20000000-0000-4000-8000-000000000041',
-            process_flow_id: E2E_PROCESS_FLOW_ID,
-            type: 'step',
-            position_x: 0,
-            position_y: 0,
-            width: null,
-            height: null,
-            data: { label: '' },
-          },
-        ]
-      : []),
-  ]);
-  if (nodesError) throw new Error(`Failed to seed process flow nodes: ${nodesError.message}`);
-
-  const { error: edgeError } = await admin.from('process_flow_edges').insert({
-    id: E2E_EDGE_REVIEW_ID,
-    process_flow_id: E2E_PROCESS_FLOW_ID,
-    type: 'flow',
-    source_node_id: E2E_NODE_RECEIVE_ID,
-    target_node_id: E2E_NODE_APPROVED_ID,
-    data: { label: 'Review' },
-  });
-  if (edgeError) throw new Error(`Failed to seed process flow edge: ${edgeError.message}`);
 }

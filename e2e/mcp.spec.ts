@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import {
   CLIENT_CAPABILITIES_META_KEY,
@@ -12,8 +11,6 @@ import { z } from 'zod';
 import { loginAsOwner, resetE2EState } from './helpers';
 import {
   createPublicClient,
-  E2E_EDGE_REVIEW_ID,
-  E2E_NODE_APPROVED_ID,
   E2E_NODE_RECEIVE_ID,
   E2E_OWNER_EMAIL,
   E2E_OWNER_PASSWORD,
@@ -68,16 +65,20 @@ test('serves authenticated MCP tools over the v2 HTTP transport', async ({ baseU
 
     expect(client.getServerVersion()).toMatchObject({ name: 'beemspec' });
     expect(client.getNegotiatedProtocolVersion()).toBe('2026-07-28');
-    expect(client.getInstructions()).toContain('processflow_nodes_mutate');
+    expect(client.getInstructions()).toContain('expected_revision');
 
     const { tools } = await client.listTools();
     const toolNames = new Set(tools.map((tool) => tool.name));
     expect(toolNames.has('team_list')).toBe(true);
     expect(toolNames.has('storymap_workflow_guide')).toBe(false);
     expect(toolNames.has('processflow_workflow_guide')).toBe(false);
-    expect(toolNames.has('processflow_nodes_mutate')).toBe(true);
-    expect(toolNames.has('processflow_edges_mutate')).toBe(true);
-    expect(toolNames.has('processflow_autolayout')).toBe(true);
+    expect([...toolNames].filter((name) => name.startsWith('processflow_')).sort()).toEqual([
+      'processflow_create',
+      'processflow_delete',
+      'processflow_get',
+      'processflow_list',
+      'processflow_update',
+    ]);
     expect(tools.every((tool) => tool.outputSchema)).toBe(true);
 
     await test.step('reject invalid HTTP requests before applying mutations', async () => {
@@ -92,8 +93,8 @@ test('serves authenticated MCP tools over the v2 HTTP transport', async ({ baseU
         id: 1,
         method: 'tools/call',
         params: {
-          name: 'processflow_node_delete',
-          arguments: { process_flow_id: E2E_PROCESS_FLOW_ID, node_id: E2E_NODE_RECEIVE_ID },
+          name: 'processflow_delete',
+          arguments: { process_flow_id: E2E_PROCESS_FLOW_ID },
         },
       };
       const envelope = {
@@ -161,145 +162,126 @@ test('serves authenticated MCP tools over the v2 HTTP transport', async ({ baseU
       data: { id: E2E_PROCESS_FLOW_ID },
     });
 
-    const flowReadSchema = z.object({
-      data: z.object({ nodes: z.array(z.object({ id: z.string(), data: z.looseObject({ label: z.string() }) })) }),
-    });
-    const flowData = flowReadSchema.parse(processFlow.structuredContent).data;
-    const receiveNode = flowData.nodes.find((node) => node.id === E2E_NODE_RECEIVE_ID);
-    if (!receiveNode) throw new Error('Seeded receive-invoice node is missing');
-    expect(receiveNode.data.owner_role).toBe('Operations');
-    const updatedNodeData = await test.step('read and preserve long REST-authored node metadata', async () => {
+    const flowReadSchema = z.object({ data: z.object({ mermaid_source: z.string(), diagram_revision: z.number() }) });
+    const read = async () =>
+      flowReadSchema.parse(
+        (
+          await client.callTool({
+            name: 'processflow_get',
+            arguments: { process_flow_id: E2E_PROCESS_FLOW_ID },
+          })
+        ).structuredContent,
+      ).data;
+    const before = flowReadSchema.parse(processFlow.structuredContent).data;
+
+    await test.step('save a canvas edit, read it through MCP, then update the same document', async () => {
       await loginAsOwner(page);
-      const restData = {
-        ...receiveNode.data,
-        notes: 'n'.repeat(20_001),
-        systems: Array(201).fill('s'.repeat(2_001)),
-      };
-      const written = await page.request.put(`/api/process-flows/${E2E_PROCESS_FLOW_ID}/nodes`, {
-        data: { mutations: [{ action: 'update', id: E2E_NODE_RECEIVE_ID, payload: { data: restData } }] },
+      await page.goto(`/process-flows/${E2E_PROCESS_FLOW_ID}`);
+      await page.getByTestId('processflow-node-step').filter({ hasText: 'Receive invoice' }).click();
+      await page.getByLabel('Label').fill('Receive and validate invoice');
+      await page.getByLabel('Frequency').fill('Daily');
+      const [canvasSave] = await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.request().method() === 'PUT' &&
+            response.url().endsWith(`/api/process-flows/${E2E_PROCESS_FLOW_ID}`),
+        ),
+        page.getByRole('button', { name: 'Save Node' }).click(),
+      ]);
+      expect(canvasSave.ok()).toBe(true);
+
+      const canvasVersion = await read();
+      expect(canvasVersion.mermaid_source).toContain('Receive and validate invoice');
+      const stale = await client.callTool({
+        name: 'processflow_update',
+        arguments: {
+          process_flow_id: E2E_PROCESS_FLOW_ID,
+          expected_revision: before.diagram_revision,
+          mermaid_source: before.mermaid_source,
+        },
       });
-      expect(written.ok()).toBe(true);
-      const reloaded = await client.callTool({
-        name: 'processflow_get',
-        arguments: { process_flow_id: E2E_PROCESS_FLOW_ID },
+      expect(stale.isError).toBe(true);
+      expect(stale.structuredContent).toMatchObject({ details: { code: 'revision_conflict' } });
+
+      const saved = await client.callTool({
+        name: 'processflow_update',
+        arguments: {
+          process_flow_id: E2E_PROCESS_FLOW_ID,
+          expected_revision: canvasVersion.diagram_revision,
+          mermaid_source: `${canvasVersion.mermaid_source}\n  archive["Archive invoice"]\n  ${E2E_NODE_RECEIVE_ID} --> archive`,
+        },
       });
-      expect(reloaded.isError).not.toBe(true);
-      const node = flowReadSchema
-        .parse(reloaded.structuredContent)
-        .data.nodes.find(({ id }) => id === E2E_NODE_RECEIVE_ID);
-      if (!node) throw new Error('REST-updated receive-invoice node is missing');
-      expect(node.data).toEqual(restData);
-      return { ...node.data, label: 'Receive and validate invoice' };
+      expect(saved.isError).not.toBe(true);
+      expect(saved.structuredContent).toMatchObject({
+        data: {
+          diagram_metadata: {
+            nodes: { [E2E_NODE_RECEIVE_ID]: { data: { owner_role: 'Operations', frequency: 'Daily' } } },
+          },
+        },
+      });
+      await page.reload();
+      await expect(page.getByTestId('processflow-node-step').filter({ hasText: 'Archive invoice' })).toBeVisible();
+      await page.getByTestId('processflow-node-step').filter({ hasText: 'Receive and validate invoice' }).click();
+      await expect(page.getByLabel('Frequency')).toHaveValue('Daily');
     });
 
-    const batchResult = await client.callTool({
-      name: 'processflow_nodes_mutate',
+    const created = await client.callTool({
+      name: 'processflow_create',
       arguments: {
-        process_flow_id: E2E_PROCESS_FLOW_ID,
-        mutations: [
-          {
-            action: 'update',
-            id: E2E_NODE_RECEIVE_ID,
-            payload: { data: updatedNodeData },
-          },
-        ],
+        team_id: E2E_TEAM_ID,
+        name: 'Agent-created flow',
+        mermaid_source: 'flowchart LR\nintake["Receive request"] --> approve{"Approved?"}',
       },
     });
-    expect(batchResult.isError).not.toBe(true);
-    expect(batchResult.structuredContent).toMatchObject({
-      ok: true,
+    expect(created.isError).not.toBe(true);
+    expect(created.structuredContent).toMatchObject({
       data: {
-        updated: [
-          {
-            id: E2E_NODE_RECEIVE_ID,
-            data: updatedNodeData,
-          },
-        ],
+        mermaid_source: expect.stringContaining('Receive request'),
+        diagram_revision: 1,
+        validation: expect.any(Object),
       },
     });
-
-    await test.step('reject oversized MCP batches without applying changes', async () => {
-      for (const [name, id] of [
-        ['processflow_nodes_mutate', E2E_NODE_RECEIVE_ID],
-        ['processflow_edges_mutate', E2E_EDGE_REVIEW_ID],
-      ]) {
-        const result = await client.callTool({
-          name,
-          arguments: {
-            process_flow_id: E2E_PROCESS_FLOW_ID,
-            mutations: Array.from({ length: 101 }, () => ({ action: 'delete', id })),
-          },
-        });
-        expect(result.isError).toBe(true);
-        expect(JSON.stringify(result.content)).toContain('100');
+    await test.step('insert a preceding step through MCP without overlapping saved nodes', async () => {
+      const placementSchema = z.object({
+        data: z.object({
+          id: z.string(),
+          mermaid_source: z.string(),
+          diagram_revision: z.number(),
+          diagram_metadata: z.object({
+            nodes: z.record(
+              z.string(),
+              z.object({
+                position: z.object({ x: z.number(), y: z.number() }),
+              }),
+            ),
+          }),
+        }),
+      });
+      const before = placementSchema.parse(created.structuredContent).data;
+      const inserted = await client.callTool({
+        name: 'processflow_update',
+        arguments: {
+          process_flow_id: before.id,
+          expected_revision: before.diagram_revision,
+          mermaid_source: `${before.mermaid_source}\nstart["New first step"] --> intake`,
+        },
+      });
+      expect(inserted.isError).not.toBe(true);
+      const after = placementSchema.parse(inserted.structuredContent).data;
+      const start = after.diagram_metadata.nodes.start.position;
+      for (const [id, node] of Object.entries(before.diagram_metadata.nodes)) {
+        expect(after.diagram_metadata.nodes[id].position).toEqual(node.position);
+        const width = id === 'approve' ? 220 : 240;
+        expect(
+          start.x + 240 <= node.position.x ||
+            node.position.x + width <= start.x ||
+            start.y + 120 <= node.position.y ||
+            node.position.y + 120 <= start.y,
+        ).toBe(true);
       }
-    });
-
-    await test.step('report stale records and roll back earlier batch updates', async () => {
-      for (const [name, id, payload] of [
-        ['processflow_nodes_mutate', E2E_NODE_RECEIVE_ID, { data: { label: 'Must roll back' } }],
-        ['processflow_edges_mutate', E2E_EDGE_REVIEW_ID, { data: { label: 'Must roll back' } }],
-      ] as const) {
-        const missingId = randomUUID();
-        const result = await client.callTool({
-          name,
-          arguments: {
-            process_flow_id: E2E_PROCESS_FLOW_ID,
-            mutations: [
-              { action: 'update', id, payload },
-              { action: 'delete', id: missingId },
-            ],
-          },
-        });
-        expect(result.isError).toBe(true);
-        expect(result.structuredContent).toMatchObject({
-          ok: false,
-          details: { code: 'P0001', message: expect.stringContaining(missingId) },
-        });
-        expect(JSON.stringify(result.structuredContent)).toContain('processflow_get');
-        expect(JSON.stringify(result.structuredContent)).toContain('batch was not applied');
-      }
-    });
-
-    await test.step('explain known edge constraints without exposing database diagnostics', async () => {
-      for (const { source, target, code, message } of [
-        { source: E2E_NODE_RECEIVE_ID, target: E2E_NODE_RECEIVE_ID, code: '23514', message: 'cannot connect' },
-        { source: E2E_NODE_RECEIVE_ID, target: E2E_NODE_APPROVED_ID, code: '23505', message: 'already exists' },
-        { source: randomUUID(), target: E2E_NODE_APPROVED_ID, code: '23503', message: 'source node' },
-        { source: E2E_NODE_RECEIVE_ID, target: randomUUID(), code: '23503', message: 'target node' },
-      ]) {
-        const result = await client.callTool({
-          name: 'processflow_edges_mutate',
-          arguments: {
-            process_flow_id: E2E_PROCESS_FLOW_ID,
-            mutations: [
-              {
-                action: 'create',
-                payload: { type: 'flow', source_node_id: source, target_node_id: target },
-              },
-            ],
-          },
-        });
-        expect(result.isError).toBe(true);
-        expect(result.structuredContent).toMatchObject({
-          ok: false,
-          details: { code, message: expect.stringContaining(message) },
-        });
-        expect(JSON.stringify(result.structuredContent)).not.toMatch(/constraint|process_flow_edges|Key \(/);
-      }
-    });
-
-    const layoutResult = await client.callTool({
-      name: 'processflow_autolayout',
-      arguments: { process_flow_id: E2E_PROCESS_FLOW_ID },
-    });
-    expect(layoutResult.isError).not.toBe(true);
-    expect(layoutResult.structuredContent).toMatchObject({
-      ok: true,
-      data: {
-        nodes: expect.arrayContaining([expect.objectContaining({ id: E2E_NODE_RECEIVE_ID, data: updatedNodeData })]),
-        edges: [expect.objectContaining({ id: E2E_EDGE_REVIEW_ID, data: { label: 'Review' } })],
-      },
+      await page.goto(`/process-flows/${before.id}`);
+      await expect(page.getByTestId('processflow-node-step').filter({ hasText: 'New first step' })).toBeVisible();
+      await expect(page.getByTestId('processflow-node-step').filter({ hasText: 'Receive request' })).toBeVisible();
     });
   } finally {
     await client.close();

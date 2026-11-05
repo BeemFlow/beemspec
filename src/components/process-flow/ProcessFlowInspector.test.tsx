@@ -50,6 +50,7 @@ describe('ProcessFlowInspector', () => {
             id: 'node-1',
             type: 'step',
             data: {
+              nodeType: 'step',
               label: 'Receive invoice',
               owner_role: 'Ops',
               systems: ['ERP'],

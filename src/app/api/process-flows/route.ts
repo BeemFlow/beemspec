@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { serverErrorResponse } from '@/lib/errors';
 import { listTeamsForUser } from '@/lib/teams';
 import { validateRequest } from '@/lib/validations';
+import { ProcessFlowDocumentError } from '@/processflow/document';
 import { createProcessFlow, listProcessFlows } from '@/processflow/service';
 
 export async function GET(request: Request) {
@@ -56,11 +57,14 @@ export async function POST(request: Request) {
   const validation = await validateRequest(request, createProcessFlowSchema);
   if (!validation.success) return validation.response;
 
-  const supabase = auth.supabase;
-  const { data, error } = await createProcessFlow(supabase, validation.data);
-  if (error) {
+  try {
+    const { data, error } = await createProcessFlow(auth.supabase, validation.data);
+    if (error) return serverErrorResponse('Failed to create process flow', error);
+    return NextResponse.json(data);
+  } catch (error) {
+    if (error instanceof ProcessFlowDocumentError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     return serverErrorResponse('Failed to create process flow', error);
   }
-
-  return NextResponse.json(data);
 }

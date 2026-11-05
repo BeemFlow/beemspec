@@ -17,7 +17,7 @@ const MCP_SERVER_INSTRUCTIONS = [
   'For story-map work, use storymap_list to discover maps, storymap_get before structural edits, release_get for release scope, and story_context_get before implementing one story.',
   'Use story_update for content or status, story_move and task_move for placement, and reorder tools only with the complete final ID order.',
   'For process-flow work, use processflow_list to discover flows and processflow_get before structural edits.',
-  'Prefer processflow_nodes_mutate and processflow_edges_mutate for related atomic graph changes; use single-item tools for isolated edits, then processflow_autolayout and processflow_validation_get after material structural changes.',
+  'Use processflow_create with Mermaid for a new diagram. Edit the source from processflow_get and save it with processflow_update and expected_revision. Preserve node and edge IDs to retain layout and operational fields.',
   'Preserve observed product and operational intent. Do not invent scope, systems, approvals, ownership, constraints, or UI behavior when stored context or a focused user clarification should decide them.',
 ].join(' ');
 

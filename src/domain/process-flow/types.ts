@@ -80,3 +80,33 @@ export interface ProcessFlowValidationWarning {
 export interface ProcessFlowValidationResult {
   warnings: ProcessFlowValidationWarning[];
 }
+
+export interface ProcessFlowDiagramMetadata {
+  nodes: Record<
+    string,
+    {
+      position?: ProcessFlowNodePosition;
+      size?: ProcessFlowNodeSize | null;
+      data?: Omit<ProcessFlowNodeData, 'label'>;
+    }
+  >;
+  edges: Record<
+    string,
+    {
+      type?: 'dependency';
+      data?: (Omit<ProcessFlowEdgeData, 'label'> & { label?: null }) | null;
+    }
+  >;
+}
+
+export interface ProcessFlowDocument extends ProcessFlow {
+  mermaid_source: string;
+  diagram_revision: number;
+  diagram_metadata: ProcessFlowDiagramMetadata;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProcessFlowView extends ProcessFlowDocument, ProcessFlowFull {
+  validation: ProcessFlowValidationResult;
+}

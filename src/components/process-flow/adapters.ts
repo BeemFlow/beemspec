@@ -171,19 +171,3 @@ export function getStartNodeId(nodes: ProcessFlowCanvasNode[], edges: ProcessFlo
 
   return best?.id ?? null;
 }
-
-export function mergeCanvasNode(nodes: ProcessFlowCanvasNode[], node: ProcessFlowNode) {
-  const next = toCanvasNode(node);
-  const existingIndex = nodes.findIndex((item) => item.id === node.id);
-  if (existingIndex === -1) return [...nodes, next];
-
-  return nodes.map((item) => (item.id === node.id ? next : item));
-}
-
-export function mergeCanvasEdge(edges: ProcessFlowCanvasEdge[], edge: ProcessFlowEdge) {
-  const next = toCanvasEdge(edge);
-  const existingIndex = edges.findIndex((item) => item.id === edge.id);
-  if (existingIndex === -1) return [...edges, next];
-
-  return edges.map((item) => (item.id === edge.id ? next : item));
-}

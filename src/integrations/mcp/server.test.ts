@@ -82,7 +82,7 @@ describe('mcp server', () => {
     expect(initializeResponse.status).toBe(200);
     const initializePayload = (await initializeResponse.json()) as { result: { instructions?: string } };
     expect(initializePayload.result.instructions).toContain('storymap_get before structural edits');
-    expect(initializePayload.result.instructions).toContain('processflow_nodes_mutate');
+    expect(initializePayload.result.instructions).toContain('expected_revision');
 
     const initializedResponse = await handleMcpRequest(
       rpcRequest({
@@ -127,14 +127,14 @@ describe('mcp server', () => {
     expect(toolNames.has('processflow_list')).toBe(true);
     expect(toolNames.has('storymap_get')).toBe(true);
     expect(toolNames.has('processflow_get')).toBe(true);
-    expect(toolNames.has('processflow_validation_get')).toBe(true);
     expect(toolNames.has('processflow_create')).toBe(true);
-    expect(toolNames.has('processflow_update')).toBe(true);
-    expect(toolNames.has('processflow_nodes_mutate')).toBe(true);
-    expect(toolNames.has('processflow_edges_mutate')).toBe(true);
-    expect(toolNames.has('processflow_autolayout')).toBe(true);
-    expect(toolNames.has('processflow_node_create')).toBe(true);
-    expect(toolNames.has('processflow_edge_create')).toBe(true);
+    expect([...toolNames].filter((name) => name.startsWith('processflow_')).sort()).toEqual([
+      'processflow_create',
+      'processflow_delete',
+      'processflow_get',
+      'processflow_list',
+      'processflow_update',
+    ]);
     expect(toolNames.has('release_get')).toBe(true);
     expect(toolNames.has('storymap_delete')).toBe(false);
     expect(toolNames.has('activity_create')).toBe(true);
@@ -155,7 +155,7 @@ describe('mcp server', () => {
     expect(byName.get('story_update')?.annotations?.idempotentHint).toBe(true);
     expect(byName.get('story_delete')?.annotations?.idempotentHint).toBe(true);
     expect(byName.get('story_create')?.annotations?.destructiveHint).toBe(false);
-    for (const name of ['story_update', 'story_delete', 'processflow_node_update', 'processflow_nodes_mutate']) {
+    for (const name of ['story_update', 'story_delete', 'processflow_delete']) {
       expect(byName.get(name)?.annotations?.destructiveHint).toBe(true);
     }
     const linearTools = ['story_create', 'story_update', 'story_delete'];
@@ -168,7 +168,7 @@ describe('mcp server', () => {
     expect(byName.get('story_delete')?.description).toContain('deletes its linked Linear issue');
   });
 
-  it('publishes shared validation, mutation batch limits, and replacement semantics to clients', async () => {
+  it('publishes shared validation and document revision requirements to clients', async () => {
     const response = await handleMcpRequest(
       rpcRequest({ jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} }),
       supabase,
@@ -234,355 +234,49 @@ describe('mcp server', () => {
       false,
     );
 
-    const nodeUpdate = schemas.get('processflow_node_update');
-    if (!nodeUpdate) throw new Error('Missing processflow_node_update schema');
-    const validateNode = validator.getValidator(nodeUpdate);
+    const flowUpdate = schemas.get('processflow_update');
+    if (!flowUpdate) throw new Error('Missing processflow_update schema');
+    const validateFlow = validator.getValidator(flowUpdate);
+    expect(validateFlow({ process_flow_id: testIds.processFlow, mermaid_source: 'flowchart LR' }).valid).toBe(false);
     expect(
-      validateNode({
-        process_flow_id: testIds.processFlow,
-        node_id: testIds.processNode,
-        data: {
-          label: 'Step',
-          notes: 'x'.repeat(20_001),
-          systems: Array(201).fill('x'.repeat(2_001)),
-          inputs: Array(201).fill('Input'),
-          outputs: Array(201).fill('Output'),
-        },
-      }).valid,
+      validateFlow({ process_flow_id: testIds.processFlow, expected_revision: 1, mermaid_source: 'flowchart LR' })
+        .valid,
     ).toBe(true);
-    for (const name of ['processflow_nodes_mutate', 'processflow_edges_mutate']) {
-      const schema = schemas.get(name);
-      if (!schema) throw new Error(`Missing ${name} schema`);
-      const validateBatch = validator.getValidator(schema);
-      const mutations = Array.from({ length: 101 }, () => ({ action: 'delete', id: testIds.processNode }));
-      expect(validateBatch({ process_flow_id: testIds.processFlow, mutations }).valid).toBe(false);
-      expect(validateBatch({ process_flow_id: testIds.processFlow, mutations: mutations.slice(0, 100) }).valid).toBe(
-        true,
-      );
-    }
-
-    for (const name of ['processflow_node_update', 'processflow_nodes_mutate']) {
-      expect(JSON.stringify(schemas.get(name))).toContain('replaces the entire data object');
-    }
+    expect(JSON.stringify(flowUpdate)).toContain('Omitted fields are preserved');
     expect(JSON.stringify(schemas.get('story_update'))).toContain('replaces the entire content object');
   });
 
-  it('documents new process flow metadata fields in tool descriptions', async () => {
-    const initializeResponse = await handleMcpRequest(
-      rpcRequest({
-        jsonrpc: '2.0',
-        id: 101,
-        method: 'initialize',
-        params: {
-          protocolVersion: '2025-03-26',
-          capabilities: {},
-          clientInfo: { name: 'vitest', version: '1.0.0' },
-        },
-      }),
-      supabase,
-      user,
-    );
-    expect(initializeResponse.status).toBe(200);
-
-    await handleMcpRequest(rpcRequest({ jsonrpc: '2.0', method: 'notifications/initialized' }), supabase, user);
-
-    const listResponse = await handleMcpRequest(
-      rpcRequest({
-        jsonrpc: '2.0',
-        id: 102,
-        method: 'tools/list',
-        params: {},
-      }),
-      supabase,
-      user,
-    );
-
-    const payload = (await listResponse.json()) as {
-      result: {
-        tools: Array<{ name: string; description?: string }>;
-      };
-    };
-
-    const tools = new Map(payload.result.tools.map((tool) => [tool.name, tool.description ?? '']));
-    expect(tools.get('processflow_node_create')).toContain('frequency, estimated_duration, and time_constraint');
-    expect(tools.get('processflow_node_update')).toContain('automation_opportunity, frequency, estimated_duration');
-    expect(tools.get('processflow_edge_create')).toContain('label and condition');
-    expect(tools.get('processflow_edge_update')).toContain('label and condition');
-  });
-
-  it('returns process flow agent insights for new metadata fields', async () => {
-    vi.spyOn(processflowService, 'getProcessFlowMcpContext').mockResolvedValue({
-      flowResult: {
-        data: {
-          id: testIds.processFlow,
-          team_id: testIds.team,
-          name: 'Accounts Payable',
-          description: 'Invoice intake and approval',
-          context_markdown: null,
-          viewport: null,
-          schema_version: 1,
-        },
-        error: null,
-      },
-      nodesResult: {
-        data: [
-          {
-            id: testIds.processNode,
-            process_flow_id: testIds.processFlow,
-            type: 'step',
-            position_x: 0,
-            position_y: 0,
-            width: null,
-            height: null,
-            data: {
-              label: 'Receive invoice',
-              owner_role: 'AP Clerk',
-              automation_opportunity: 'OCR intake',
-              frequency: '~200/day',
-              time_constraint: 'same-day turnaround',
-            },
-          },
-          {
-            id: testIds.otherProcessNode,
-            process_flow_id: testIds.processFlow,
-            type: 'decision',
-            position_x: 100,
-            position_y: 0,
-            width: null,
-            height: null,
-            data: { label: 'High value?' },
-          },
-        ],
-        error: null,
-      },
-      edgesResult: {
-        data: [
-          {
-            id: testIds.processEdge,
-            process_flow_id: testIds.processFlow,
-            type: 'flow',
-            source_node_id: testIds.processNode,
-            target_node_id: testIds.otherProcessNode,
-            data: { label: 'Review', condition: 'amount > $10,000' },
-          },
-        ],
-        error: null,
-      },
-    } as never);
-
+  it('saves process flows through the revision-checked document service', async () => {
+    const { ProcessFlowDocumentError } = await import('@/processflow/document');
+    const update = vi
+      .spyOn(processflowService, 'updateProcessFlow')
+      .mockRejectedValueOnce(new ProcessFlowDocumentError('This process flow changed. Reload it.', 409));
+    const changes = { expected_revision: 1, mermaid_source: 'flowchart LR' };
     const response = await handleMcpRequest(
       rpcRequest({
         jsonrpc: '2.0',
         id: 103,
         method: 'tools/call',
         params: {
-          name: 'processflow_get',
-          arguments: { process_flow_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4' },
+          name: 'processflow_update',
+          arguments: { process_flow_id: testIds.processFlow, ...changes },
         },
       }),
       supabase,
       user,
     );
 
-    expect(response.status).toBe(200);
-    const payload = (await response.json()) as {
+    expect(update).toHaveBeenCalledWith(supabase, testIds.processFlow, changes);
+    expect(await response.json()).toMatchObject({
       result: {
+        isError: true,
         structuredContent: {
-          ok: boolean;
-          data: {
-            agent_insights: {
-              automationCandidates: number;
-              ownershipTaggedNodes: number;
-              frequencyTaggedNodes: number;
-              timeConstrainedNodes: number;
-              conditionedEdges: number;
-            };
-          };
-        };
-      };
-    };
-
-    expect(payload.result.structuredContent.ok).toBe(true);
-    expect(payload.result.structuredContent.data.agent_insights).toEqual(
-      expect.objectContaining({
-        automationCandidates: 1,
-        ownershipTaggedNodes: 1,
-        frequencyTaggedNodes: 1,
-        timeConstrainedNodes: 1,
-        conditionedEdges: 1,
-      }),
-    );
-  });
-
-  it('runs atomic process flow node batches through the MCP contract', async () => {
-    const deletedNode = {
-      id: testIds.processNode,
-      process_flow_id: testIds.processFlow,
-      type: 'step' as const,
-      position: { x: 0, y: 0 },
-      size: null,
-      data: { label: 'Old step' },
-    };
-    const mutateSpy = vi.spyOn(processflowService, 'batchMutateProcessFlowNodes').mockResolvedValue({
-      data: { created: [], updated: [], deleted: [deletedNode] },
-      error: null,
-    });
-
-    const response = await handleMcpRequest(
-      rpcRequest({
-        jsonrpc: '2.0',
-        id: 104,
-        method: 'tools/call',
-        params: {
-          name: 'processflow_nodes_mutate',
-          arguments: {
-            process_flow_id: testIds.processFlow,
-            mutations: [{ action: 'delete', id: testIds.processNode }],
-          },
+          ok: false,
+          details: { code: 'revision_conflict' },
         },
-      }),
-      supabase,
-      user,
-    );
-
-    expect(response.status).toBe(200);
-    expect(mutateSpy).toHaveBeenCalledWith(supabase, {
-      process_flow_id: testIds.processFlow,
-      mutations: [{ action: 'delete', id: testIds.processNode }],
-    });
-    const payload = (await response.json()) as {
-      result: { structuredContent: { ok: boolean; data: { deleted: Array<{ id: string }> } } };
-    };
-    expect(payload.result.structuredContent).toMatchObject({
-      ok: true,
-      data: { deleted: [{ id: testIds.processNode }] },
-    });
-  });
-
-  it('runs atomic process flow edge batches through the MCP contract', async () => {
-    const mutateSpy = vi.spyOn(processflowService, 'batchMutateProcessFlowEdges').mockResolvedValue({
-      data: {
-        created: [],
-        updated: [],
-        deleted: [
-          {
-            id: testIds.processEdge,
-            process_flow_id: testIds.processFlow,
-            type: 'flow',
-            source_node_id: testIds.processNode,
-            target_node_id: testIds.otherProcessNode,
-            data: null,
-          },
-        ],
       },
-      error: null,
     });
-
-    const response = await handleMcpRequest(
-      rpcRequest({
-        jsonrpc: '2.0',
-        id: 105,
-        method: 'tools/call',
-        params: {
-          name: 'processflow_edges_mutate',
-          arguments: {
-            process_flow_id: testIds.processFlow,
-            mutations: [{ action: 'delete', id: testIds.processEdge }],
-          },
-        },
-      }),
-      supabase,
-      user,
-    );
-
-    expect(response.status).toBe(200);
-    expect(mutateSpy).toHaveBeenCalledWith(supabase, {
-      process_flow_id: testIds.processFlow,
-      mutations: [{ action: 'delete', id: testIds.processEdge }],
-    });
-    const payload = (await response.json()) as {
-      result: { structuredContent: { ok: boolean; data: { deleted: Array<{ id: string }> } } };
-    };
-    expect(payload.result.structuredContent.data.deleted[0].id).toBe(testIds.processEdge);
-  });
-
-  it('autolayouts a process flow through the MCP contract', async () => {
-    const layoutSpy = vi.spyOn(processflowService, 'autolayoutProcessFlow').mockResolvedValue({
-      data: { nodes: [], edges: [] },
-      error: null,
-    });
-
-    const response = await handleMcpRequest(
-      rpcRequest({
-        jsonrpc: '2.0',
-        id: 106,
-        method: 'tools/call',
-        params: {
-          name: 'processflow_autolayout',
-          arguments: { process_flow_id: testIds.processFlow },
-        },
-      }),
-      supabase,
-      user,
-    );
-
-    expect(response.status).toBe(200);
-    expect(layoutSpy).toHaveBeenCalledWith(supabase, testIds.processFlow);
-    const payload = (await response.json()) as {
-      result: { structuredContent: { ok: boolean; data: { nodes: unknown[]; edges: unknown[] } } };
-    };
-    expect(payload.result.structuredContent).toEqual({ ok: true, data: { nodes: [], edges: [] } });
-  });
-
-  it('rejects processflow_node_update without process_flow_id', async () => {
-    const response = await handleMcpRequest(
-      rpcRequest({
-        jsonrpc: '2.0',
-        id: 301,
-        method: 'tools/call',
-        params: {
-          name: 'processflow_node_update',
-          arguments: {
-            node_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
-            data: { label: 'Updated' },
-          },
-        },
-      }),
-      supabase,
-      user,
-    );
-
-    expect(response.status).toBe(200);
-    const payload = (await response.json()) as {
-      result: { isError: boolean; content?: Array<{ text: string }> };
-    };
-    expect(payload.result.isError).toBe(true);
-    expect(payload.result.content?.[0]?.text ?? '').toContain('process_flow_id');
-  });
-
-  it('rejects processflow_edge_delete without process_flow_id', async () => {
-    const response = await handleMcpRequest(
-      rpcRequest({
-        jsonrpc: '2.0',
-        id: 302,
-        method: 'tools/call',
-        params: {
-          name: 'processflow_edge_delete',
-          arguments: {
-            edge_id: 'd7f34189-5d27-4dc0-b2c5-23d11796add4',
-          },
-        },
-      }),
-      supabase,
-      user,
-    );
-
-    expect(response.status).toBe(200);
-    const payload = (await response.json()) as {
-      result: { isError: boolean; content?: Array<{ text: string }> };
-    };
-    expect(payload.result.isError).toBe(true);
-    expect(payload.result.content?.[0]?.text ?? '').toContain('process_flow_id');
+    update.mockRestore();
   });
 
   it('returns story map insights with warnings and recommendations', async () => {

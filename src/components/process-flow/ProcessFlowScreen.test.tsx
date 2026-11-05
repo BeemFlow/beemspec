@@ -42,8 +42,6 @@ vi.mock('./ProcessFlowCanvas', () => ({
     onEdgeClick,
     onConnect,
     onNodeDragStop,
-    onNodesDelete,
-    onEdgesDelete,
     onPaneClick,
   }: any) => (
     <div>
@@ -60,17 +58,11 @@ vi.mock('./ProcessFlowCanvas', () => ({
       <button type="button" onClick={() => onEdgeClick(edges[0]?.id)}>
         Select Edge
       </button>
-      <button type="button" onClick={() => onConnect({ source: 'node-1', target: 'node-2' })}>
+      <button type="button" onClick={() => onConnect({ source: 'node-1', target: nodes[1]?.id })}>
         Connect Nodes
       </button>
       <button type="button" onClick={() => onNodeDragStop(null, { id: 'node-1', position: { x: 400, y: 320 } })}>
         Drag Node
-      </button>
-      <button type="button" onClick={() => onNodesDelete(nodes.filter((node: any) => node.id === 'node-2'))}>
-        Bulk Delete Node
-      </button>
-      <button type="button" onClick={() => onEdgesDelete(edges.filter((edge: any) => edge.id === 'edge-2'))}>
-        Bulk Delete Edge
       </button>
       <button type="button" onClick={onPaneClick}>
         Clear Selection
@@ -115,6 +107,8 @@ function createFlow() {
     context_markdown: null,
     viewport: null,
     schema_version: 1,
+    diagram_revision: 1,
+    validation: { warnings: [] },
     nodes: [
       {
         id: 'node-1',
@@ -141,116 +135,13 @@ function createFlow() {
 describe('ProcessFlowScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    fetchJsonMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const method = init?.method ?? 'GET';
-
-      if (url.endsWith('/validation')) return { warnings: [{ code: 'warning', message: 'Heads up' }] };
-      if (url.endsWith('/nodes') && method === 'POST') {
-        return {
-          id: 'node-2',
-          process_flow_id: 'flow-1',
-          type: 'step',
-          position: { x: 30, y: 40 },
-          size: null,
-          data: { label: 'New step' },
-        };
-      }
-      if (url.endsWith('/nodes') && method === 'PUT') {
-        const body = init?.body ? JSON.parse(String(init.body)) : {};
-        const deletes = Array.isArray(body.mutations)
-          ? body.mutations.filter((mutation: { action?: string }) => mutation.action === 'delete')
-          : [];
-        const updates = Array.isArray(body.mutations)
-          ? body.mutations.filter((mutation: { action?: string }) => mutation.action === 'update')
-          : [];
-        if (deletes.length > 0) {
-          return {
-            created: [],
-            updated: [],
-            deleted: deletes.map((mutation: { id: string }) => ({ id: mutation.id })),
-          };
-        }
-        return {
-          created: [],
-          updated: updates.map(
-            (mutation: {
-              id: string;
-              payload?: { data?: { label?: string }; position?: { x: number; y: number } };
-            }) => ({
-              id: mutation.id,
-              process_flow_id: 'flow-1',
-              type: 'step',
-              position: mutation.payload?.position ?? { x: 10, y: 20 },
-              size: null,
-              data: { label: mutation.payload?.data?.label ?? 'Updated node' },
-            }),
-          ),
-          deleted: [],
-        };
-      }
-      if (url.endsWith('/edges') && method === 'PUT') {
-        const body = init?.body ? JSON.parse(String(init.body)) : {};
-        const deletes = Array.isArray(body.mutations)
-          ? body.mutations.filter((mutation: { action?: string }) => mutation.action === 'delete')
-          : [];
-        return {
-          created: [],
-          updated:
-            deletes.length > 0
-              ? []
-              : [
-                  {
-                    id: 'edge-1',
-                    process_flow_id: 'flow-1',
-                    type: 'flow',
-                    source_node_id: 'node-1',
-                    target_node_id: 'node-1',
-                    data: { label: 'Updated edge' },
-                  },
-                ],
-          deleted: deletes.map((mutation: { id: string }) => ({ id: mutation.id })),
-        };
-      }
-      if (url.endsWith('/edges') && method === 'POST') {
-        return {
-          id: 'edge-2',
-          process_flow_id: 'flow-1',
-          type: 'flow',
-          source_node_id: 'node-1',
-          target_node_id: 'node-2',
-          data: null,
-        };
-      }
-      if (url.endsWith('/layout')) {
-        return {
-          nodes: [
-            {
-              id: 'node-1',
-              process_flow_id: 'flow-1',
-              type: 'step',
-              position: { x: 100, y: 120 },
-              size: null,
-              data: { label: 'Receive invoice' },
-            },
-          ],
-          edges: [],
-        };
-      }
-      if (url.endsWith('/flow-1') && method === 'PUT') {
-        const body = init?.body ? JSON.parse(String(init.body)) : {};
-        return {
-          id: 'flow-1',
-          team_id: 'team-1',
-          name: body.name ?? 'Accounts Payable',
-          description: null,
-          context_markdown: body.context_markdown ?? null,
-        };
-      }
-      if (url.endsWith('/flow-1') && method === 'DELETE') {
-        return { success: true };
-      }
-      return { warnings: [] };
+    let flow = createFlow();
+    fetchJsonMock.mockImplementation(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'DELETE') return { success: true };
+      const { canvas, expected_revision, ...changes } = JSON.parse(String(init?.body));
+      expect(expected_revision).toBe(flow.diagram_revision);
+      flow = { ...flow, ...changes, ...canvas, diagram_revision: expected_revision + 1 };
+      return flow;
     });
   });
 
@@ -260,23 +151,41 @@ describe('ProcessFlowScreen', () => {
 
   it('surfaces request failures as visible UI errors', async () => {
     const user = userEvent.setup();
-    fetchJsonMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit, fallback?: string) => {
-      const url = String(input);
-      const method = init?.method ?? 'GET';
-      if (url.endsWith('/validation')) return { warnings: [] };
-      if (url.endsWith('/layout') && method === 'POST') {
-        throw new Error(fallback ?? 'Failed to auto-layout process flow');
-      }
-      return {};
-    });
+    fetchJsonMock.mockRejectedValue(new Error('Failed to update process flow'));
 
     render(<ProcessFlowScreen initialProcessFlow={createFlow()} />);
     await user.click(screen.getByRole('button', { name: 'Auto-layout' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Failed to auto-layout process flow')).toBeTruthy();
+      expect(screen.getByText('Failed to update process flow')).toBeTruthy();
     });
   });
+
+  it.each([
+    { kind: 'Node', field: 'Label', draft: 'Review invoice', savedLabel: 'node-labels:Review invoice' },
+    { kind: 'Edge', field: 'Label', draft: 'Requires review', savedLabel: 'edge-labels:Requires review' },
+  ])(
+    'keeps a $kind inspector draft after a failed save and lets it be retried',
+    async ({ kind, field, draft, savedLabel }) => {
+      const user = userEvent.setup();
+      fetchJsonMock.mockRejectedValueOnce(new Error('Connection interrupted'));
+
+      render(<ProcessFlowScreen initialProcessFlow={createFlow()} />);
+      await user.click(screen.getByRole('button', { name: `Select ${kind}` }));
+      const input = screen.getByLabelText<HTMLInputElement>(field);
+      await user.clear(input);
+      await user.type(input, draft);
+
+      const save = screen.getByRole('button', { name: `Save ${kind}` });
+      await user.click(save);
+      await screen.findByText('Connection interrupted');
+      expect(input.value).toBe(draft);
+
+      await user.click(save);
+      await screen.findByText(savedLabel);
+      expect(screen.queryByText('Connection interrupted')).toBeNull();
+    },
+  );
 
   it('updates local screen state for connect, save, delete, drag, and selection flows', async () => {
     const user = userEvent.setup();
@@ -314,36 +223,14 @@ describe('ProcessFlowScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Save Edge' }));
     await waitFor(() => {
       expect(screen.getByText('Edge Details')).toBeTruthy();
-      expect(fetchJsonMock).toHaveBeenCalledWith(
-        '/api/process-flows/flow-1/edges',
-        expect.objectContaining({
-          method: 'PUT',
-          body: JSON.stringify({
-            mutations: [
-              {
-                action: 'update',
-                id: 'edge-1',
-                payload: { type: 'flow', data: { label: 'Loop', condition: 'amount > $10,000' } },
-              },
-            ],
-          }),
-        }),
-        'Failed to mutate process flow edges',
-      );
+      const lastRequest = JSON.parse(String(fetchJsonMock.mock.lastCall?.[1].body));
+      expect(lastRequest.canvas.edges[0].data).toMatchObject({ label: 'Loop', condition: 'amount > $10,000' });
     });
 
     await user.click(screen.getByRole('button', { name: 'Drag Node' }));
     await waitFor(() => {
-      expect(fetchJsonMock).toHaveBeenCalledWith(
-        '/api/process-flows/flow-1/nodes',
-        expect.objectContaining({
-          method: 'PUT',
-          body: JSON.stringify({
-            mutations: [{ action: 'update', id: 'node-1', payload: { position: { x: 400, y: 320 } } }],
-          }),
-        }),
-        'Failed to mutate process flow nodes',
-      );
+      const lastRequest = JSON.parse(String(fetchJsonMock.mock.lastCall?.[1].body));
+      expect(lastRequest.canvas.nodes[0].position).toEqual({ x: 400, y: 320 });
     });
 
     await user.click(screen.getByRole('button', { name: 'Clear Selection' }));

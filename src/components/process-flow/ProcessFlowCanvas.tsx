@@ -12,13 +12,13 @@ import {
   MiniMap,
   type NodeChange,
   type OnConnect,
-  type OnEdgesDelete,
+  type OnDelete,
   type OnNodeDrag,
-  type OnNodesDelete,
   ReactFlow,
 } from '@xyflow/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import type { ProcessFlowNodeType } from '@/types';
 import type { ProcessFlowCanvasEdge, ProcessFlowCanvasNode } from './adapters';
 import { getStartNodeId } from './adapters';
 import { processFlowNodeTypes } from './ProcessFlowNode';
@@ -43,9 +43,8 @@ interface ProcessFlowCanvasProps {
   onNodeClick?: (nodeId: string) => void;
   onEdgeClick?: (edgeId: string) => void;
   onPaneClick?: () => void;
-  onNodesDelete?: OnNodesDelete<ProcessFlowCanvasNode>;
-  onEdgesDelete?: OnEdgesDelete<ProcessFlowCanvasEdge>;
-  onCreateNode?: (type: ProcessFlowCanvasNode['type']) => void;
+  onDelete?: OnDelete<ProcessFlowCanvasNode, ProcessFlowCanvasEdge>;
+  onCreateNode?: (type: ProcessFlowNodeType) => void;
 }
 
 const minimapColors: Record<string, string> = {
@@ -118,8 +117,7 @@ export function ProcessFlowCanvas(props: ProcessFlowCanvasProps) {
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onNodeDragStop={props.onNodeDragStop}
-        onNodesDelete={props.onNodesDelete}
-        onEdgesDelete={props.onEdgesDelete}
+        onDelete={props.onDelete}
         onConnect={props.onConnect}
         onNodeClick={props.onNodeClick ? (_, node) => props.onNodeClick?.(node.id) : undefined}
         onEdgeClick={props.onEdgeClick ? (_, edge) => props.onEdgeClick?.(edge.id) : undefined}

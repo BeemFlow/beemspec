@@ -2,7 +2,7 @@
 
 import { applyEdgeChanges, applyNodeChanges, type Connection, type EdgeChange, type NodeChange } from '@xyflow/react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ProcessFlowCanvas } from '@/components/process-flow/ProcessFlowCanvas';
 import { ProcessFlowInspector } from '@/components/process-flow/ProcessFlowInspector';
 import { ProcessFlowSettingsDialog } from '@/components/process-flow/ProcessFlowSettingsDialog';
@@ -11,61 +11,77 @@ import { ProcessFlowValidationPanel } from '@/components/process-flow/ProcessFlo
 import { ContextMarkdownDialog } from '@/components/story-map/ContextMarkdownDialog';
 import { McpSetupDialog } from '@/components/story-map/McpSetupDialog';
 import { useRouteRefresh } from '@/components/use-route-refresh';
+import type { UpdateProcessFlow } from '@/domain/process-flow';
 import { fetchJson } from '@/lib/http';
-import type { ProcessFlow, ProcessFlowFull, ProcessFlowValidationResult } from '@/types';
+import type { ProcessFlowEdge, ProcessFlowFull, ProcessFlowNode, ProcessFlowView } from '@/types';
 import {
-  mergeCanvasEdge,
-  mergeCanvasNode,
   type ProcessFlowCanvasEdge,
   type ProcessFlowCanvasNode,
+  toCanvasEdge,
   toCanvasFlow,
+  toCanvasNode,
 } from './adapters';
 
 type Selection = { kind: 'flow' } | { kind: 'node'; id: string } | { kind: 'edge'; id: string };
 
-type BatchMutationResult<T> = {
-  created: T[];
-  updated: T[];
-  deleted: T[];
-};
-
+type Graph = Pick<ProcessFlowFull, 'nodes' | 'edges'>;
+type FlowChanges = Omit<UpdateProcessFlow, 'expected_revision' | 'canvas'> & { canvas?: Graph };
 const initialSelection: Selection = { kind: 'flow' };
 
-export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: ProcessFlowFull }) {
+export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: ProcessFlowView }) {
   const router = useRouter();
   const refreshProcessFlow = useRouteRefresh();
+  const currentFlow = useRef(initialProcessFlow);
+  const pendingSave = useRef(Promise.resolve());
   const [processFlow, setProcessFlow] = useState(initialProcessFlow);
   const [nodes, setNodes] = useState<ProcessFlowCanvasNode[]>(() => toCanvasFlow(initialProcessFlow).nodes);
   const [edges, setEdges] = useState<ProcessFlowCanvasEdge[]>(() => toCanvasFlow(initialProcessFlow).edges);
   const [selection, setSelection] = useState<Selection>(initialSelection);
-  const [validation, setValidation] = useState<ProcessFlowValidationResult | null>(null);
   const [validationOpen, setValidationOpen] = useState(false);
   const [uiError, setUiError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [mcpSetupOpen, setMcpSetupOpen] = useState(false);
 
-  useEffect(() => {
-    setProcessFlow(initialProcessFlow);
-    const canvas = toCanvasFlow(initialProcessFlow);
+  const showCanvas = useCallback((flow: ProcessFlowView) => {
+    const canvas = toCanvasFlow(flow);
     setNodes(canvas.nodes);
     setEdges(canvas.edges);
-    setSelection(initialSelection);
-  }, [initialProcessFlow]);
+  }, []);
 
+  const showFlow = useCallback(
+    (flow: ProcessFlowView) => {
+      currentFlow.current = flow;
+      setProcessFlow(flow);
+      showCanvas(flow);
+    },
+    [showCanvas],
+  );
+
+  useEffect(() => {
+    if (
+      initialProcessFlow.id !== currentFlow.current.id ||
+      initialProcessFlow.diagram_revision >= currentFlow.current.diagram_revision
+    ) {
+      showFlow(initialProcessFlow);
+      setSelection(initialSelection);
+    }
+  }, [initialProcessFlow, showFlow]);
+
+  // Only changes to the saved flow or selection should reset inspector fields.
   const selected = useMemo(() => {
     if (selection.kind === 'node') {
-      const node = nodes.find((item) => item.id === selection.id);
-      return node ? ({ kind: 'node', node } as const) : ({ kind: 'flow' } as const);
+      const node = processFlow.nodes.find((item) => item.id === selection.id);
+      return node ? ({ kind: 'node', node: toCanvasNode(node) } as const) : ({ kind: 'flow' } as const);
     }
 
     if (selection.kind === 'edge') {
-      const edge = edges.find((item) => item.id === selection.id);
-      return edge ? ({ kind: 'edge', edge } as const) : ({ kind: 'flow' } as const);
+      const edge = processFlow.edges.find((item) => item.id === selection.id);
+      return edge ? ({ kind: 'edge', edge: toCanvasEdge(edge) } as const) : ({ kind: 'flow' } as const);
     }
 
     return { kind: 'flow' } as const;
-  }, [selection, nodes, edges]);
+  }, [selection, processFlow]);
 
   const request = useCallback(async <T,>(input: RequestInfo | URL, init: RequestInit | undefined, fallback: string) => {
     setUiError(null);
@@ -78,222 +94,134 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
     }
   }, []);
 
-  const handleValidate = useCallback(async () => {
-    try {
-      const next = await request<ProcessFlowValidationResult>(
-        `/api/process-flows/${processFlow.id}/validation`,
-        undefined,
-        'Failed to validate process flow',
-      );
-      setValidation(next);
-    } catch {
-      // request() already records a user-visible error message; swallow to avoid unhandled rejection noise.
-    }
-  }, [processFlow.id, request]);
+  const saveFlow = useCallback(
+    (changes: (flow: ProcessFlowView) => FlowChanges) => {
+      const save = pendingSave.current.then(async () => {
+        const flow = currentFlow.current;
+        try {
+          const updated = await request<ProcessFlowView>(
+            `/api/process-flows/${flow.id}`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...changes(flow), expected_revision: flow.diagram_revision }),
+            },
+            'Failed to update process flow',
+          );
+          if (currentFlow.current.id === flow.id && currentFlow.current.diagram_revision <= updated.diagram_revision) {
+            showFlow(updated);
+          }
+        } catch (error) {
+          if (currentFlow.current.id === flow.id) showCanvas(currentFlow.current);
+          throw error;
+        }
+      });
+      pendingSave.current = save.catch(() => {});
+      return save;
+    },
+    [request, showCanvas, showFlow],
+  );
 
-  const handleToggleValidation = useCallback(async () => {
-    if (!validationOpen) {
-      await handleValidate();
-    }
-    setValidationOpen((current) => !current);
-  }, [handleValidate, validationOpen]);
+  const saveGraph = (edit: (flow: ProcessFlowView) => Graph) => saveFlow((flow) => ({ canvas: edit(flow) }));
 
-  useEffect(() => {
-    void handleValidate();
-  }, [handleValidate]);
-
-  const handleNodesChange = useCallback((changes: NodeChange<ProcessFlowCanvasNode>[]) => {
+  const handleNodesChange = (changes: NodeChange<ProcessFlowCanvasNode>[]) => {
     setNodes((current) => applyNodeChanges(changes, current));
-  }, []);
-
-  const handleEdgesChange = useCallback((changes: EdgeChange<ProcessFlowCanvasEdge>[]) => {
+  };
+  const handleEdgesChange = (changes: EdgeChange<ProcessFlowCanvasEdge>[]) => {
     setEdges((current) => applyEdgeChanges(changes, current));
-  }, []);
+  };
 
-  const mutateNodes = useCallback(
-    async (mutations: Array<Record<string, unknown>>) => {
-      return request<BatchMutationResult<ProcessFlowFull['nodes'][number]>>(
-        `/api/process-flows/${processFlow.id}/nodes`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mutations }),
-        },
-        'Failed to mutate process flow nodes',
-      );
-    },
-    [processFlow.id, request],
-  );
-
-  const mutateEdges = useCallback(
-    async (mutations: Array<Record<string, unknown>>) => {
-      return request<BatchMutationResult<ProcessFlowFull['edges'][number]>>(
-        `/api/process-flows/${processFlow.id}/edges`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mutations }),
-        },
-        'Failed to mutate process flow edges',
-      );
-    },
-    [processFlow.id, request],
-  );
-
-  const handleCreateNode = useCallback(
-    async (type: ProcessFlowCanvasNode['type']) => {
-      try {
-        const offset = nodes.length * 24;
-        const created = await request<ProcessFlowFull['nodes'][number]>(
-          `/api/process-flows/${processFlow.id}/nodes`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type,
-              position: { x: 120 + offset, y: 120 + offset / 2 },
-              data: { label: `New ${type}` },
-            }),
-          },
-          'Failed to create process flow node',
-        );
-
-        setNodes((current) => mergeCanvasNode(current, created));
-        setSelection({ kind: 'node', id: created.id });
-        await handleValidate();
-      } catch {
-        // request() already records a user-visible error message; swallow to avoid unhandled rejection noise.
-      }
-    },
-    [handleValidate, nodes.length, processFlow.id, request],
-  );
-
-  const handleSaveNode = useCallback(
-    async (nodeId: string, changes: Record<string, unknown>) => {
-      const result = await mutateNodes([{ action: 'update', id: nodeId, payload: changes }]);
-      setNodes((current) => result.updated.reduce((acc, item) => mergeCanvasNode(acc, item), current));
-      await handleValidate();
-    },
-    [mutateNodes, handleValidate],
-  );
-
-  const handleDeleteNode = useCallback(
-    async (nodeId: string) => {
-      await mutateNodes([{ action: 'delete', id: nodeId }]);
-      setNodes((current) => current.filter((node) => node.id !== nodeId));
-      setEdges((current) => current.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
-      setSelection(initialSelection);
-      await handleValidate();
-    },
-    [mutateNodes, handleValidate],
-  );
-
-  const handleSaveEdge = useCallback(
-    async (edgeId: string, changes: Record<string, unknown>) => {
-      const result = await mutateEdges([{ action: 'update', id: edgeId, payload: changes }]);
-      setEdges((current) => result.updated.reduce((acc, item) => mergeCanvasEdge(acc, item), current));
-      await handleValidate();
-    },
-    [mutateEdges, handleValidate],
-  );
-
-  const handleDeleteEdge = useCallback(
-    async (edgeId: string) => {
-      await mutateEdges([{ action: 'delete', id: edgeId }]);
-      setEdges((current) => current.filter((edge) => edge.id !== edgeId));
-      setSelection(initialSelection);
-      await handleValidate();
-    },
-    [mutateEdges, handleValidate],
-  );
-
-  const handleConnect = useCallback(
-    async (connection: Connection) => {
-      if (!connection.source || !connection.target) return;
-      const created = await request<ProcessFlowFull['edges'][number]>(
-        `/api/process-flows/${processFlow.id}/edges`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'flow',
-            source_node_id: connection.source,
-            target_node_id: connection.target,
-            data: null,
-          }),
-        },
-        'Failed to create process flow edge',
-      );
-
-      setEdges((current) => mergeCanvasEdge(current, created));
-      setSelection({ kind: 'edge', id: created.id });
-      await handleValidate();
-    },
-    [processFlow.id, request, handleValidate],
-  );
-
-  const handleNodeDragStop = useCallback(
-    async (_: unknown, node: ProcessFlowCanvasNode) => {
-      await mutateNodes([{ action: 'update', id: node.id, payload: { position: node.position } }]);
-    },
-    [mutateNodes],
-  );
-
-  const handleNodesDelete = useCallback(
-    async (deleted: ProcessFlowCanvasNode[]) => {
-      if (deleted.length === 0) return;
-      await mutateNodes(deleted.map((node) => ({ action: 'delete', id: node.id })));
-      setEdges((current) =>
-        current.filter((edge) => !deleted.some((node) => node.id === edge.source || node.id === edge.target)),
-      );
-      setSelection(initialSelection);
-      await handleValidate();
-    },
-    [mutateNodes, handleValidate],
-  );
-
-  const handleEdgesDelete = useCallback(
-    async (deleted: ProcessFlowCanvasEdge[]) => {
-      if (deleted.length === 0) return;
-      await mutateEdges(deleted.map((edge) => ({ action: 'delete', id: edge.id })));
-      setSelection(initialSelection);
-      await handleValidate();
-    },
-    [mutateEdges, handleValidate],
-  );
-
-  const handleSaveFlow = useCallback(
-    async (changes: { name?: string; description?: string | null; context_markdown?: string | null }) => {
-      const updated = await request<ProcessFlow>(
-        `/api/process-flows/${processFlow.id}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(changes),
-        },
-        'Failed to update process flow',
-      );
-
-      setProcessFlow((current) => ({ ...current, ...updated }));
-    },
-    [processFlow.id, request],
-  );
-
-  const handleAutolayout = useCallback(async () => {
+  const handleCreateNode = async (type: ProcessFlowNode['type']) => {
+    const id = `n_${crypto.randomUUID()}`;
     try {
-      const layouted = await request<{ nodes: ProcessFlowFull['nodes']; edges: ProcessFlowFull['edges'] }>(
-        `/api/process-flows/${processFlow.id}/layout`,
-        { method: 'POST' },
-        'Failed to auto-layout process flow',
-      );
-
-      setNodes((layouted.nodes ?? []).map((node) => ({ ...mergeCanvasNode([], node)[0], selected: false })));
-      setEdges((layouted.edges ?? []).map((edge) => ({ ...mergeCanvasEdge([], edge)[0], selected: false })));
-      await handleValidate();
+      await saveGraph((flow) => ({
+        nodes: [
+          ...flow.nodes,
+          {
+            id,
+            process_flow_id: flow.id,
+            type,
+            position: { x: 120 + flow.nodes.length * 24, y: 120 + flow.nodes.length * 12 },
+            data: { label: `New ${type}` },
+          },
+        ],
+        edges: flow.edges,
+      }));
+      setSelection({ kind: 'node', id });
     } catch {
-      // request() already records a user-visible error message; swallow to avoid unhandled rejection noise.
+      // The shared request displays the error.
     }
-  }, [handleValidate, processFlow.id, request]);
+  };
+
+  const handleSaveNode = (nodeId: string, changes: Partial<Pick<ProcessFlowNode, 'type' | 'position' | 'data'>>) =>
+    saveGraph((flow) => ({
+      nodes: flow.nodes.map((node) =>
+        node.id === nodeId
+          ? {
+              ...node,
+              ...changes,
+              data: { ...node.data, ...changes.data },
+            }
+          : node,
+      ),
+      edges: flow.edges,
+    }));
+
+  const handleSaveEdge = (edgeId: string, changes: Pick<ProcessFlowEdge, 'type' | 'data'>) =>
+    saveGraph((flow) => ({
+      nodes: flow.nodes,
+      edges: flow.edges.map((edge) =>
+        edge.id === edgeId
+          ? {
+              ...edge,
+              ...changes,
+              data: { ...edge.data, ...changes.data },
+            }
+          : edge,
+      ),
+    }));
+
+  const deleteFromCanvas = async (nodeIds: string[], edgeIds: string[]) => {
+    const removedNodes = new Set(nodeIds);
+    const removedEdges = new Set(edgeIds);
+    await saveGraph((flow) => ({
+      nodes: flow.nodes.filter((node) => !removedNodes.has(node.id)),
+      edges: flow.edges.filter(
+        (edge) =>
+          !removedEdges.has(edge.id) &&
+          !removedNodes.has(edge.source_node_id) &&
+          !removedNodes.has(edge.target_node_id),
+      ),
+    }));
+    setSelection(initialSelection);
+  };
+
+  const handleConnect = async ({ source, target }: Connection) => {
+    if (!source || !target) return;
+    const id = `e_${crypto.randomUUID()}`;
+    try {
+      await saveGraph((flow) => ({
+        nodes: flow.nodes,
+        edges: [
+          ...flow.edges,
+          {
+            id,
+            process_flow_id: flow.id,
+            type: 'flow',
+            source_node_id: source,
+            target_node_id: target,
+            data: null,
+          },
+        ],
+      }));
+      setSelection({ kind: 'edge', id });
+    } catch {
+      // The shared request displays the error.
+    }
+  };
+
+  const handleSaveFlow = (changes: Pick<FlowChanges, 'name' | 'description' | 'context_markdown'>) =>
+    saveFlow(() => changes);
 
   const handleDeleteFlow = useCallback(async () => {
     await request(
@@ -310,11 +238,11 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
     <div className="flex h-[calc(100vh-var(--header-height))] min-h-0 flex-col bg-background">
       <ProcessFlowToolbar
         name={processFlow.name}
-        warningCount={validation?.warnings.length ?? 0}
+        warningCount={processFlow.validation.warnings.length}
         validationOpen={validationOpen}
         onCreateNode={handleCreateNode}
-        onAutolayout={handleAutolayout}
-        onToggleValidation={handleToggleValidation}
+        onAutolayout={() => void saveFlow(() => ({ layout: 'auto' })).catch(() => {})}
+        onToggleValidation={() => setValidationOpen((open) => !open)}
         onOpenContext={() => setContextOpen(true)}
         onOpenMcpSetup={() => setMcpSetupOpen(true)}
         onRefresh={refreshProcessFlow}
@@ -330,13 +258,17 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
             edges={edges}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
-            onNodeDragStop={handleNodeDragStop}
+            onNodeDragStop={(_, node) => void handleSaveNode(node.id, { position: node.position }).catch(() => {})}
             onConnect={handleConnect}
             onNodeClick={(nodeId) => setSelection({ kind: 'node', id: nodeId })}
             onEdgeClick={(edgeId) => setSelection({ kind: 'edge', id: edgeId })}
             onPaneClick={() => setSelection(initialSelection)}
-            onNodesDelete={handleNodesDelete}
-            onEdgesDelete={handleEdgesDelete}
+            onDelete={({ nodes: deletedNodes, edges: deletedEdges }) =>
+              void deleteFromCanvas(
+                deletedNodes.map(({ id }) => id),
+                deletedEdges.map(({ id }) => id),
+              ).catch(() => {})
+            }
             onCreateNode={handleCreateNode}
           />
         </div>
@@ -346,14 +278,14 @@ export function ProcessFlowScreen({ initialProcessFlow }: { initialProcessFlow: 
             <ProcessFlowInspector
               selection={selected}
               onSaveNode={handleSaveNode}
-              onDeleteNode={handleDeleteNode}
+              onDeleteNode={(id) => deleteFromCanvas([id], [])}
               onSaveEdge={handleSaveEdge}
-              onDeleteEdge={handleDeleteEdge}
+              onDeleteEdge={(id) => deleteFromCanvas([], [id])}
             />
           </div>
           {validationOpen ? (
             <div className="shrink-0 border-t px-4 py-4">
-              <ProcessFlowValidationPanel validation={validation} />
+              <ProcessFlowValidationPanel validation={processFlow.validation} />
             </div>
           ) : null}
         </aside>

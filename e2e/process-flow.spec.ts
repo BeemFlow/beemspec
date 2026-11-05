@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import {
   connectNodes,
   E2E_NODE_APPROVED_ID,
@@ -7,6 +7,12 @@ import {
   loginAsOwner,
   resetE2EState,
 } from './helpers';
+
+function waitForSave(page: Page) {
+  return page.waitForResponse(
+    (response) => /\/api\/process-flows\/[^/]+$/.test(response.url()) && response.request().method() === 'PUT',
+  );
+}
 
 test.beforeEach(async ({ page }) => {
   await resetE2EState();
@@ -47,12 +53,7 @@ test('can create, open, and edit a process flow through the UI', async ({ page }
   await page.getByRole('button', { name: 'Validate' }).click();
   await expect(page.getByText('Validation')).toBeVisible();
 
-  const autolayoutResponse = page.waitForResponse(
-    (response) =>
-      response.url().includes('/layout') &&
-      response.request().method() === 'POST' &&
-      response.url().includes('/api/process-flows/'),
-  );
+  const autolayoutResponse = waitForSave(page);
   await page.getByRole('button', { name: 'Auto-layout' }).click();
   expect((await autolayoutResponse).ok()).toBeTruthy();
   await page.reload();
@@ -84,25 +85,16 @@ test('supports a full process-flow journey from creation through persistence and
   await page
     .getByPlaceholder(/Use this space to capture durable operational context for this process flow\./)
     .fill('Critical order escalations must reach operations within 15 minutes.');
-  await page.getByRole('button', { name: 'Save' }).click();
+  const [contextSave] = await Promise.all([waitForSave(page), page.getByRole('button', { name: 'Save' }).click()]);
+  expect(contextSave.ok()).toBe(true);
 
-  const firstNodeResponse = page.waitForResponse(
-    (response) =>
-      response.url().includes('/api/process-flows/') &&
-      response.url().includes('/nodes') &&
-      response.request().method() === 'POST',
-  );
+  const firstNodeResponse = waitForSave(page);
   await page.getByRole('button', { name: 'Step', exact: true }).click();
-  const firstNode = await (await firstNodeResponse).json();
+  const firstNode = (await (await firstNodeResponse).json()).nodes.at(-1);
 
-  const secondNodeResponse = page.waitForResponse(
-    (response) =>
-      response.url().includes('/api/process-flows/') &&
-      response.url().includes('/nodes') &&
-      response.request().method() === 'POST',
-  );
+  const secondNodeResponse = waitForSave(page);
   await page.getByRole('button', { name: 'Step', exact: true }).click();
-  const secondNode = await (await secondNodeResponse).json();
+  const secondNode = (await (await secondNodeResponse).json()).nodes.at(-1);
 
   const newStepNode = page.getByTestId('processflow-node-step').filter({ hasText: 'New step' }).nth(1);
   await expect(newStepNode).toBeVisible();
@@ -111,45 +103,22 @@ test('supports a full process-flow journey from creation through persistence and
   await page.getByLabel('Label').fill('Resolve escalation');
   await page.getByLabel('Systems').fill('Zendesk\nSlack');
   await page.getByLabel('Frequency').fill('~20/day');
-  await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        response.url().includes('/api/process-flows/') &&
-        response.url().includes('/nodes') &&
-        response.request().method() === 'PUT',
-    ),
-    page.getByRole('button', { name: 'Save Node' }).click(),
-  ]);
+  await Promise.all([waitForSave(page), page.getByRole('button', { name: 'Save Node' }).click()]);
 
-  await connectNodes(
-    page,
-    page.getByTestId(`processflow-handle-source-${firstNode.id}`),
-    page.getByTestId(`processflow-handle-target-${secondNode.id}`),
-  );
+  await Promise.all([waitForSave(page), page.getByRole('button', { name: 'Auto-layout' }).click()]);
+  await page.getByRole('button', { name: 'Fit View' }).press('Enter');
+  const sourceHandle = page.getByTestId(`processflow-handle-source-${firstNode.id}`);
+  const targetHandle = page.getByTestId(`processflow-handle-target-${secondNode.id}`);
+  await expect(sourceHandle).toBeInViewport();
+  await expect(targetHandle).toBeInViewport();
+  const [connected] = await Promise.all([waitForSave(page), connectNodes(page, sourceHandle, targetHandle)]);
+  expect(connected.ok()).toBe(true);
   await page.getByRole('group', { name: `Edge from ${firstNode.id} to ${secondNode.id}` }).click({ force: true });
   await page.getByLabel('Condition').fill('high priority customer');
-  await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        response.url().includes('/api/process-flows/') &&
-        response.url().includes('/edges') &&
-        response.request().method() === 'PUT',
-    ),
-    page.getByRole('button', { name: 'Save Edge' }).click(),
-  ]);
+  await Promise.all([waitForSave(page), page.getByRole('button', { name: 'Save Edge' }).click()]);
 
   await page.getByRole('button', { name: 'Validate' }).click();
   await expect(page.getByText('Validation')).toBeVisible();
-
-  await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        response.url().includes('/api/process-flows/') &&
-        response.url().includes('/layout') &&
-        response.request().method() === 'POST',
-    ),
-    page.getByRole('button', { name: 'Auto-layout' }).click(),
-  ]);
 
   await page.reload();
   await expect(page.getByText('Order Escalation Ops')).toBeVisible();
@@ -178,14 +147,7 @@ test('can edit and persist operational metadata for nodes and edges', async ({ p
   await page.getByLabel('Frequency').fill('~200/day');
   await page.getByLabel('Est. Duration').fill('5-10 min');
   await page.getByLabel('Time Constraint').fill('must complete within 48h');
-  await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        response.url().includes(`/api/process-flows/${E2E_PROCESS_FLOW_ID}/nodes`) &&
-        response.request().method() === 'PUT',
-    ),
-    page.getByRole('button', { name: 'Save Node' }).click(),
-  ]);
+  await Promise.all([waitForSave(page), page.getByRole('button', { name: 'Save Node' }).click()]);
 
   await page.reload();
   await page.getByTestId('processflow-node-step').filter({ hasText: 'Receive invoice' }).first().click();
@@ -198,14 +160,7 @@ test('can edit and persist operational metadata for nodes and edges', async ({ p
     .click({ force: true });
   await expect(page.getByText('Edge Details')).toBeVisible();
   await page.getByLabel('Condition').fill('invoice total > $10,000');
-  await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        response.url().includes(`/api/process-flows/${E2E_PROCESS_FLOW_ID}/edges`) &&
-        response.request().method() === 'PUT',
-    ),
-    page.getByRole('button', { name: 'Save Edge' }).click(),
-  ]);
+  await Promise.all([waitForSave(page), page.getByRole('button', { name: 'Save Edge' }).click()]);
 
   await page.reload();
   await page
@@ -221,39 +176,21 @@ test('can delete an edge and remove a newly created node', async ({ page }) => {
     .getByRole('group', { name: `Edge from ${E2E_NODE_RECEIVE_ID} to ${E2E_NODE_APPROVED_ID}` })
     .click({ force: true });
   await expect(page.getByText('Edge Details')).toBeVisible();
-  await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        response.url().includes(`/api/process-flows/${E2E_PROCESS_FLOW_ID}/edges`) &&
-        response.request().method() === 'PUT',
-    ),
-    page.getByRole('button', { name: 'Delete' }).click(),
-  ]);
+  await Promise.all([waitForSave(page), page.getByRole('button', { name: 'Delete' }).click()]);
 
   await page.reload();
   await expect(
     page.getByRole('group', { name: `Edge from ${E2E_NODE_RECEIVE_ID} to ${E2E_NODE_APPROVED_ID}` }),
   ).toHaveCount(0);
 
-  const createNodeResponse = page.waitForResponse(
-    (response) =>
-      response.url().includes(`/api/process-flows/${E2E_PROCESS_FLOW_ID}/nodes`) &&
-      response.request().method() === 'POST',
-  );
+  const createNodeResponse = waitForSave(page);
   await page.getByRole('button', { name: 'Step', exact: true }).click();
-  const createdNode = await (await createNodeResponse).json();
+  const createdNode = (await (await createNodeResponse).json()).nodes.at(-1);
 
   await expect(page.getByTestId('processflow-node-step').filter({ hasText: 'New step' }).first()).toBeVisible();
   await page.getByTestId('processflow-node-step').filter({ hasText: 'New step' }).first().click();
   await expect(page.getByText('Node Details')).toBeVisible();
-  await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        response.url().includes(`/api/process-flows/${E2E_PROCESS_FLOW_ID}/nodes`) &&
-        response.request().method() === 'PUT',
-    ),
-    page.getByRole('button', { name: 'Delete' }).click(),
-  ]);
+  await Promise.all([waitForSave(page), page.getByRole('button', { name: 'Delete' }).click()]);
 
   await page.reload();
   await expect(page.getByTestId('processflow-node-step').filter({ hasText: 'New step' })).toHaveCount(0);
@@ -267,4 +204,29 @@ test('malformed persisted flow data does not crash the process flow page', async
 
   await expect(page.getByText('Accounts Payable')).toBeVisible();
   await expect(page.getByText('Untitled')).toBeVisible();
+});
+
+test('the same signed embed shows a document after its source changes', async ({ page, browser }) => {
+  const api = `/api/process-flows/${E2E_PROCESS_FLOW_ID}`;
+  const share = await page.request.post(`${api}/shares`);
+  expect(share.ok()).toBe(true);
+  const { url } = await share.json();
+  const context = await browser.newContext();
+  try {
+    const embed = await context.newPage();
+    await embed.goto(url);
+    await expect(embed.getByText('Receive invoice')).toBeVisible();
+    const current = await (await page.request.get(api)).json();
+    const saved = await page.request.put(api, {
+      data: {
+        expected_revision: current.diagram_revision,
+        mermaid_source: current.mermaid_source.replace('Receive invoice', 'Confirm invoice'),
+      },
+    });
+    expect(saved.ok()).toBe(true);
+    await embed.reload();
+    await expect(embed.getByText('Confirm invoice')).toBeVisible();
+  } finally {
+    await context.close();
+  }
 });

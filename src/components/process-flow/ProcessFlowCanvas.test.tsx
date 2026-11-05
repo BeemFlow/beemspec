@@ -46,8 +46,7 @@ describe('ProcessFlowCanvas', () => {
         onNodeClick={vi.fn()}
         onEdgeClick={vi.fn()}
         onPaneClick={vi.fn()}
-        onNodesDelete={vi.fn()}
-        onEdgesDelete={vi.fn()}
+        onDelete={vi.fn()}
         onCreateNode={onCreateNode}
       />,
     );
@@ -68,8 +67,7 @@ describe('ProcessFlowCanvas', () => {
     const onNodeClick = vi.fn();
     const onEdgeClick = vi.fn();
     const onPaneClick = vi.fn();
-    const onNodesDelete = vi.fn();
-    const onEdgesDelete = vi.fn();
+    const onDelete = vi.fn();
 
     const { container } = render(
       <ProcessFlowCanvas
@@ -89,8 +87,7 @@ describe('ProcessFlowCanvas', () => {
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
-        onNodesDelete={onNodesDelete}
-        onEdgesDelete={onEdgesDelete}
+        onDelete={onDelete}
         onCreateNode={vi.fn()}
       />,
     );
@@ -117,8 +114,7 @@ describe('ProcessFlowCanvas', () => {
     props.onNodeClick?.('event', { id: 'node-1' });
     props.onEdgeClick?.('event', { id: 'edge-1' });
     props.onPaneClick?.();
-    props.onNodesDelete?.([{ id: 'node-1' }]);
-    props.onEdgesDelete?.([{ id: 'edge-1' }]);
+    props.onDelete?.({ nodes: [{ id: 'node-1' }], edges: [{ id: 'edge-1' }] });
 
     expect(onNodesChange).toHaveBeenCalledWith(['node-change']);
     expect(onEdgesChange).toHaveBeenCalledWith(['edge-change']);
@@ -127,8 +123,7 @@ describe('ProcessFlowCanvas', () => {
     expect(onNodeClick).toHaveBeenCalledWith('node-1');
     expect(onEdgeClick).toHaveBeenCalledWith('edge-1');
     expect(onPaneClick).toHaveBeenCalledTimes(1);
-    expect(onNodesDelete).toHaveBeenCalledWith([{ id: 'node-1' }]);
-    expect(onEdgesDelete).toHaveBeenCalledWith([{ id: 'edge-1' }]);
+    expect(onDelete).toHaveBeenCalledWith({ nodes: [{ id: 'node-1' }], edges: [{ id: 'edge-1' }] });
   });
 
   it('disables editor-only chrome and interactions in viewer mode', () => {
